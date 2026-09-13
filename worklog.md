@@ -1119,3 +1119,82 @@ Stage Summary:
 - Acceptance: 6/6 original criteria pass (Select width, content max-width, card padding, table styling, sidebar width, premium feel).
 - Phase status: F5 UI/UX Desktop Polish now 1/2 (F5-S1 ✅). Next: F5-S2 (Forms + Supplier Edit + animations).
 - Artifacts committed: Select fix, AppShell max-width + sidebar var, globals.css (--sidebar-width + print + Firefox), desktop-sidebar var usage, table.tsx padding + bg, DataTable maxHeight + shadow, CartTable alignment, customers + dashboard Card consistency.
+
+---
+Task ID: F4-S1
+Agent: Z.ai Code (main)
+Task: Session F4-S1 — Reports Enhancement Part 1 (Core Reports). Enhance Cash Book + create Product Movement + standalone Customer/Supplier Ledger reports. All with date range, CSV export, print, summary cards, responsive mobile/desktop. First session of Phase F4 (Reports Enhancement).
+
+Work Log:
+- Read REVIEW_ISSUES.md F4-S1 spec (Issue 19) + comprehensive Explore agent audit of all 10 existing reports + CSV utility + DateRangePicker + print CSS.
+- Critical insights:
+    - Cash Book API already had running balance + summary + date range — only UI lacked DateRangePicker, CSV, Print, mobile cards.
+    - Customer + Supplier ledger endpoints existed at `/api/{customers,suppliers}/[id]/ledger` but hardcode partyId path param + no date filtering.
+    - Product Movement was entirely greenfield — no existing endpoint. Sources: PurchaseItem (IN) + SaleItem where lineType=PRODUCT (OUT).
+    - Reusable infra: `exportToCSV`, `DateRangePicker`, `DataTable`, `computeOnHand`, `@media print` CSS (from F5-S1) with `data-print-hidden` escape hatch.
+    - No mobile card rendering pattern existed for reports — net-new.
+
+- Built 3 new API endpoints:
+    - `GET /api/reports/customer-ledger?partyId=&from=&to=` — opening balance computed from ALL transactions before `from` (customer.openingBalance + Σsales before from − Σreceipts before from); display-window entries (OPENING + SALE debit + RECEIPT credit) with running balance; summary with opening/totalDebit/totalCredit/closing + Display fields.
+    - `GET /api/reports/supplier-ledger?partyId=&from=&to=` — same pattern: opening = supplier.openingBalance + Σpurchases before from − Σpayments before from; entries OPENING + PURCHASE debit + PAYMENT credit.
+    - `GET /api/reports/product-movement?productId=&from=&to=` — union PurchaseItem (IN, ref=purchase.invoiceNo, party=supplier.name) + SaleItem where lineType=PRODUCT (OUT, ref=sale.invoiceNo, party=customer.name); opening stock per product via new `computeOnHandAt(tx, tenantId, productId, isSerialised, at)` helper (date-filtered variant of `computeOnHand`); running stock balance per product; per-product summary (opening/totalIn/totalOut/closing) + overall summary.
+
+- Added `computeOnHandAt` to `src/lib/onhand.ts` — date-filtered variant that computes stock as of a specific date (for product movement opening balance). For serialised: ΣPurchaseItem.qty (purchase.date < at) − ΣSaleItem.qty (sale.date < at). For non-serialised: same formula. Uses purchase.date / sale.date (parent dates) not createdAt.
+
+- Enhanced Cash Book page (`/accounting/cash-book`):
+    - Switched from single `<Input type="date">` to `<DateRangePicker>` (Today / This month / 30d presets + Apply button).
+    - Added CSV export button (maps entries to clean CSV shape: date, type, reference, narration, in, out, balance).
+    - Added Print button (`window.print()` + `data-print-hidden` on toolbar).
+    - Added mobile card fallback (`<ul className="sm:hidden">` with type badge + ref + amount + balance per card).
+    - Print-only header (`hidden print:block`) showing "Cash Book" + period.
+    - Upgraded table to premium styling (bg-muted/40 header, px-4 py-3 cells, hover:bg-muted/30 rows).
+
+- Built Customer Ledger report page (`/reports/customer-ledger`):
+    - Party picker (`<Select>` populated from `/api/customers` — shows name + phone + balance).
+    - DateRangePicker for window.
+    - Apply button triggers fetch with partyId + from + to.
+    - 4 summary cards (Opening / Total debit / Total credit / Closing) with color coding (amber=debit, emerald=credit).
+    - CSV export + Print button.
+    - Desktop table (Date / Type / Reference / Mode / Narration / Debit / Credit / Balance) with premium styling + mobile card fallback.
+    - Empty state when no customer selected.
+
+- Built Supplier Ledger report page (`/reports/supplier-ledger`) — mirrors customer ledger exactly.
+
+- Built Product Movement report page (`/reports/product-movement`):
+    - Product picker (optional — leave blank for all products; populated from `/api/products` with name + sku + onHand).
+    - DateRangePicker.
+    - 4 summary cards (Products / Movements / Total IN / Total OUT).
+    - When all-products mode: per-product summary table (Product / Tracking / Opening / IN / OUT / Closing).
+    - Movements table (Date / Type / Reference / Party / Product (if all-mode) / Qty / Unit price / Line total / Stock balance) with IN/OUT badges (emerald IN with ArrowDownCircle, red OUT with ArrowUpCircle).
+    - CSV export + Print + mobile cards.
+
+- Updated reports hub (`/reports/page.tsx`):
+    - Added Product Movement card (ArrowLeftRight icon, phase "F4", desc "All IN/OUT movements per product with running stock").
+    - Updated description "All 11 reports" (was "All 10 reports").
+    - Now 11 report cards in the grid.
+
+- Updated REVIEW_ISSUES.md: marked F4-S1 ✅ Complete.
+
+Acceptance criteria (all pass — verified via curl + HTML render checks):
+- [x] Cash Book: DateRangePicker + CSV export + Print + mobile cards + running balance (already had running balance in API; now exposed via range picker instead of single date).
+- [x] Customer Ledger API: returns opening (computed from before-from transactions) + display-window entries + running balance + summary. Verified: opening=৳12,000 + debit=৳12,000 + credit=৳0 + closing=৳24,000 for City Security Solutions.
+- [x] Supplier Ledger API: same pattern. Verified: opening=৳15,000 + debit=৳15,000 + credit=৳0 + closing=৳30,000 for Dahua Distributor BD.
+- [x] Customer Ledger without partyId returns 400 "Missing partyId."
+- [x] Product Movement API (all products): returns per-product summary + movements with running stock. Verified with test data: RG59 cable opening=0, IN=10 (purchase), OUT=3 (sale), closing=7; 2 movements with refs PUR-260913-448 + INV-260913-892 + party names.
+- [x] Product Movement API (single product): filters to one product.
+- [x] Product Movement API (empty range): returns 0 movements gracefully.
+- [x] HTML render: reports hub has "Product Movement" + "11 reports"; cash book has DateRangePicker Apply; customer/supplier ledger pages have party Select; product movement page has product Select.
+- [x] All report pages have Print button (window.print + data-print-hidden on toolbar) + CSV export button.
+- [x] All report pages have mobile card fallback (sm:hidden ul + hidden sm:block table).
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning).
+
+Stage Summary:
+- Deliverables: 3 new API endpoints (customer-ledger, supplier-ledger, product-movement), 1 new helper (`computeOnHandAt` in onhand.ts), 4 UI pages (cash book enhanced, customer ledger, supplier ledger, product movement), reports hub updated (11 cards). REVIEW_ISSUES.md updated.
+- Key decision: created new `/api/reports/customer-ledger` + `/api/reports/supplier-ledger` endpoints instead of adding `?from`+`?to` to the existing `/api/{customers,suppliers}/[id]/ledger` endpoints — keeps the per-party detail-page behavior untouched while the standalone reports have their own date-filtered logic.
+- Key decision: opening balance computed from ALL transactions before `from` (not just `party.openingBalance`) so the report window shows accurate running balance even when the party has years of history before the selected `from` date.
+- Key decision: Product Movement opening stock uses `computeOnHandAt(db, tenantId, productId, isSerialised, fromDate)` — date-filtered variant of `computeOnHand`. For serialised products, uses the same purchase/sale qty formula (works because serialised products always have qty = serial count per the purchase API).
+- Key decision: mobile card rendering pattern is `<div className="hidden sm:block">{table}</div>` + `<ul className="sm:hidden space-y-2">{cards}</ul>` — table on desktop, cards on mobile. Net-new pattern (no existing report had it).
+- Key decision: `data-print-hidden` attribute on toolbar elements (DateRangePicker, CSV button, Print button, Back link) so they don't appear in printed output. Plus `hidden print:block` for print-only headers showing report title + period.
+- Acceptance: 5/5 original criteria pass (Cash Book enhanced, Product Movement new, Customer Ledger standalone, Supplier Ledger standalone, all with date range + CSV + print + summary cards).
+- Phase status: F4 Reports Enhancement now 1/2 (F4-S1 ✅). Next: F4-S2 (Detailed + Category Reports).
+- Artifacts committed: 3 API routes, computeOnHandAt helper, 4 UI pages (1 enhanced + 3 new), reports hub updated.

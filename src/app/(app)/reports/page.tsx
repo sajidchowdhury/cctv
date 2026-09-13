@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import {
   Boxes, ShoppingCart, PackagePlus, TrendingUp, BookOpen, Users, Truck,
-  Wallet, ArrowDownCircle, ArrowUpCircle, ReceiptText, Briefcase,
+  Wallet, ArrowDownCircle, ArrowUpCircle, ReceiptText, Briefcase, ArrowLeftRight,
 } from "lucide-react";
 
 const REPORTS = [
@@ -17,6 +17,7 @@ const REPORTS = [
   { href: "/reports/customer-ledger", title: "Customer Ledger", desc: "Party-wise all transactions + running balance", icon: Users, phase: "S14" },
   { href: "/reports/supplier-ledger", title: "Supplier Ledger", desc: "Party-wise all transactions + running balance", icon: Truck, phase: "S07" },
   { href: "/reports/cash-book", title: "Cash Book", desc: "Day-wise cash in/out with closing balance", icon: Wallet, phase: "S15" },
+  { href: "/reports/product-movement", title: "Product Movement", desc: "All IN/OUT movements per product with running stock", icon: ArrowLeftRight, phase: "F4" },
   { href: "/reports/income-expense", title: "Income / Expense", desc: "Account-head-wise summary (monthly)", icon: ReceiptText, phase: "S18" },
   { href: "/reports/salary-sheet", title: "Employee Salary Sheet", desc: "Monthly payroll summary", icon: Briefcase, phase: "S19" },
   { href: "/reports/warranty", title: "Warranty Expiry", desc: "Upcoming warranty ends by date window", icon: BookOpen, phase: "S19" },
@@ -25,7 +26,7 @@ const REPORTS = [
 export default function ReportsPage() {
   return (
     <div className="space-y-6">
-      <PageHeader title="Reports" description="All 10 reports, printable + CSV export, date-range filters (doc §5.3)." />
+      <PageHeader title="Reports" description="All 11 reports, printable + CSV export, date-range filters (doc §5.3)." />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {REPORTS.map((r) => {
           const Icon = r.icon;

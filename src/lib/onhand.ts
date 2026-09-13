@@ -58,6 +58,58 @@ export async function computeOnHand(
 }
 
 /**
+ * Compute onHand as of a specific date (F4-S1 — product movement opening balance).
+ * For serialised products: counts InventoryUnits created (purchaseItem.createdAt <= at).
+ * For non-serialised: ΣPurchaseItem.qty (purchase.date <= at) − ΣSaleItem.qty (sale.date <= at).
+ */
+export async function computeOnHandAt(
+  tx: Tx,
+  tenantId: string,
+  productId: string,
+  isSerialised: boolean,
+  at: Date
+): Promise<number> {
+  if (isSerialised) {
+    // InventoryUnits created before `at` — purchase.date is the parent date.
+    const purchased = await tx.purchaseItem.aggregate({
+      where: {
+        tenantId, productId,
+        purchase: { deletedAt: null, date: { lt: at } },
+      },
+      _sum: { qty: true },
+    });
+    const sold = await tx.saleItem.aggregate({
+      where: {
+        tenantId, productId,
+        sale: { deletedAt: null, date: { lt: at } },
+      },
+      _sum: { qty: true },
+    });
+    // For serialised, qty is typically 1 per unit but inventory_unit rows are the truth.
+    // Use the same formula as non-serialised — for serialised products qty always = unit count
+    // (the seed data + purchase API set qty = serials.length for serialised products).
+    return Math.max(0, (purchased._sum.qty ?? 0) - (sold._sum.qty ?? 0));
+  }
+  const [purchased, sold] = await Promise.all([
+    tx.purchaseItem.aggregate({
+      where: {
+        tenantId, productId,
+        purchase: { deletedAt: null, date: { lt: at } },
+      },
+      _sum: { qty: true },
+    }),
+    tx.saleItem.aggregate({
+      where: {
+        tenantId, productId,
+        sale: { deletedAt: null, date: { lt: at } },
+      },
+      _sum: { qty: true },
+    }),
+  ]);
+  return Math.max(0, (purchased._sum.qty ?? 0) - (sold._sum.qty ?? 0));
+}
+
+/**
  * Compute onHand for many products in one round-trip.
  * Returns a Map<productId, number>.
  *

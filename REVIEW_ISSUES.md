@@ -571,7 +571,7 @@ Service Tickets:
 
 ### Phase F4: Reports Enhancement (2 sessions)
 
-#### F4-S1: Report Suite — Part 1 (Core Reports)
+#### F4-S1: Report Suite — Part 1 (Core Reports) ✅ Complete
 - Cash Book: enhanced layout with running balance, print CSS
 - Product Movement: new report showing all IN/OUT per product with running stock
 - Customer Ledger: standalone report page with date range + print
