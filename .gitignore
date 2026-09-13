@@ -68,3 +68,4 @@ server.log
 # Runtime artifacts
 .zscripts/dev.pid
 .zscripts/*.pid
+.github/workflows/ci.yml

@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { formatBDT } from "@/lib/format";
 import { useTranslation } from "@/lib/lang-store";
+import { OnboardingBanner } from "@/components/layout/onboarding-banner";
 
 const STATUS_TONE: Record<string, string> = {
   ACTIVE: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
@@ -94,6 +95,9 @@ export default function DashboardPage() {
           </Button>
         }
       />
+
+      {/* Onboarding banner (S25) */}
+      <OnboardingBanner />
 
       {/* Stock snapshot */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

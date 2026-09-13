@@ -11,3 +11,4 @@ export { CartTable } from "./cart-table";
 export type { CartLine } from "./cart-table";
 export { ConfirmDialog } from "./confirm-dialog";
 export { TableSkeleton, CardGridSkeleton } from "./skeletons";
+export { OnboardingBanner } from "./onboarding-banner";

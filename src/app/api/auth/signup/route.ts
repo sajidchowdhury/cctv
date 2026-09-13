@@ -60,6 +60,29 @@ export async function POST(req: Request) {
     );
   }
 
+  // Email-change cooldown (doc §3.3): if this email was recently used as a
+  // CHANGE_EMAIL verification target (within 7 days), block reuse.
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const recentChangeEmail = await adminDb.emailVerification.findFirst({
+    where: {
+      email: normalizedEmail,
+      purpose: "CHANGE_EMAIL",
+      consumed: true,
+      createdAt: { gt: sevenDaysAgo },
+    },
+    select: { id: true },
+  });
+  if (recentChangeEmail) {
+    return NextResponse.json(
+      {
+        error:
+          "This email was recently changed away from another account. It will be available for reuse after a 7-day cooldown.",
+        code: "EMAIL_COOLDOWN",
+      },
+      { status: 409 }
+    );
+  }
+
   const passwordHash = await bcrypt.hash(password, 10);
   const otpCode = String(randomInt(100000, 999999));
   const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 min
