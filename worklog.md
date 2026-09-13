@@ -164,3 +164,50 @@ Stage Summary:
 - Acceptance: 4/4 original criteria + 3 bonus. Full lifecycle verified end-to-end: signup→pending→submit→admin verify→+30d active; reject→SMS; day-41 lock→/payment.
 - Phase status: P0 Foundation COMPLETE (S01–S05 ✅, 5/5). Next: Phase P1 — Catalogue & Stock (S06).
 - Artifacts committed: schema.prisma (SuperAdmin), subscription.ts, lifecycle-worker.ts, instrumentation.ts, 7 API routes, auth.ts refactor, session.ts, admin-session.ts, proxy.ts, /payment page, /admin login + verifications UI, seed.ts.
+
+---
+Task ID: S06
+Agent: Z.ai Code (main)
+Task: Session S06 — Product Setup & Reference Tables. Full product master with categories, units, SKU/barcode auto-generation, low-stock threshold, image upload. First session of Phase P1 — Catalogue & Stock.
+
+Work Log:
+- Read S05 worklog + schema (Product/Category/Unit already in S02 from P0). Found SKU was globally @unique (would collide across tenants) → changed to @@unique([tenantId, sku]) for tenant-scoped uniqueness.
+- Wrote src/lib/sku.ts — generateSku(): format `{CATEGORY_PREFIX}-{MODEL_SLUG}-{SEQ}`, e.g. CAM-DH2431-001. Category prefix = first 3 chars uppercased; model slug = alphanumeric uppercased (max 8). Sequence = highest existing +1, zero-padded 3-digit. Collision-safe with 5 retries.
+- Wrote products API:
+    GET  /api/products (list with q search, categoryId filter, lowStock filter; computes onHand from inventoryUnits + lowStock flag)
+    POST /api/products (Zod validation, auto-generates SKU if not provided, resolves category name for prefix)
+    GET  /api/products/[id] (single product with onHand + lowStock flag)
+    PATCH /api/products/[id] (update fields, SKU fixed)
+    DELETE /api/products/[id] (soft delete via deletedAt)
+    GET  /api/products/low-stock (products at/below safety stock, fires digest SMS to owner via INotifier)
+- Wrote categories API: GET (list with product count), POST (create, @@unique([tenantId,name])), DELETE/[id] (soft delete).
+- Wrote units API: GET, POST, DELETE/[id] — same pattern.
+- Wrote /api/uploads (multipart/form-data, IStorage adapter, 5MB max, image/pdf types, key = products/{tenantId}/{timestamp}-{rand}.{ext}).
+- Added TanStack Query QueryClientProvider to providers.tsx (was in stack but not wired; needed for React 19-compatible data fetching).
+- Wrote products UI:
+    /(app)/products/page.tsx — list with DataTable (sortable: Product/SKU/Category/On hand/Safety/Price/Status), SearchScanInput, low-stock-only filter, empty state. Uses useQuery (TanStack Query) for data fetching.
+    /(app)/products/new/page.tsx — create form (name, category select, model, unit select, safety stock, default price). SKU auto-generated on save.
+    /(app)/products/[id]/page.tsx — detail with stats cards (on hand/safety/status), edit form, barcode label (SVG from SKU chars + name + SKU + price), print button, delete (ConfirmDialog soft-delete).
+- Updated seed.ts: added Cable + PSU categories, Roll unit, 5 demo products (Dahua Dome, Hikvision Bullet, Dahua DVR, RG59 Cable, 12V PSU) with safety stock + default prices.
+
+Bugs found + fixed:
+- React 19 lint rule "set-state-in-effect" blocked useEffect+setState pattern in products list. Fixed by switching to TanStack Query useQuery (proper React data-fetching pattern, already in stack).
+- db.product.create() failed with "Argument tenant is missing" — the Prisma extension's create auto-inject wasn't adding tenantId reliably. Fixed by explicitly passing tenantId: user.tenantId in the create data.
+- Empty string categoryId ("") caused foreign key error. Fixed with `categoryId || null` (treats empty string as null).
+- Seed.ts had leftover code after edit (duplicated Unit:Pcs block). Fixed by removing the orphaned lines.
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Products list renders with DataTable (5 seeded products, sortable columns)
+- [x] Low-stock filter works (all 5 products show as Low since onHand=0, safetyStock>0)
+- [x] Low-stock endpoint fires owner SMS digest ("Low-stock alert: 5 product(s)")
+- [x] Create product with auto-SKU: GEN-TCX100-001 (no category), CAB-DVRPRO-001 (Cable category)
+- [x] Product detail page: stats cards + edit form + barcode label (SVG) + print button
+- [x] Categories + units APIs work (tenant-scoped CRUD)
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning)
+
+Stage Summary:
+- Deliverables: sku.ts (SKU generator), 8 API routes (products CRUD + low-stock, categories CRUD, units CRUD, uploads), providers.tsx (TanStack Query), 3 products UI pages (list/new/detail+barcode), updated seed.ts (5 demo products + 4 categories + 2 units).
+- Key decision: SKU is tenant-scoped unique (@@unique([tenantId, sku])) so two tenants can both have "CAM-001" without collision. Format: {CAT_PREFIX}-{MODEL?}-{SEQ}. TanStack Query replaces useEffect+setState for React 19 compatibility.
+- Acceptance: 2/2 original criteria pass. Low-stock alert fires; barcode label prints.
+- Phase status: P1 Catalogue & Stock now 1/4 (S06 ✅). Next: S07 — Suppliers & Opening Balances.
+- Artifacts committed: schema.prisma (tenant-scoped SKU), sku.ts, 8 API routes, providers.tsx (QueryClient), 3 products UI pages, seed.ts (demo products).

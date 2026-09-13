@@ -219,7 +219,7 @@ model Product {
   name          String
   categoryId    String?
   model         String?
-  sku           String   @unique // auto-generated, printable barcode label
+  sku           String   // auto-generated, printable barcode label (tenant-scoped unique)
   unitId        String? // Pcs | Box | Roll | Set (ref to Unit)
   safetyStock   Int      @default(0) // low-stock alert trigger threshold
   defaultPrice  Float?   // suggested retail, auto-fills Sales (doc §4.2)
@@ -236,6 +236,7 @@ model Product {
   saleItems     SaleItem[]
   quotationItems QuotationItem[]
 
+  @@unique([tenantId, sku])
   @@index([tenantId])
   @@index([tenantId, name])
   @@index([tenantId, sku])

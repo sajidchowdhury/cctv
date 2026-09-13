@@ -274,6 +274,8 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **Acceptance criteria:** product with qty below safety stock surfaces a low-stock alert; barcode label prints.
 
+**Status:** ✅ Complete (S06) — verified via curl API tests (create/list/low-stock/get) + Agent Browser (list with DataTable, detail with barcode label, edit form).
+
 ---
 
 ### Session S07 — Suppliers & Opening Balances
@@ -674,7 +676,7 @@ After each phase is complete:
 | Phase | Status | Sessions done | Pushed (commit) |
 |-------|--------|---------------|------------------|
 | P0 Foundation | ✅ Done (S01 ✅, S02 ✅, S03 ✅, S04 ✅, S05 ✅) | 5/5 | session(S05) |
-| P1 Catalogue & Stock | ☐ Not started | 0/4 | — |
+| P1 Catalogue & Stock | 🔄 In progress (S06 ✅) | 1/4 | session(S06) |
 | P2 Sales & Invoicing | ☐ Not started | 0/5 | — |
 | P3 Accounting | ☐ Not started | 0/2 | — |
 | P4 Employees & Payroll | ☐ Not started | 0/1 | — |
@@ -686,4 +688,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Phase P0 Foundation complete (S01–S05). Next: Phase P1 — Catalogue & Stock (Session S06).*
+*End of implementation plan. Phase P0 Foundation complete. Phase P1 in progress (S06 ✅). Next: S07 — Suppliers & Opening Balances.*

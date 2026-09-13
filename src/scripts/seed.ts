@@ -99,14 +99,58 @@ async function main() {
       update: {},
       create: { tenantId: tenant.id, name: "DVR/NVR" },
     });
-    console.log(`✓ Categories: Camera, DVR/NVR`);
+    const cableCat = await adminDb.category.upsert({
+      where: { tenantId_name: { tenantId: tenant.id, name: "Cable" } },
+      update: {},
+      create: { tenantId: tenant.id, name: "Cable" },
+    });
+    console.log(`✓ Categories: Camera, DVR/NVR, Cable`);
+
+    await adminDb.category.upsert({
+      where: { tenantId_name: { tenantId: tenant.id, name: "PSU" } },
+      update: {},
+      create: { tenantId: tenant.id, name: "PSU" },
+    });
 
     await adminDb.unit.upsert({
       where: { tenantId_name: { tenantId: tenant.id, name: "Pcs" } },
       update: {},
       create: { tenantId: tenant.id, name: "Pcs" },
     });
-    console.log(`✓ Unit: Pcs`);
+    await adminDb.unit.upsert({
+      where: { tenantId_name: { tenantId: tenant.id, name: "Roll" } },
+      update: {},
+      create: { tenantId: tenant.id, name: "Roll" },
+    });
+    const cameraCat = await adminDb.category.findFirst({ where: { tenantId: tenant.id, name: "Camera" } });
+    const dvrCat = await adminDb.category.findFirst({ where: { tenantId: tenant.id, name: "DVR/NVR" } });
+    const pcsUnit = await adminDb.unit.findFirst({ where: { tenantId: tenant.id, name: "Pcs" } });
+    const rollUnit = await adminDb.unit.findFirst({ where: { tenantId: tenant.id, name: "Roll" } });
+
+    // ── Demo products (S06) ─────────────────────────────────
+    const demoProducts = [
+      { name: "Dahua 4MP Dome Camera", cat: cameraCat?.id, model: "DH-IPC-HDBW2431R", unit: pcsUnit?.id, safety: 5, price: 3200 },
+      { name: "Hikvision 2MP Bullet Camera", cat: cameraCat?.id, model: "DS-2CE16D0T", unit: pcsUnit?.id, safety: 5, price: 2100 },
+      { name: "Dahua 8-Channel DVR", cat: dvrCat?.id, model: "DH-XVR5108H", unit: pcsUnit?.id, safety: 3, price: 6500 },
+      { name: "RG59 Coaxial Cable", cat: cableCat?.id, model: "RG59-90M", unit: rollUnit?.id, safety: 2, price: 1800 },
+      { name: "12V 5A Power Adapter", cat: null, model: "PSU-12V5A", unit: pcsUnit?.id, safety: 4, price: 450 },
+    ];
+    for (const p of demoProducts) {
+      const existing = await adminDb.product.findFirst({ where: { tenantId: tenant.id, name: p.name } });
+      if (existing) {
+        await adminDb.product.update({ where: { id: existing.id }, data: {
+          categoryId: p.cat ?? null, unitId: p.unit ?? null, model: p.model,
+          safetyStock: p.safety, defaultPrice: p.price,
+        }});
+      } else {
+        await adminDb.product.create({ data: {
+          tenantId: tenant.id, name: p.name, categoryId: p.cat ?? null, unitId: p.unit ?? null,
+          model: p.model, safetyStock: p.safety, defaultPrice: p.price,
+          sku: `${p.model?.slice(0,6).toUpperCase() ?? "GEN"}-001`,
+        }});
+      }
+    }
+    console.log(`✓ Demo products: ${demoProducts.length} seeded`);
 
     console.log(
       `\n✅ Tenant + users seeded.\n` +
