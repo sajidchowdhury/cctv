@@ -16,6 +16,7 @@ import { Plus, Trash2, Save, Loader2, ArrowLeft, Package, Wrench, RotateCcw, Era
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT } from "@/lib/format";
 import { useSession } from "next-auth/react";
+import { InlineEntityCreator } from "@/components/layout/inline-entity-creator";
 
 type SearchResult = {
   productId: string;
@@ -385,12 +386,33 @@ function NewSalePage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label>Customer</Label>
-              <Select value={customerId} onValueChange={setCustomerId}>
-                <SelectTrigger><SelectValue placeholder="Walk-in…" /></SelectTrigger>
-                <SelectContent>
-                  {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select value={customerId} onValueChange={setCustomerId}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="Walk-in…" /></SelectTrigger>
+                  <SelectContent>
+                    {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {/* F7-S1: inline customer creation */}
+                <InlineEntityCreator
+                  label="Customer"
+                  endpoint="/api/customers"
+                  bodyBuilder={(name, extra) => ({
+                    name,
+                    phone: extra.phone || null,
+                    type: "RETAIL",
+                    openingBalance: 0,
+                  })}
+                  extraFields={[
+                    { key: "phone", label: "Phone", placeholder: "01XXXXXXXXX" },
+                  ]}
+                  namePlaceholder="Customer name"
+                  onCreated={(c) => {
+                    setCustomers((cs) => [...cs, { id: c.id, name: c.name, phone: null }]);
+                    setCustomerId(c.id);
+                  }}
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Payment mode</Label>

@@ -27,7 +27,7 @@ export const POST = withTenant(async (user, req: Request) => {
     return NextResponse.json({ error: "Unit name required." }, { status: 422 });
   }
   try {
-    const unit = await db.unit.create({ data: { name: parsed.data.name }, select: { id: true, name: true } });
+    const unit = await db.unit.create({ data: { tenantId: user.tenantId!, name: parsed.data.name }, select: { id: true, name: true } });
     return NextResponse.json({ unit }, { status: 201 });
   } catch (err: any) {
     if (err?.code === "P2002") {

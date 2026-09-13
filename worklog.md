@@ -1373,3 +1373,62 @@ Stage Summary:
 - Acceptance: 5/5 original criteria pass (settings on Tenant model, admin panel section, /payment page reads settings, subscription lifecycle uses configurable fee via display, signup page mentions current fee).
 - Phase status: F6 Admin & Subscription COMPLETE (F6-S1, 1/1). Next per priority order: F7-S1 (Inline Category/Unit Creation + Misc Fixes).
 - Artifacts committed: schema migration (4 Tenant fields), 3 API routes, 1 admin page, 2 updated user pages, 1 nav link.
+
+---
+Task ID: F7-S1
+Agent: Z.ai Code (main)
+Task: Session F7-S1 — Inline Category/Unit Creation + Misc Fixes. Add inline "+ New" buttons next to category/unit dropdowns on the product form + customer dropdown on the sales form. Popover/modal creates the entity via API + auto-selects it. Completes Phase F7 (Reminders & Misc) + ALL 14 fix sessions.
+
+Work Log:
+- Read REVIEW_ISSUES.md F7-S1 spec (Issue 1) + existing categories/units API (both already have GET + POST) + product new/edit forms + sales new page customer Select.
+- Critical insight: the categories + units POST APIs had a pre-existing bug — they relied on the Prisma extension's `create` interceptor to auto-inject `tenantId`, but the interceptor wasn't firing for these models. The supplier POST (which works) explicitly passes `tenantId: user.tenantId!`. Fixed by adding explicit `tenantId` to the category + unit create calls.
+
+- Built reusable `InlineEntityCreator` component (`src/components/layout/inline-entity-creator.tsx`):
+    - Dialog-based popover (not a full page navigation).
+    - Props: label (e.g. "Category"), endpoint (e.g. "/api/categories"), bodyBuilder (function that takes name + extra fields → request body), onCreated (callback with the new entity), optional extraFields (for customer: phone), optional trigger (custom button).
+    - Creates the entity via POST, extracts the entity from the response (handles `data.category` / `data.unit` / `data.customer` shapes), calls onCreated, closes the dialog.
+    - Toast on success + error.
+    - Auto-focuses the name input on open.
+
+- Updated product NEW page (`products/new`):
+    - Added `InlineEntityCreator` next to the Category Select (Plus icon button).
+    - onCreated: appends the new category to the `categories` state + calls `onCategoryChange(c.id)` to auto-select it.
+    - Added `InlineEntityCreator` next to the Unit Select.
+    - onCreated: appends the new unit to the `units` state + sets `form.unitId` to the new unit's id.
+
+- Updated product EDIT page (`products/[id]`):
+    - Same inline category + unit creation buttons + onCreated handlers.
+
+- Updated sales NEW page (`sales/new`):
+    - Added `InlineEntityCreator` next to the Customer Select.
+    - Uses `extraFields` prop to add a Phone field (optional).
+    - bodyBuilder: `{ name, phone: extra.phone || null, type: "RETAIL", openingBalance: 0 }`.
+    - onCreated: appends the new customer to the `customers` state + sets `customerId` to the new customer's id.
+
+- Fixed pre-existing bug in categories + units POST APIs:
+    - `src/app/api/categories/route.ts`: added `tenantId: user.tenantId!` to `db.category.create({ data: { ... } })`.
+    - `src/app/api/units/route.ts`: added `tenantId: user.tenantId!` to `db.unit.create({ data: { ... } })`.
+    - Root cause: the Prisma extension's `create` interceptor (which should auto-inject `tenantId` from AsyncLocalStorage) wasn't firing for these models. The supplier POST (which works) explicitly passes `tenantId`. Now categories + units match that pattern.
+
+- Updated REVIEW_ISSUES.md: marked F7-S1 ✅ Complete.
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Inline category creation: + button next to Category dropdown on product new page. Agent Browser confirmed: `button "Create new category inline" [ref=e10]`.
+- [x] Inline unit creation: + button next to Unit dropdown. Agent Browser confirmed: `button "Create new unit inline" [ref=e13]`.
+- [x] Popover/modal form: Dialog opens with Name input + Create button + Cancel button. Agent Browser confirmed: `heading "New category"`, `textbox "Name *"`, `button "Create category"`.
+- [x] Auto-select: onCreated appends to the list + sets the form value.
+- [x] Same pattern for customer creation during sales: + button next to Customer Select on sales new page. Agent Browser confirmed: `button "Create new customer inline" [ref=e6]`.
+- [x] Customer dialog has extra Phone field.
+- [x] API fix: categories POST now returns 201 with `{ category: { id, name } }` (was 500 "Argument 'tenant' is missing"). Verified via curl: `{"category":{"id":"cmu07xuzv000fnnppzvwxc22q","name":"Test Inline Category F7"}}`.
+- [x] Units POST now returns 201 with `{ unit: { id, name } }`. Verified via curl: `{"unit":{"id":"cmu07xv60000hnnppk7jktrwe","name":"Test Unit F7"}}`.
+- [x] Customers POST works (was already working — explicitly passed tenantId). Verified: `{"customer":{"id":"cmu07xv80000jnnpp6km0evxj","name":"Test Inline Customer","phone":"01711112222"}}`.
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning).
+
+Stage Summary:
+- Deliverables: 1 reusable component (InlineEntityCreator), 3 pages updated (product new + edit + sales new with inline creation buttons), 2 API bug fixes (categories + units POST now explicitly pass tenantId). REVIEW_ISSUES.md updated.
+- Key decision: reusable `InlineEntityCreator` component rather than duplicating the Dialog + form + API call logic in 3 places. The `extraFields` prop makes it flexible enough for the customer case (which needs a phone field) without duplicating code.
+- Key decision: Dialog (popover) rather than inline expandable form. Dialog is cleaner — doesn't shift the form layout, works on mobile + desktop, and the shadcn Dialog component handles focus management + escape-to-close + backdrop click.
+- Key decision: the pre-existing categories/units POST bug is fixed by explicitly passing `tenantId` (matching the supplier POST pattern) rather than debugging why the Prisma extension's create interceptor isn't firing. The extension works for other models (supplier, customer, product) — likely a model-specific issue with how `Category` and `Unit` are registered. Explicit `tenantId` is the pragmatic fix.
+- Acceptance: 5/5 original criteria pass (inline category, inline unit, popover/modal, customer creation, misc fixes).
+- Phase status: F7 Reminders & Misc COMPLETE (F7-S1, 1/1). ALL 14 FIX SESSIONS COMPLETE (F1-S1 through F7-S1).
+- Artifacts committed: InlineEntityCreator component, 3 page updates, 2 API bug fixes.

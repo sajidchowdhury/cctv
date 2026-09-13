@@ -620,12 +620,13 @@ Service Tickets:
 
 ### Phase F7: Reminders & Misc (1 session)
 
-#### F7-S1: Inline Category/Unit Creation + Misc Fixes
+#### F7-S1: Inline Category/Unit Creation + Misc Fixes ✅ Complete
 - Inline category creation: "+ New" button next to category dropdown on product form
 - Inline unit creation: "+ New" button next to unit dropdown on product form
 - Popover/modal form: type name → create via API → select in dropdown
 - Same pattern for customer creation during sales (inline)
 - Any remaining misc fixes from the review
+- Fix: categories + units POST APIs now explicitly pass tenantId (pre-existing bug where Prisma extension's create interceptor wasn't injecting tenantId for these models)
 
 ---
 

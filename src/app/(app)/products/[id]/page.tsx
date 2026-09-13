@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, Save, Trash2, Printer, Loader2, AlertTriangle, ScanLine, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT } from "@/lib/format";
+import { InlineEntityCreator } from "@/components/layout/inline-entity-creator";
 
 type Category = { id: string; name: string };
 type Unit = { id: string; name: string };
@@ -143,10 +144,22 @@ export default function ProductDetailPage() {
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Category</Label>
-                  <Select value={form.categoryId ?? ""} onValueChange={(v) => setForm((f) => ({ ...f, categoryId: v }))}>
-                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                    <SelectContent>{categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select value={form.categoryId ?? ""} onValueChange={(v) => setForm((f) => ({ ...f, categoryId: v }))}>
+                      <SelectTrigger className="flex-1"><SelectValue placeholder="—" /></SelectTrigger>
+                      <SelectContent>{categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                    {/* F7-S1: inline category creation */}
+                    <InlineEntityCreator
+                      label="Category"
+                      endpoint="/api/categories"
+                      bodyBuilder={(name) => ({ name })}
+                      onCreated={(c) => {
+                        setCategories((cats) => [...cats, c].sort((a, b) => a.name.localeCompare(b.name)));
+                        setForm((f) => ({ ...f, categoryId: c.id }));
+                      }}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="model">Model</Label>
@@ -156,10 +169,22 @@ export default function ProductDetailPage() {
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Unit</Label>
-                  <Select value={form.unitId ?? ""} onValueChange={(v) => setForm((f) => ({ ...f, unitId: v }))}>
-                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                    <SelectContent>{units.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select value={form.unitId ?? ""} onValueChange={(v) => setForm((f) => ({ ...f, unitId: v }))}>
+                      <SelectTrigger className="flex-1"><SelectValue placeholder="—" /></SelectTrigger>
+                      <SelectContent>{units.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent>
+                    </Select>
+                    {/* F7-S1: inline unit creation */}
+                    <InlineEntityCreator
+                      label="Unit"
+                      endpoint="/api/units"
+                      bodyBuilder={(name) => ({ name })}
+                      onCreated={(u) => {
+                        setUnits((us) => [...us, u].sort((a, b) => a.name.localeCompare(b.name)));
+                        setForm((f) => ({ ...f, unitId: u.id }));
+                      }}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="safetyStock">Safety stock</Label>

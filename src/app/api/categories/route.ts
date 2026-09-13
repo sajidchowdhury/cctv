@@ -35,7 +35,7 @@ export const POST = withTenant(async (user, req: Request) => {
     return NextResponse.json({ error: "Category name (2–50 chars) required." }, { status: 422 });
   }
   try {
-    const cat = await db.category.create({ data: { name: parsed.data.name }, select: { id: true, name: true } });
+    const cat = await db.category.create({ data: { tenantId: user.tenantId!, name: parsed.data.name }, select: { id: true, name: true } });
     return NextResponse.json({ category: cat }, { status: 201 });
   } catch (err: any) {
     if (err?.code === "P2002") {
