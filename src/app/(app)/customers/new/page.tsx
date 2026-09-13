@@ -1,0 +1,115 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { PageHeader } from "@/components/layout/page-header";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Save, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+export default function NewCustomerPage() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    phone: "",
+    address: "",
+    type: "RETAIL",
+    openingBalance: "",
+  });
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch("/api/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          phone: form.phone || null,
+          address: form.address || null,
+          type: form.type,
+          openingBalance: form.openingBalance ? Number(form.openingBalance) : 0,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Failed", description: data.error ?? "Could not create customer.", variant: "destructive" });
+        setSaving(false);
+        return;
+      }
+      toast({ title: "Customer created", description: data.customer.name });
+      router.push("/customers");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="New customer"
+        description="Opening balance: + = receivable, − = advance."
+        action={
+          <Button asChild variant="outline" size="sm">
+            <Link href="/customers"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
+          </Button>
+        }
+      />
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Customer details</CardTitle>
+          <CardDescription>All fields except name are optional.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onSubmit} className="space-y-4 max-w-lg">
+            <div className="space-y-2">
+              <Label htmlFor="name">Customer name *</Label>
+              <Input id="name" required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Rahman Electronics" />
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone</Label>
+                <Input id="phone" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="01XXXXXXXXX" />
+              </div>
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={form.type} onValueChange={(v) => setForm((f) => ({ ...f, type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="RETAIL">Retail</SelectItem>
+                    <SelectItem value="INSTALLER">Installer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address">Address</Label>
+              <Input id="address" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} placeholder="Address" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="openingBalance">Opening balance (BDT)</Label>
+              <Input id="openingBalance" type="number" step="0.01" value={form.openingBalance} onChange={(e) => setForm((f) => ({ ...f, openingBalance: e.target.value }))} placeholder="0 — negative for advance" />
+              <p className="text-xs text-muted-foreground">Positive = they owe you; negative = you owe them (advance).</p>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button type="submit" disabled={saving || !form.name}>
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save customer
+              </Button>
+              <Button type="button" variant="outline" asChild>
+                <Link href="/customers">Cancel</Link>
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

@@ -433,6 +433,8 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **Acceptance criteria:** a sale attributes to the logged-in salesman and appears on the customer ledger.
 
+**Status:** ✅ Complete (S14) — verified via curl (sale attributed to Demo Owner salesman, appears on customer ledger with running balance, openingBalance persists) + Agent Browser (list with balances + detail with ledger table). Completes Phase P2.
+
 ---
 
 ## 6. Phase P3 — Accounting (Sessions S15–S16)
@@ -691,7 +693,7 @@ After each phase is complete:
 |-------|--------|---------------|------------------|
 | P0 Foundation | ✅ Done (S01 ✅, S02 ✅, S03 ✅, S04 ✅, S05 ✅) | 5/5 | session(S05) |
 | P1 Catalogue & Stock | ✅ Done (S06 ✅, S07 ✅, S08 ✅, S09 ✅) | 4/4 | session(S09) |
-| P2 Sales & Invoicing | 🔄 In progress (S10 ✅, S11 ✅, S12 ✅, S13 ✅) | 4/5 | session(S13) |
+| P2 Sales & Invoicing | ✅ Done (S10 ✅, S11 ✅, S12 ✅, S13 ✅, S14 ✅) | 5/5 | session(S14) |
 | P3 Accounting | ☐ Not started | 0/2 | — |
 | P4 Employees & Payroll | ☐ Not started | 0/1 | — |
 | P5 Reports | ☐ Not started | 0/2 | — |
@@ -702,4 +704,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Phase P0 + P1 complete. Phase P2 in progress (S10–S13 ✅). Next: S14 — Customer Master & Sales Attribution (completes P2).*
+*End of implementation plan. Phase P0 + P1 + P2 complete. Next: Phase P3 — Accounting (Session S15).*

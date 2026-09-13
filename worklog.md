@@ -471,3 +471,38 @@ Stage Summary:
 - Acceptance: 1/1 original criterion passes. Held cart survives both page reload (localStorage) and server restart (DB isHeld).
 - Phase status: P2 Sales & Invoicing now 4/5 (S10–S13 ✅). Next: S14 — Customer Master & Sales Attribution (completes P2).
 - Artifacts committed: /sales/new rewrite (resume + localStorage), sales list Resume button, sale detail Resume button.
+
+---
+Task ID: S14
+Agent: Z.ai Code (main)
+Task: Session S14 — Customer Master & Sales Attribution. Customer entity (name, phone, address, type RETAIL/INSTALLER, opening balance), sales attribution to logged-in user, customer ledger preview (sales debit - receipts credit + opening running balance). Completes Phase P2 — Sales & Invoicing.
+
+Work Log:
+- Read S13 worklog + Customer schema (already in S02 with openingBalance + currentBalance + type). S10 had minimal customers list/create API. S14 adds: GET/[id] detail, PATCH, DELETE, /[id]/ledger, full UI (list, new, detail).
+- Wrote customers API:
+    GET  /api/customers/[id] — detail with recent sales (last 20) + receipts.
+    PATCH /api/customers/[id] — update fields; opening balance change recomputes currentBalance delta (same pattern as supplier).
+    DELETE /api/customers/[id] — soft delete.
+    GET  /api/customers/[id]/ledger — unified ledger: opening + sales (debit, increases receivable) - receipts (credit, reduces). Running balance. BDT-formatted display. (Mirror of supplier ledger from S07.)
+- Wrote customers UI (3 pages):
+    /(app)/customers/page.tsx — list with DataTable (Customer/Phone/Type/Balance/Status), summary cards (total receivable/advance/count), Receivable/Advance/Settled status badges, search.
+    /(app)/customers/new/page.tsx — create form (name, phone, type RETAIL/INSTALLER, address, opening balance with + = receivable / - = advance hint).
+    /(app)/customers/[id]/page.tsx — detail: 3 stat cards (opening/current/status), contact details, edit form, recent sales table (invoice/date/total/due), ledger table (Date/Type/Reference/Debit/Credit/Balance with running balance), delete (ConfirmDialog).
+- Updated seed.ts: 3 demo customers (Rahman Electronics +5000 receivable, City Security Solutions +12000, Walk-in 0).
+- Sales attribution verified: POST /api/sales creates Sale with salesmanId = logged-in user.id (from S11 withTenant wrapper passes user). The sale detail endpoint returns salesman.name.
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Sale attributes to logged-in salesman (curl: sale detail shows salesman="Demo Owner")
+- [x] Sale appears on customer ledger (Rahman: INV-260913-678 debit 3,200 -> balance 8,200)
+- [x] Opening balance persists (Rahman opening=5000, after sale computedBalance=8200)
+- [x] Customer list with DataTable + balance badges + summary cards
+- [x] Customer detail renders (contact, edit, recent sales, ledger table, delete)
+- [x] Create customer works (201)
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning)
+
+Stage Summary:
+- Deliverables: customers API (GET/[id], PATCH, DELETE, /[id]/ledger), 3 UI pages (list/new/detail+ledger), seed.ts (3 demo customers).
+- Key decision: customer ledger mirrors supplier ledger pattern (opening + debits - credits + running balance). Sales attribution via salesmanId set in the S11 create handler (user.id from withTenant). Opening balance change on PATCH recomputes currentBalance delta.
+- Acceptance: 1/1 original criterion passes. Sale attributes to salesman + appears on customer ledger.
+- Phase status: P2 Sales & Invoicing COMPLETE (S10-S14, 5/5). Next: Phase P3 - Accounting (S15).
+- Artifacts committed: 2 API routes (customers/[id], customers/[id]/ledger), 3 UI pages, seed.ts (demo customers).

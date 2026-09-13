@@ -174,6 +174,28 @@ async function main() {
     }
     console.log(`✓ Demo suppliers: ${demoSuppliers.length} seeded`);
 
+    // ── Demo customers (S14) ─────────────────────────────────
+    const demoCustomers = [
+      { name: "Rahman Electronics", phone: "01711112222", address: "New Market, Dhaka", type: "RETAIL", opening: 5000 },
+      { name: "City Security Solutions", phone: "01722223333", address: "Gulshan, Dhaka", type: "INSTALLER", opening: 12000 },
+      { name: "Walk-in Customer", phone: null, address: null, type: "RETAIL", opening: 0 },
+    ];
+    for (const c of demoCustomers) {
+      const existing = await adminDb.customer.findFirst({ where: { tenantId: tenant.id, name: c.name } });
+      if (existing) {
+        await adminDb.customer.update({ where: { id: existing.id }, data: {
+          phone: c.phone, address: c.address, type: c.type,
+          openingBalance: c.opening, currentBalance: c.opening,
+        }});
+      } else {
+        await adminDb.customer.create({ data: {
+          tenantId: tenant.id, name: c.name, phone: c.phone, address: c.address, type: c.type,
+          openingBalance: c.opening, currentBalance: c.opening,
+        }});
+      }
+    }
+    console.log(`✓ Demo customers: ${demoCustomers.length} seeded`);
+
     console.log(
       `\n✅ Tenant + users seeded.\n` +
         `   Tenant: ${tenant.id}\n` +
