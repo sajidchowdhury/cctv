@@ -1,8 +1,24 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// ─────────────────────────────────────────────────────────────────────────
+// CCTV Inventory SaaS — Prisma schema (doc §7)
+// Session S02 — Database Schema, Prisma & Tenant Isolation
+// ─────────────────────────────────────────────────────────────────────────
+//
+// Multi-tenant, shared-database model. Every business table carries
+// tenant_id (+ created_at / updated_at / deleted_at soft-delete).
+//
+// Production target (doc §3): PostgreSQL 16 with Row-Level Security.
+// Dev build: SQLite — RLS is replicated via a Prisma client extension
+//            that auto-filters reads by tenant_id and injects it on
+//            create (see src/lib/db.ts). Migrating to Postgres only
+//            requires flipping the datasource provider + re-running
+//            prisma migrate; the schema below is dialect-portable.
+//
+// SQLite limitations worked around:
+//  - No native enum support → string + @default with app-side validation.
+//  - No native array columns → serials[] on purchase_items is stored as a
+//    JSON string and parsed in app code.
+//  - Money stored as Float (2 dp). Postgres swap can use Decimal(12,2).
+// ─────────────────────────────────────────────────────────────────────────
 
 generator client {
   provider = "prisma-client-js"
@@ -13,20 +29,675 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// ─────────────────────────────────────────────────────────────────────────
+// 1. Tenancy & Auth (doc §3)
+// ─────────────────────────────────────────────────────────────────────────
+
+/// A tenant = one CCTV business. Owns all business data.
+model Tenant {
+  id         String   @id @default(cuid())
+  name       String // business name
+  ownerEmail String   @unique // doc §3.3: 1-email-per-account, DB-enforced
+  phone      String?
+  address    String?
+  status     String   @default("PENDING_ACTIVATION") // PENDING_ACTIVATION | ACTIVE | GRACE | LOCKED | SUSPENDED
+  // Super-admin fields (doc §3.3.1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
+
+  // Relations
+  users                 User[]
+  subscription          Subscription?
+  paymentVerifications  PaymentVerification[]
+  categories            Category[]
+  units                 Unit[]
+  products              Product[]
+  inventoryUnits        InventoryUnit[]
+  suppliers             Supplier[]
+  customers             Customer[]
+  employees             Employee[]
+  purchases             Purchase[]
+  sales                 Sale[]
+  transactions          Transaction[]
+  accountHeads          AccountHead[]
+  serviceTickets        ServiceTicket[]
+  followUps             FollowUp[]
+  reminders             Reminder[]
+  salaryRecords         SalaryRecord[]
+  quotations            Quotation[]
+  rmaTickets            RmaTicket[]
+  emailVerifications    EmailVerification[]
+
+  @@index([status])
 }
 
-model Post {
+/// A user belonging to a tenant. Email is globally unique (doc §3.3).
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String
+  email        String   @unique // doc §3.3: 1-email-per-account, DB-enforced
+  name         String
+  phone        String?
+  role         String   @default("OWNER") // OWNER | MANAGER | SALESMAN | ACCOUNTANT
+  status       String   @default("ACTIVE") // ACTIVE | DISABLED
+  passwordHash String?
+  image        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Sales attribution (doc §4.3)
+  sales        Sale[]   @relation("Salesman")
+  // Reminder/follow-up authorship
+  followUps    FollowUp[]
+  rmaActions   RmaHistory[]
+
+  @@index([tenantId])
+  @@index([tenantId, role])
+}
+
+/// One-time email verification codes (signup + email-change, doc §3.3).
+model EmailVerification {
   id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+  tenantId  String?
+  email     String
+  code      String // 6-digit OTP
+  purpose   String // SIGNUP | CHANGE_EMAIL
+  expiresAt DateTime
+  consumed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([email, purpose])
+  @@index([expiresAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 2. Subscription & Billing (doc §3.2, §3.3)
+// ─────────────────────────────────────────────────────────────────────────
+
+/// One active subscription per tenant. Flat plan BDT 500/month (doc §3.2).
+model Subscription {
+  id        String   @id @default(cuid())
+  tenantId  String   @unique
+  plan      String   @default("UNLIMITED") // single flat plan
+  startedAt DateTime
+  cycleEnd  DateTime // 30 days from activation; +30 on each verified payment
+  status    String   @default("PENDING_ACTIVATION") // PENDING_ACTIVATION | ACTIVE | GRACE | LOCKED
+  lockedAt  DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([status, cycleEnd])
+}
+
+/// Manual payment submissions, verified by super-admin (doc §3.3).
+model PaymentVerification {
+  id              String   @id @default(cuid())
+  tenantId        String
+  method          String // BKASH | NAGAD | BANK
+  txnId           String // user-submitted transaction ID
+  amount          Float // BDT, 2 dp
+  paidDate        DateTime
+  senderNumber    String?
+  status          String   @default("PENDING") // PENDING | VERIFIED | REJECTED
+  verifiedBy      String? // super-admin user id
+  verifiedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@index([status, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 3. Reference Tables (doc §4.1) — tenant-scoped, owner-addable
+// ─────────────────────────────────────────────────────────────────────────
+
+/// Product category — Camera, DVR/NVR, Cable, PSU, Accessories, Service.
+model Category {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products  Product[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+/// Unit of measure — Pcs, Box, Roll, Set.
+model Unit {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  products  Product[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// 4. Catalogue & Inventory (doc §4.1, §4.2)
+// ─────────────────────────────────────────────────────────────────────────
+
+/// Product master. Individual units (with serials) created at purchase.
+model Product {
+  id            String   @id @default(cuid())
+  tenantId      String
+  name          String
+  categoryId    String?
+  model         String?
+  sku           String   @unique // auto-generated, printable barcode label
+  unitId        String? // Pcs | Box | Roll | Set (ref to Unit)
+  safetyStock   Int      @default(0) // low-stock alert trigger threshold
+  defaultPrice  Float?   // suggested retail, auto-fills Sales (doc §4.2)
+  imageUrl      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  tenant        Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category      Category?  @relation(fields: [categoryId], references: [id])
+  unit          Unit?      @relation(fields: [unitId], references: [id])
+  inventoryUnits InventoryUnit[]
+  purchaseItems PurchaseItem[]
+  saleItems     SaleItem[]
+  quotationItems QuotationItem[]
+
+  @@index([tenantId])
+  @@index([tenantId, name])
+  @@index([tenantId, sku])
+}
+
+/// A single physical unit with a serial number, created at purchase and
+/// consumed at sale. Carries its own warranty window (doc §5.1).
+model InventoryUnit {
+  id           String    @id @default(cuid())
+  tenantId     String
+  productId    String
+  serialNo     String
+  purchaseId   String?
+  purchaseItemId String?
+  saleItemId   String?   @unique
+  status       String    @default("IN_STOCK") // IN_STOCK | SOLD | IN_RMA | RETURNED_TO_VENDOR | DELIVERED | SCRAPPED
+  warrantyEnd  DateTime? // computed at purchase: purchase.date + warrantyMonths
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id])
+  purchase     Purchase?    @relation(fields: [purchaseId], references: [id])
+  purchaseItem PurchaseItem? @relation("FromPurchaseItem", fields: [purchaseItemId], references: [id])
+  saleItem     SaleItem?    @relation("SoldAs")
+  serviceTickets ServiceTicket[]
+  rmaTickets   RmaTicket[]
+
+  @@unique([tenantId, serialNo])
+  @@index([tenantId, productId, status])
+  @@index([tenantId, status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 5. Parties — Suppliers, Customers, Employees (doc §4.6)
+// ─────────────────────────────────────────────────────────────────────────
+
+model Supplier {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  phone           String?
+  company         String?
+  address         String?
+  openingBalance  Float    @default(0) // payable (+) or advance (−)
+  currentBalance  Float    @default(0) // running, updated by purchase/payment
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchases       Purchase[]
+  payments        Transaction[]  @relation("SupplierPayments")
+  rmaTickets      RmaTicket[]
+
+  @@index([tenantId])
+  @@index([tenantId, name])
+}
+
+model Customer {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  phone           String?
+  address         String?
+  type            String   @default("RETAIL") // RETAIL | INSTALLER
+  openingBalance  Float    @default(0) // receivable (+) or advance (−)
+  currentBalance  Float    @default(0) // running, updated by sale/receipt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sales           Sale[]
+  receipts        Transaction[] @relation("CustomerReceipts")
+  serviceTickets  ServiceTicket[]
+  followUps       FollowUp[]
+  quotations      Quotation[]
+  rmaTickets      RmaTicket[]
+
+  @@index([tenantId])
+  @@index([tenantId, name])
+  @@index([tenantId, phone])
+}
+
+model Employee {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  phone       String?
+  role         String   @default("STAFF") // STAFF | SALESMAN | ACCOUNTANT | INSTALLER
+  salary      Float    @default(0) // monthly basic
+  joinDate    DateTime @default(now())
+  status      String   @default("ACTIVE") // ACTIVE | RESIGNED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  salaryRecords SalaryRecord[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 6. Purchase (doc §4.2) — multi-row cart + serial capture
+// ─────────────────────────────────────────────────────────────────────────
+
+model Purchase {
+  id          String   @id @default(cuid())
+  tenantId    String
+  supplierId  String?
+  invoiceNo   String // auto or manual
+  date        DateTime @default(now())
+  total       Float   @default(0) // sum(qty × purchase price)
+  paid        Float   @default(0)
+  due         Float   @default(0) // drives supplier payable
+  mode        String  @default("CASH") // CASH | BANK | BKASH | DUE
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier    Supplier?      @relation(fields: [supplierId], references: [id])
+  items       PurchaseItem[]
+  inventoryUnits InventoryUnit[]
+
+  @@unique([tenantId, invoiceNo])
+  @@index([tenantId, date])
+  @@index([tenantId, supplierId])
+}
+
+model PurchaseItem {
+  id             String  @id @default(cuid())
+  tenantId       String
+  purchaseId     String
+  productId      String
+  qty             Float // fractional allowed (e.g. 1.5 rolls of cable)
+  unitPrice      Float // per unit, BDT
+  salesPrice     Float? // suggested retail, auto-fills Product.defaultPrice
+  warrantyMonths Int    @default(0) // per product line
+  serials        String // JSON-encoded string[] (SQLite has no array); bulk paste/scan
+  lineTotal      Float // qty × unitPrice
+  createdAt      DateTime @default(now())
+
+  purchase       Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product        Product  @relation(fields: [productId], references: [id])
+  inventoryUnits InventoryUnit[] @relation("FromPurchaseItem")
+
+  @@index([tenantId, purchaseId])
+  @@index([tenantId, productId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 7. Sales (doc §4.3) — cart-based, warranty card, due ledger
+// ─────────────────────────────────────────────────────────────────────────
+
+model Sale {
+  id          String   @id @default(cuid())
+  tenantId    String
+  customerId   String? // null = walk-in
+  salesmanId  String? // User attribution (doc §4.3)
+  invoiceNo   String // auto: INV-YYMMDD-001
+  date        DateTime @default(now())
+  total       Float   @default(0)
+  discount    Float   @default(0) // invoice-level
+  paid        Float   @default(0)
+  due         Float   @default(0) // drives customer receivable
+  mode        String  @default("CASH") // CASH | BANK | BKASH | NAGAD | DUE
+  notes       String?
+  // Derived from quotation? (doc §5.6 convert-to-sale)
+  quotationId String?
+  isHeld      Boolean @default(false) // held cart draft (doc §5.2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer    Customer?     @relation(fields: [customerId], references: [id])
+  salesman    User?         @relation("Salesman", fields: [salesmanId], references: [id])
+  quotation   Quotation?    @relation("ConvertedFromQuotation")
+  items       SaleItem[]
+
+  @@unique([tenantId, invoiceNo])
+  @@index([tenantId, date])
+  @@index([tenantId, customerId])
+  @@index([tenantId, salesmanId])
+  @@index([tenantId, isHeld])
+}
+
+model SaleItem {
+  id             String   @id @default(cuid())
+  tenantId       String
+  saleId         String
+  productId      String?
+  inventoryUnitId String? @unique // set for serialised stock; null for service/labour lines
+  description    String? // free-text for SERVICE line items (doc §5.2)
+  lineType       String   @default("PRODUCT") // PRODUCT | SERVICE
+  qty            Float // fractional allowed
+  unitPrice      Float
+  discount       Float   @default(0)
+  warrantyMonths Int     @default(0) // auto from product, editable per sale
+  lineTotal      Float
+  createdAt      DateTime @default(now())
+
+  sale           Sale           @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product        Product?       @relation(fields: [productId], references: [id])
+  inventoryUnit  InventoryUnit? @relation("SoldAs", fields: [inventoryUnitId], references: [id])
+
+  @@index([tenantId, saleId])
+  @@index([tenantId, productId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 8. Accounting (doc §4.4, §4.5) — single-entry cash-book
+// ─────────────────────────────────────────────────────────────────────────
+
+/// Account head — Rent, Electricity, Service Income, etc. Tenant-customisable.
+model AccountHead {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  kind      String // IN | EXP
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, kind])
+}
+
+/// Unified ledger row. Covers income, expense, customer receipts, supplier payments.
+/// (doc §4.4 + §4.5 collapsed into one typed table.)
+model Transaction {
+  id            String   @id @default(cuid())
+  tenantId      String
+  type          String // IN | EXP | RECV | PAY (doc §7)
+  partyType     String? // CUSTOMER | SUPPLIER | EMPLOYEE | NONE
+  customerId    String?
+  supplierId    String?
+  accountHeadId String?
+  amount        Float // BDT, 2 dp
+  mode          String  @default("CASH") // CASH | BANK | BKASH | NAGAD | CHEQUE
+  date          DateTime @default(now())
+  narration     String?
+  refInvoiceId  String? // optional link to a Sale or Purchase invoice
+  attachmentUrl String? // bill photo (optional)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer     Customer?    @relation("CustomerReceipts", fields: [customerId], references: [id])
+  supplier     Supplier?    @relation("SupplierPayments", fields: [supplierId], references: [id])
+  accountHead  AccountHead? @relation(fields: [accountHeadId], references: [id])
+
+  @@index([tenantId, date])
+  @@index([tenantId, type])
+  @@index([tenantId, customerId])
+  @@index([tenantId, supplierId])
+  @@index([tenantId, accountHeadId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 9. Warranty & Service Tickets (doc §5.1)
+// ─────────────────────────────────────────────────────────────────────────
+
+/// Repair / service request tied to an inventory unit + customer.
+model ServiceTicket {
+  id              String   @id @default(cuid())
+  tenantId        String
+  customerId      String?
+  inventoryUnitId String?
+  issue           String // customer-reported symptom
+  status          String   @default("OPEN") // OPEN | IN_PROGRESS | RESOLVED | CLOSED
+  charge          Float    @default(0) // free if in warranty, else payable
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer        Customer?      @relation(fields: [customerId], references: [id])
+  inventoryUnit   InventoryUnit? @relation(fields: [inventoryUnitId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([tenantId, customerId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 10. CRM Follow-ups (doc §5.4)
+// ─────────────────────────────────────────────────────────────────────────
+
+model FollowUp {
+  id           String   @id @default(cuid())
+  tenantId     String
+  customerId   String
+  note         String
+  rating       String   @default("NEUTRAL") // HAPPY | NEUTRAL | UNHAPPY
+  nextDueDate  DateTime?
+  createdBy    String? // User id
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  author       User?    @relation(fields: [createdBy], references: [id])
+
+  @@index([tenantId, customerId])
+  @@index([tenantId, nextDueDate])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 11. Reminders (doc §5.5) — unified reminder + bill-renewal engine
+// ─────────────────────────────────────────────────────────────────────────
+
+model Reminder {
+  id        String   @id @default(cuid())
+  tenantId  String
+  type      String // TRADELICENSE | RENT | ELECTRICITY | INTERNET_GAS | SALARY | WARRANTY_EXPIRY | LOW_STOCK | FOLLOW_UP | SERVICE_TICKET | SUBSCRIPTION_BILL
+  title     String
+  amount    Float?   // optional, for bill amounts
+  frequency  String // DAILY | WEEKLY | MONTHLY | YEARLY | ONCE
+  nextDue    DateTime
+  channel    String  @default("IN_APP_SMS") // IN_APP_SMS | IN_APP | SMS
+  active     Boolean  @default(true)
+  refType    String? // CUSTOMER | PRODUCT | INVOICE | TENANT (polymorphic link)
+  refId      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  deletedAt  DateTime?
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, nextDue])
+  @@index([tenantId, active])
+  @@index([tenantId, type])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 12. Payroll (doc §4.6)
+// ─────────────────────────────────────────────────────────────────────────
+
+model SalaryRecord {
+  id                String   @id @default(cuid())
+  tenantId          String
+  employeeId        String
+  month             String // YYYY-MM
+  basic             Float
+  allowance         Float    @default(0)
+  advanceDeduction  Float    @default(0)
+  netPayable        Float // basic + allowance − advanceDeduction
+  paidOn            DateTime?
+  transactionId     String? // link to the auto-created EXP transaction
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, employeeId, month])
+  @@index([tenantId, month])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 13. Quotations (doc §5.6) — pre-sale project estimation
+// ─────────────────────────────────────────────────────────────────────────
+
+model Quotation {
+  id            String   @id @default(cuid())
+  tenantId      String
+  customerId     String?
+  customerName   String? // walk-in prospect (saved on accept)
+  quoteNo        String // QT-YYMMDD-001
+  date           DateTime @default(now())
+  siteAddress    String?
+  projectType    String  @default("OTHER") // CORPORATE | FACTORY | RESIDENTIAL | RETAIL | OTHER
+  subtotal       Float   @default(0)
+  discount       Float   @default(0)
+  vat            Float   @default(0)
+  total          Float   @default(0)
+  validUntil     DateTime?
+  status         String   @default("DRAFT") // DRAFT | SENT | ACCEPTED | REJECTED | EXPIRED | CONVERTED
+  termsConditions String?
+  pdfUrl         String?
+  lossReason     String? // captured on rejection
+  convertedSaleId String? @unique // set when converted to a Sale
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer   Customer?       @relation(fields: [customerId], references: [id])
+  sale       Sale?           @relation("ConvertedFromQuotation", fields: [convertedSaleId], references: [id])
+  items      QuotationItem[]
+
+  @@unique([tenantId, quoteNo])
+  @@index([tenantId, date])
+  @@index([tenantId, status])
+  @@index([tenantId, customerId])
+}
+
+model QuotationItem {
+  id          String   @id @default(cuid())
+  tenantId    String
+  quotationId String
+  productId   String? // null for LABOR/SERVICE lines
+  lineType    String   @default("PRODUCT") // PRODUCT | LABOR | SERVICE
+  description String
+  qty         Float
+  unitPrice   Float
+  discount    Float   @default(0)
+  lineTotal   Float
+  createdAt   DateTime @default(now())
+
+  quotation  Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product    Product?  @relation(fields: [productId], references: [id])
+
+  @@index([tenantId, quotationId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 14. Vendor RMA (doc §5.7) — 5-stage repair pipeline
+// ─────────────────────────────────────────────────────────────────────────
+
+model RmaTicket {
+  id              String   @id @default(cuid())
+  tenantId        String
+  rmaNo           String // RMA-YYMMDD-001
+  dateOpened      DateTime @default(now())
+  customerId      String?
+  saleId          String? // original sale (ref via Sale.invoiceNo loosely; here we link by id)
+  inventoryUnitId String?
+  productId       String?
+  supplierId      String? // vendor/distributor handling repair
+  faultReason     String
+  stage           String   @default("RECEIVED_FROM_CUSTOMER")
+  // RECEIVED_FROM_CUSTOMER | SENT_TO_VENDOR | UNDER_REPAIR | RETURNED_FROM_VENDOR | DELIVERED_TO_CUSTOMER
+  vendorRmaRef    String?
+  vendorCharge    Float    @default(0) // 0 if in warranty
+  eta             DateTime?
+  closedAt        DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer        Customer?      @relation(fields: [customerId], references: [id])
+  inventoryUnit   InventoryUnit? @relation(fields: [inventoryUnitId], references: [id])
+  supplier        Supplier?      @relation(fields: [supplierId], references: [id])
+  history         RmaHistory[]
+
+  @@unique([tenantId, rmaNo])
+  @@index([tenantId, dateOpened])
+  @@index([tenantId, stage])
+  @@index([tenantId, supplierId])
+}
+
+/// Timestamped stage transitions (doc §5.7 "Stage History: Log[]").
+model RmaHistory {
+  id          String   @id @default(cuid())
+  rmaTicketId String
+  stage       String
+  notes       String?
+  actorUserId String?
+  timestamp   DateTime @default(now())
+
+  rmaTicket   RmaTicket @relation(fields: [rmaTicketId], references: [id], onDelete: Cascade)
+  actor       User?     @relation(fields: [actorUserId], references: [id])
+
+  @@index([rmaTicketId, timestamp])
 }

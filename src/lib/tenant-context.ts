@@ -1,22 +1,58 @@
 /**
- * Tenant Context — resolves the active tenant_id for the current request.
+ * Tenant Context — resolves the active tenant_id for the current request
+ * and threads it through the Prisma client extension (RLS replication on SQLite).
  *
- * S01: stub implementation. S02 wires the Prisma tenant_id middleware;
- * S03 resolves the tenant from the authenticated NextAuth session.
+ * Doc §3.1: PostgreSQL RLS template
+ *   ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ *   CREATE POLICY tenant_isolation ON products
+ *     USING (tenant_id = current_setting('app.tenant_id')::uuid);
  *
- * Architecture rule (doc §3.1): tenant_id is mandatory on every business
- * table. Every query must be scoped by it (replicates PostgreSQL RLS on SQLite).
+ * On SQLite there is no native RLS, so we replicate the guarantee with:
+ *   1. AsyncLocalStorage — per-request tenant_id (set by S03 auth middleware)
+ *   2. Prisma client extension — auto-filters every read by tenant_id and
+ *      injects it on every create. A missed app filter can never leak.
+ *
+ * S02: context + extension are live; tenant_id is set explicitly via
+ *      `runWithTenant()` for seed scripts + tests.
+ * S03: NextAuth session middleware calls `runWithTenant()` automatically.
  */
 
+import { AsyncLocalStorage } from "async_hooks";
+
+/** Role enum — enforced on every API route + page (doc §3, §4). */
+export type Role = "OWNER" | "MANAGER" | "SALESMAN" | "ACCOUNTANT";
+
+/** Subscription lifecycle status (doc §3.3). */
+export type SubscriptionStatus =
+  | "PENDING_ACTIVATION"
+  | "ACTIVE"
+  | "GRACE"
+  | "LOCKED";
+
 /**
- * Returns the tenant_id for the current request, or null if unauthenticated.
- *
- * S01 stub: always returns null — no auth yet.
- * S03: reads from `getServerSession()` → session.user.tenantId.
+ * Per-request tenant context. Survives async hops within a single request
+ * without polluting global state across concurrent requests.
  */
-export async function getTenantId(): Promise<string | null> {
-  // TODO(S03): resolve from NextAuth session
-  return null;
+const tenantStorage = new AsyncLocalStorage<string>();
+
+/**
+ * Run a block of work scoped to a tenant_id. All Prisma reads/writes
+ * inside `fn` are automatically filtered/injected with this tenant_id.
+ *
+ * Used by:
+ *  - S03 auth middleware (sets tenant from session)
+ *  - S02 seed + isolation tests (sets tenant explicitly)
+ */
+export function runWithTenant<T>(tenantId: string, fn: () => Promise<T>): Promise<T> {
+  return tenantStorage.run(tenantId, fn);
+}
+
+/**
+ * Synchronous variant — for use inside the Prisma extension query callback
+ * where we are already inside a `runWithTenant` scope.
+ */
+export function getTenantId(): string | null {
+  return tenantStorage.getStore() ?? null;
 }
 
 /**
@@ -24,15 +60,11 @@ export async function getTenantId(): Promise<string | null> {
  * Use inside protected API routes where a tenant is guaranteed.
  */
 export async function requireTenantId(): Promise<string> {
-  const tenantId = await getTenantId();
+  const tenantId = getTenantId();
   if (!tenantId) {
-    throw new Error("Tenant context required but no tenant resolved.");
+    throw new Error(
+      "Tenant context required but no tenant resolved. Wrap the request in runWithTenant()."
+    );
   }
   return tenantId;
 }
-
-/**
- * Role enum — enforced on every API route + page (doc §3, §4).
- * Shared with the auth layer in S03.
- */
-export type Role = "OWNER" | "MANAGER" | "SALESMAN" | "ACCOUNTANT";

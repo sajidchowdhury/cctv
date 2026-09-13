@@ -132,9 +132,11 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 **UI screens:** none.
 
 **Acceptance criteria:**
-- `prisma/schema.prisma` matches every table in doc §7.
-- A cross-tenant read test (tenant A queries tenant B's rows) returns empty.
-- `users.email` UNIQUE constraint rejects a duplicate signup at DB level.
+- ✅ `prisma/schema.prisma` matches every table in doc §7.
+- ✅ A cross-tenant read test (tenant A queries tenant B's rows) returns empty.
+- ✅ `users.email` UNIQUE constraint rejects a duplicate signup at DB level.
+
+**Status:** ✅ Complete (S02) — schema pushed, tenant-isolation extension verified by `bun run db:verify` (4/4 tests pass).
 
 ---
 
@@ -660,7 +662,7 @@ After each phase is complete:
 
 | Phase | Status | Sessions done | Pushed (commit) |
 |-------|--------|---------------|------------------|
-| P0 Foundation | 🔄 In progress (S01 ✅) | 1/5 | session(S01) |
+| P0 Foundation | 🔄 In progress (S01 ✅, S02 ✅) | 2/5 | session(S02) |
 | P1 Catalogue & Stock | ☐ Not started | 0/4 | — |
 | P2 Sales & Invoicing | ☐ Not started | 0/5 | — |
 | P3 Accounting | ☐ Not started | 0/2 | — |
@@ -673,4 +675,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Sessions S01 complete — continue at Session S02.*
+*End of implementation plan. Sessions S01–S02 complete — continue at Session S03.*

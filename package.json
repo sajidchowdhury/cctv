@@ -10,7 +10,9 @@
     "db:push": "prisma db push --accept-data-loss",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:reset": "prisma migrate reset"
+    "db:reset": "prisma migrate reset",
+    "db:seed": "bun run src/scripts/seed.ts",
+    "db:verify": "bun run src/scripts/verify-tenant-isolation.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
