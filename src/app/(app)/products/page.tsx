@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/layout/data-table";
-import { Boxes, Plus, AlertTriangle, Loader2 } from "lucide-react";
+import { Boxes, Plus, AlertTriangle, Loader2, ScanLine, Package } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatBDT } from "@/lib/format";
 import { TableSkeleton, CardGridSkeleton } from "@/components/layout/skeletons";
@@ -24,6 +24,7 @@ type Product = {
   unitName: string | null;
   safetyStock: number;
   defaultPrice: number | null;
+  isSerialised: boolean;
   onHand: number;
   lowStock: boolean;
 };
@@ -56,6 +57,19 @@ export default function ProductsPage() {
       },
       { header: "SKU", accessorKey: "sku", cell: ({ row }) => <code className="text-xs">{row.original.sku}</code> },
       { header: "Category", accessorKey: "categoryName", cell: ({ row }) => row.original.categoryName ?? "—" },
+      {
+        header: "Tracking",
+        id: "tracking",
+        cell: ({ row }) => (
+          <Badge variant="outline" className="text-xs">
+            {row.original.isSerialised ? (
+              <><ScanLine className="h-3 w-3 mr-1" /> Serialised</>
+            ) : (
+              <><Package className="h-3 w-3 mr-1" /> Qty-based</>
+            )}
+          </Badge>
+        ),
+      },
       { header: "On hand", accessorKey: "onHand", cell: ({ row }) => <span className="tabular-nums">{row.original.onHand}</span> },
       {
         header: "Safety",

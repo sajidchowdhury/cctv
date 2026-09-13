@@ -22,6 +22,7 @@ type SearchResult = {
   model: string | null;
   sku: string;
   defaultPrice: number | null;
+  isSerialised: boolean; // F1-S2
   onHand: number;
   outOfStock: boolean;
   serials: { id: string; serialNo: string }[];
@@ -32,6 +33,7 @@ type CartLine = {
   productId: string;
   productName: string;
   productModel: string | null;
+  isSerialised: boolean; // F1-S2: false = qty-based (no serial pick)
   inventoryUnitId: string;
   serialNo: string;
   qty: string;
@@ -105,6 +107,9 @@ function NewSalePage() {
             productId: it.productId ?? "",
             productName: it.product?.name ?? it.description ?? "",
             productModel: it.product?.model ?? null,
+            // F1-S2: derive isSerialised from whether inventoryUnitId is set.
+            // If the item has an inventory unit → serialised; otherwise qty-based (non-serial or service).
+            isSerialised: !!(it.inventoryUnitId || (it.inventoryUnit && it.inventoryUnit.serialNo)),
             inventoryUnitId: it.inventoryUnitId ?? "",
             serialNo: it.inventoryUnit?.serialNo ?? "",
             qty: String(it.qty),
@@ -150,11 +155,38 @@ function NewSalePage() {
 
   function addProductLine(p: SearchResult, serialId?: string, serialNo?: string) {
     // Stock check: block out-of-stock products.
-    if (p.outOfStock || p.serials.length === 0) {
+    if (p.outOfStock) {
       toast({ title: "Out of stock", description: `${p.name} has no available stock. Create a purchase first.`, variant: "destructive" });
       return;
     }
-    // For serialised products: use the specified serial or auto-select first available.
+
+    // F1-S2: branch on isSerialised.
+    //   - Serialised: pick a specific inventory unit, qty=1, serialNo shown.
+    //   - Non-serialised: qty-based line, no inventoryUnitId, qty editable.
+    if (!p.isSerialised) {
+      setLines((l) => [...l, {
+        key: `${p.productId}-${Date.now()}`,
+        productId: p.productId,
+        productName: p.name,
+        productModel: p.model,
+        isSerialised: false,
+        inventoryUnitId: "",
+        serialNo: "",
+        qty: "1",
+        unitPrice: p.defaultPrice ? String(p.defaultPrice) : "",
+        discount: "0",
+        lineType: "PRODUCT",
+        description: p.name,
+      }]);
+      setProductSearch("");
+      return;
+    }
+
+    // Serialised path: serial pick.
+    if (p.serials.length === 0) {
+      toast({ title: "No serials in stock", description: `${p.name} has no IN_STOCK units. Create a purchase first.`, variant: "destructive" });
+      return;
+    }
     const selectedSerial = serialId
       ? { id: serialId, serialNo: serialNo ?? "" }
       : p.serials[0];
@@ -164,6 +196,7 @@ function NewSalePage() {
       productId: p.productId,
       productName: p.name,
       productModel: p.model,
+      isSerialised: true,
       inventoryUnitId: selectedSerial?.id ?? "",
       serialNo: selectedSerial?.serialNo ?? "",
       qty: "1",
@@ -181,6 +214,7 @@ function NewSalePage() {
       productId: "",
       productName: "",
       productModel: null,
+      isSerialised: false,
       inventoryUnitId: "",
       serialNo: "",
       qty: "1",
@@ -408,6 +442,9 @@ function NewSalePage() {
                             {p.onHand} in stock
                           </Badge>
                         )}
+                        <Badge variant="outline" className="ml-1 text-xs">
+                          {p.isSerialised ? "Serialised" : "Qty-based"}
+                        </Badge>
                         {p.defaultPrice && (
                           <p className="text-xs text-muted-foreground mt-1">{formatBDT(p.defaultPrice)}</p>
                         )}
@@ -464,6 +501,11 @@ function NewSalePage() {
                       <Package className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm font-medium">{line.productName}</span>
                       {line.productModel && <span className="text-xs text-muted-foreground">{line.productModel}</span>}
+                      {line.isSerialised ? (
+                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300 border-blue-200 dark:border-blue-900">Serialised</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 border-amber-200 dark:border-amber-900">Qty-based</Badge>
+                      )}
                     </div>
                   ) : (
                     <Input placeholder="Service description (e.g. Installation charge)" value={line.description} onChange={(e) => updateLine(line.key, "description", e.target.value)} />

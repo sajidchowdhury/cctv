@@ -2,11 +2,14 @@
  * GET    /api/products/[id] — fetch a single product with on-hand qty.
  * PATCH  /api/products/[id] — update product fields.
  * DELETE /api/products/[id] — soft-delete a product.
+ *
+ * F1-S2: products have `isSerialised` flag — onHand computation branches on it.
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { withTenant } from "@/lib/session";
+import { computeOnHand } from "@/lib/onhand";
 
 export const GET = withTenant(async (user, _req: Request, ctx: any) => {
   const params = ctx?.params ? await ctx.params : {};
@@ -15,20 +18,31 @@ export const GET = withTenant(async (user, _req: Request, ctx: any) => {
 
   const product = await db.product.findUnique({
     where: { id },
-    include: {
+    select: {
+      id: true,
+      tenantId: true,
+      name: true,
+      categoryId: true,
+      model: true,
+      sku: true,
+      unitId: true,
+      safetyStock: true,
+      defaultPrice: true,
+      isSerialised: true,
+      imageUrl: true,
+      createdAt: true,
+      updatedAt: true,
       category: { select: { id: true, name: true } },
       unit: { select: { id: true, name: true } },
-      inventoryUnits: { select: { id: true, status: true } },
     },
   });
   if (!product || product.deletedAt) {
     return NextResponse.json({ error: "Product not found." }, { status: 404 });
   }
-  const onHand = product.inventoryUnits.filter((u) => u.status === "IN_STOCK").length;
+  const onHand = await computeOnHand(db, user.tenantId!, product.id, product.isSerialised);
   return NextResponse.json({
     product: {
       ...product,
-      inventoryUnits: undefined,
       onHand,
       lowStock: onHand <= product.safetyStock,
     },
@@ -42,6 +56,7 @@ const PatchSchema = z.object({
   unitId: z.string().optional().nullable(),
   safetyStock: z.number().int().min(0).optional(),
   defaultPrice: z.number().min(0).optional().nullable(),
+  isSerialised: z.boolean().optional(), // F1-S2
   imageUrl: z.string().url().optional().nullable(),
 });
 
@@ -66,7 +81,7 @@ export const PATCH = withTenant(async (user, req: Request, ctx: any) => {
   const product = await db.product.update({
     where: { id },
     data: parsed.data,
-    select: { id: true, name: true, sku: true },
+    select: { id: true, name: true, sku: true, isSerialised: true },
   });
   return NextResponse.json({ product });
 });

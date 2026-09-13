@@ -4,11 +4,14 @@
  * Pass ?notify=1 to fire the digest SMS to the owner (use after a sale reduces
  * stock, not on every dashboard read — otherwise the owner gets spammed).
  * Default (no param) is a silent read for the dashboard widget.
+ *
+ * F1-S2: onHand branches on product.isSerialised.
  */
 import { NextResponse } from "next/server";
 import { db, adminDb } from "@/lib/db";
 import { withTenant } from "@/lib/session";
 import { getNotifier } from "@/lib/adapters/notifier";
+import { computeOnHandBatch } from "@/lib/onhand";
 
 export const GET = withTenant(async (user, req: Request) => {
   const url = new URL(req.url);
@@ -16,22 +19,36 @@ export const GET = withTenant(async (user, req: Request) => {
 
   const products = await db.product.findMany({
     where: { deletedAt: null },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      safetyStock: true,
+      isSerialised: true,
       category: { select: { name: true } },
-      inventoryUnits: { where: { status: "IN_STOCK" }, select: { id: true } },
     },
   });
 
+  const onHandMap = await computeOnHandBatch(
+    db,
+    user.tenantId!,
+    products.map((p) => ({ id: p.id, isSerialised: p.isSerialised }))
+  );
+
   const lowStock = products
-    .map((p) => ({
-      id: p.id,
-      name: p.name,
-      sku: p.sku,
-      categoryName: p.category?.name ?? null,
-      onHand: p.inventoryUnits.length,
-      safetyStock: p.safetyStock,
-      deficit: p.safetyStock - p.inventoryUnits.length,
-    }))
+    .map((p) => {
+      const onHand = onHandMap.get(p.id) ?? 0;
+      return {
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        categoryName: p.category?.name ?? null,
+        isSerialised: p.isSerialised,
+        onHand,
+        safetyStock: p.safetyStock,
+        deficit: p.safetyStock - onHand,
+      };
+    })
     .filter((p) => p.onHand <= p.safetyStock && p.safetyStock > 0)
     .sort((a, b) => b.deficit - a.deficit);
 

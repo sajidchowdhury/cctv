@@ -33,7 +33,7 @@ export const GET = withTenant(async (user, _req: Request, ctx: any) => {
       supplier: { select: { id: true, name: true, company: true, phone: true } },
       items: {
         include: {
-          product: { select: { id: true, name: true, model: true, sku: true } },
+          product: { select: { id: true, name: true, model: true, sku: true, isSerialised: true } },
           inventoryUnits: { select: { id: true, serialNo: true, status: true, warrantyEnd: true } },
         },
       },
@@ -61,6 +61,7 @@ export const GET = withTenant(async (user, _req: Request, ctx: any) => {
         productName: it.product.name,
         productModel: it.product.model,
         productSku: it.product.sku,
+        isSerialised: it.product.isSerialised, // F1-S2
         qty: it.qty,
         unitPrice: it.unitPrice,
         salesPrice: it.salesPrice,

@@ -498,7 +498,7 @@ Service Tickets:
 - Duplicate within same purchase detection
 - Products listed as serial tags with remove buttons
 
-#### F1-S2: Non-Serialised Products + Auto-Serial Generation
+#### F1-S2: Non-Serialised Products + Auto-Serial Generation ✅ Complete
 - Add `isSerialised` boolean to Product model
 - Product edit page: "Serialised?" toggle
 - Purchase cart: hide serial input for non-serialised products, show "Non-serialised item"
@@ -506,6 +506,10 @@ Service Tickets:
 - Auto-suggest based on category (cameras = serialised, cables = non-serialised)
 - Products API: return `isSerialised` flag + compute onHand correctly for both types
 - Stock summary: show both types correctly
+- Sales cart: non-serialised products use qty-based line (no serial picker)
+- Sales POST API: oversell check for non-serialised products (ΣPurchaseItem.qty − ΣSaleItem.qty ≥ requested qty)
+- Shared `computeOnHand` + `computeOnHandBatch` helpers in `src/lib/onhand.ts` (used by 5 API endpoints)
+- Backfill: existing Cable/PSU/Accessories products auto-set to `isSerialised=false`
 
 #### F1-S3: Purchase Edit + Delete + Inline Supplier Creation ✅ Complete
 - Purchase edit: load items back into cart, allow editing all fields

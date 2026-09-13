@@ -16,16 +16,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Save, Loader2, ArrowLeft, ScanLine, Search, X, AlertTriangle, UserPlus } from "lucide-react";
+import { Plus, Trash2, Save, Loader2, ArrowLeft, ScanLine, Search, X, AlertTriangle, UserPlus, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT } from "@/lib/format";
 
-type Product = { id: string; name: string; model: string | null; sku: string; defaultPrice: number | null; unitName: string | null };
+type Product = { id: string; name: string; model: string | null; sku: string; defaultPrice: number | null; unitName: string | null; isSerialised: boolean };
 type Supplier = { id: string; name: string; company: string | null };
 type CartLine = {
   key: string;
   productId: string;
   productName: string;
+  isSerialised: boolean; // F1-S2: false = qty-based (no serial entry)
   qty: string;
   unitPrice: string;
   salesPrice: string;
@@ -99,6 +100,7 @@ function NewPurchaseForm() {
             key: `${it.productId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             productId: it.productId,
             productName: it.productName,
+            isSerialised: it.isSerialised ?? products.find((p) => p.id === it.productId)?.isSerialised ?? true,
             qty: String(it.qty),
             unitPrice: String(it.unitPrice),
             salesPrice: it.salesPrice != null ? String(it.salesPrice) : "",
@@ -128,6 +130,7 @@ function NewPurchaseForm() {
         key,
         productId: p.id,
         productName: p.name,
+        isSerialised: p.isSerialised,
         qty: "1",
         unitPrice: "",
         salesPrice: p.defaultPrice ? String(p.defaultPrice) : "",
@@ -469,6 +472,15 @@ function NewPurchaseForm() {
                     <div className="min-w-0">
                       <p className="font-medium text-sm">{line.productName}</p>
                       <div className="flex items-center gap-2 mt-0.5">
+                        {line.isSerialised ? (
+                          <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300">
+                            <ScanLine className="h-3 w-3 mr-1" /> Serialised
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+                            <Package className="h-3 w-3 mr-1" /> Non-serialised
+                          </Badge>
+                        )}
                         {serialCount > 0 && (
                           <Badge variant="outline" className="text-xs">
                             <ScanLine className="h-3 w-3 mr-1" />{serialCount} serials
@@ -491,12 +503,13 @@ function NewPurchaseForm() {
                     </Button>
                   </div>
 
-                  {/* Qty + prices grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {/* Qty + prices grid (warranty only for serialised products) */}
+                  <div className={`grid grid-cols-2 sm:grid-cols-4 gap-2`}>
                     <div className="space-y-1">
-                      <Label className="text-xs">Qty {serialCount > 0 && `(${serialCount} serials)`}</Label>
+                      <Label className="text-xs">Qty {line.isSerialised && serialCount > 0 && `(${serialCount} serials)`}</Label>
                       <Input type="number" step="0.01" min="0" value={line.qty}
-                        onChange={(e) => updateLine(line.key, "qty", e.target.value)} />
+                        onChange={(e) => updateLine(line.key, "qty", e.target.value)}
+                        placeholder={line.isSerialised ? "matches serial count" : "e.g. 5 rolls"} />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Unit price</Label>
@@ -508,51 +521,65 @@ function NewPurchaseForm() {
                       <Input type="number" step="0.01" min="0" value={line.salesPrice}
                         onChange={(e) => updateLine(line.key, "salesPrice", e.target.value)} placeholder="optional" />
                     </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Warranty (mo)</Label>
-                      <Input type="number" min="0" value={line.warrantyMonths}
-                        onChange={(e) => updateLine(line.key, "warrantyMonths", e.target.value)} />
-                    </div>
-                  </div>
-
-                  {/* Serial chips input */}
-                  <div className="space-y-1">
-                    <Label className="text-xs">Serial numbers (scan or type + Enter)</Label>
-                    <div className="flex flex-wrap items-center gap-1 rounded-lg border p-2 min-h-[42px] focus-within:ring-2 focus-within:ring-ring">
-                      {line.serials.map((serial, i) => (
-                        <span
-                          key={i}
-                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-mono ${
-                            isDuplicateAcrossLines(serial, line.key)
-                              ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border border-red-300"
-                              : "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300 border border-blue-200 dark:border-blue-900"
-                          }`}
-                        >
-                          {serial}
-                          <button
-                            type="button"
-                            onClick={() => removeSerial(line.key, i)}
-                            className="hover:text-destructive"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </span>
-                      ))}
-                      <input
-                        type="text"
-                        aria-label="Serial input"
-                        value={line.serialInput}
-                        onChange={(e) => updateLine(line.key, "serialInput", e.target.value)}
-                        onKeyDown={(e) => handleSerialInputKeyDown(line.key, e)}
-                        onBlur={(e) => handleSerialInputBlur(line.key, e.target.value)}
-                        placeholder={line.serials.length === 0 ? "Scan or type serial + Enter…" : ""}
-                        className="flex-1 min-w-[120px] bg-transparent text-xs font-mono outline-none"
-                      />
-                    </div>
-                    {line.serials.some((s) => isDuplicateAcrossLines(s, line.key)) && (
-                      <p className="text-xs text-red-600">Duplicate serial detected across products — will be rejected on save.</p>
+                    {line.isSerialised ? (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Warranty (mo)</Label>
+                        <Input type="number" min="0" value={line.warrantyMonths}
+                          onChange={(e) => updateLine(line.key, "warrantyMonths", e.target.value)} />
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Warranty</Label>
+                        <div className="flex h-9 items-center px-2 rounded-md border bg-muted/30 text-xs text-muted-foreground">N/A</div>
+                      </div>
                     )}
                   </div>
+
+                  {/* Serial chips input — only for serialised products */}
+                  {line.isSerialised && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Serial numbers (scan or type + Enter)</Label>
+                      <div className="flex flex-wrap items-center gap-1 rounded-lg border p-2 min-h-[42px] focus-within:ring-2 focus-within:ring-ring">
+                        {line.serials.map((serial, i) => (
+                          <span
+                            key={i}
+                            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-mono ${
+                              isDuplicateAcrossLines(serial, line.key)
+                                ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border border-red-300"
+                                : "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300 border border-blue-200 dark:border-blue-900"
+                            }`}
+                          >
+                            {serial}
+                            <button
+                              type="button"
+                              onClick={() => removeSerial(line.key, i)}
+                              className="hover:text-destructive"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                        <input
+                          type="text"
+                          aria-label="Serial input"
+                          value={line.serialInput}
+                          onChange={(e) => updateLine(line.key, "serialInput", e.target.value)}
+                          onKeyDown={(e) => handleSerialInputKeyDown(line.key, e)}
+                          onBlur={(e) => handleSerialInputBlur(line.key, e.target.value)}
+                          placeholder={line.serials.length === 0 ? "Scan or type serial + Enter…" : ""}
+                          className="flex-1 min-w-[120px] bg-transparent text-xs font-mono outline-none"
+                        />
+                      </div>
+                      {line.serials.some((s) => isDuplicateAcrossLines(s, line.key)) && (
+                        <p className="text-xs text-red-600">Duplicate serial detected across products — will be rejected on save.</p>
+                      )}
+                    </div>
+                  )}
+                  {!line.isSerialised && (
+                    <p className="text-xs text-muted-foreground italic">
+                      Qty-based item — no serial numbers required. Stock tracked via purchase/sale totals.
+                    </p>
+                  )}
 
                   <div className="text-right text-sm">
                     <span className="text-muted-foreground">Line total: </span>

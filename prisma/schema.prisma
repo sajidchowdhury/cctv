@@ -224,6 +224,7 @@ model Product {
   unitId        String? // Pcs | Box | Roll | Set (ref to Unit)
   safetyStock   Int      @default(0) // low-stock alert trigger threshold
   defaultPrice  Float?   // suggested retail, auto-fills Sales (doc §4.2)
+  isSerialised  Boolean  @default(true) // true = track per-unit via InventoryUnit (cameras/DVRs); false = qty-based stock (cables/PSU/accessories) — F1-S2
   imageUrl      String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

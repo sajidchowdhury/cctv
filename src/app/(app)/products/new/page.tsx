@@ -8,9 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, ArrowLeft, Save } from "lucide-react";
+import { Loader2, ArrowLeft, Save, ScanLine, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { suggestIsSerialised } from "@/lib/onhand";
 
 type Category = { id: string; name: string };
 type Unit = { id: string; name: string };
@@ -28,6 +31,7 @@ export default function NewProductPage() {
     unitId: "",
     safetyStock: 0,
     defaultPrice: "",
+    isSerialised: true,
   });
 
   useEffect(() => {
@@ -39,6 +43,14 @@ export default function NewProductPage() {
       setUnits(u.units ?? []);
     });
   }, []);
+
+  // F1-S2: auto-suggest isSerialised when category changes (Camera/DVR → true, Cable/PSU → false).
+  // Only auto-suggest on NEW products (not on edit — preserve the existing flag there).
+  function onCategoryChange(categoryId: string) {
+    const cat = categories.find((c) => c.id === categoryId);
+    const suggested = suggestIsSerialised(cat?.name ?? null);
+    setForm((f) => ({ ...f, categoryId, isSerialised: suggested }));
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -54,6 +66,7 @@ export default function NewProductPage() {
           unitId: form.unitId || null,
           safetyStock: Number(form.safetyStock),
           defaultPrice: form.defaultPrice ? Number(form.defaultPrice) : null,
+          isSerialised: form.isSerialised,
         }),
       });
       const data = await res.json();
@@ -62,7 +75,7 @@ export default function NewProductPage() {
         setSaving(false);
         return;
       }
-      toast({ title: "Product created", description: `${data.name} — SKU ${data.sku}` });
+      toast({ title: "Product created", description: `${data.name} — SKU ${data.sku} — ${data.isSerialised ? "Serialised" : "Non-serialised"}` });
       router.push("/products");
     } finally {
       setSaving(false);
@@ -73,7 +86,7 @@ export default function NewProductPage() {
     <div className="space-y-6">
       <PageHeader
         title="New product"
-        description="SKU auto-generated from category + model."
+        description="SKU auto-generated from category + model. Toggle serialised mode per product."
         action={
           <Button asChild variant="outline" size="sm">
             <Link href="/products"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
@@ -96,7 +109,7 @@ export default function NewProductPage() {
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
-                <Select value={form.categoryId} onValueChange={(v) => setForm((f) => ({ ...f, categoryId: v }))}>
+                <Select value={form.categoryId} onValueChange={onCategoryChange}>
                   <SelectTrigger id="category"><SelectValue placeholder="Select…" /></SelectTrigger>
                   <SelectContent>
                     {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -132,6 +145,40 @@ export default function NewProductPage() {
                 onChange={(e) => setForm((f) => ({ ...f, defaultPrice: e.target.value }))}
                 placeholder="Auto-fills sales (doc §4.2)" />
             </div>
+
+            {/* F1-S2: Serialised toggle */}
+            <div className="rounded-lg border p-4 space-y-3 bg-muted/30">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    {form.isSerialised ? (
+                      <ScanLine className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    ) : (
+                      <Package className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    )}
+                    <Label htmlFor="isSerialised" className="font-medium cursor-pointer">
+                      {form.isSerialised ? "Serialised product" : "Non-serialised product"}
+                    </Label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {form.isSerialised
+                      ? "Tracks each physical unit by serial number (cameras, DVRs, NVRs). Stock = count of IN_STOCK units. Required at purchase time."
+                      : "Qty-based stock tracking (cables, PSU, accessories). Stock = ΣPurchase qty − ΣSale qty. No serial entry at purchase."}
+                  </p>
+                </div>
+                <Switch
+                  id="isSerialised"
+                  checked={form.isSerialised}
+                  onCheckedChange={(v) => setForm((f) => ({ ...f, isSerialised: v }))}
+                />
+              </div>
+              {form.categoryId && (
+                <Badge variant="outline" className="text-xs">
+                  Auto-suggested from category
+                </Badge>
+              )}
+            </div>
+
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={saving || !form.name}>
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}

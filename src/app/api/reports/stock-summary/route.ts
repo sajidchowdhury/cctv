@@ -5,11 +5,16 @@
  * Stock value = on-hand × last purchase price (from the latest PurchaseItem
  * for each product). Products with no purchases yet have value 0.
  *
+ * F1-S2: onHand branches on product.isSerialised.
+ *   - Serialised: onHand = count of IN_STOCK InventoryUnit rows.
+ *   - Non-serialised: onHand = ΣPurchaseItem.qty − ΣSaleItem.qty.
+ *
  * Returns: per-product rows + totals (totalUnits, totalValue, lowStockCount).
  */
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { withTenant } from "@/lib/session";
+import { computeOnHandBatch } from "@/lib/onhand";
 
 export const GET = withTenant(async (user, req: Request) => {
   const url = new URL(req.url);
@@ -17,10 +22,15 @@ export const GET = withTenant(async (user, req: Request) => {
 
   const products = await db.product.findMany({
     where: { deletedAt: null },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      sku: true,
+      model: true,
+      safetyStock: true,
+      isSerialised: true,
       category: { select: { name: true } },
       unit: { select: { name: true } },
-      inventoryUnits: { where: { status: "IN_STOCK" }, select: { id: true } },
       purchaseItems: {
         orderBy: { createdAt: "desc" },
         take: 1,
@@ -30,8 +40,15 @@ export const GET = withTenant(async (user, req: Request) => {
     orderBy: { name: "asc" },
   });
 
+  // Compute onHand via shared helper (handles both serialised + non-serialised).
+  const onHandMap = await computeOnHandBatch(
+    db,
+    user.tenantId!,
+    products.map((p) => ({ id: p.id, isSerialised: p.isSerialised }))
+  );
+
   let rows = products.map((p) => {
-    const onHand = p.inventoryUnits.length;
+    const onHand = onHandMap.get(p.id) ?? 0;
     const lastCost = p.purchaseItems[0]?.unitPrice ?? 0;
     const value = onHand * lastCost;
     const lowStock = p.safetyStock > 0 && onHand <= p.safetyStock;
@@ -42,6 +59,7 @@ export const GET = withTenant(async (user, req: Request) => {
       model: p.model,
       categoryName: p.category?.name ?? null,
       unitName: p.unit?.name ?? null,
+      isSerialised: p.isSerialised,
       onHand,
       safetyStock: p.safetyStock,
       lastCost,

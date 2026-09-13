@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/layout/data-table";
-import { Boxes, AlertTriangle, Loader2, PackagePlus } from "lucide-react";
+import { Boxes, AlertTriangle, Loader2, PackagePlus, ScanLine, Package } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatBDT } from "@/lib/format";
 
@@ -20,6 +20,7 @@ type Row = {
   model: string | null;
   categoryName: string | null;
   unitName: string | null;
+  isSerialised: boolean; // F1-S2
   onHand: number;
   safetyStock: number;
   lastCost: number;
@@ -53,6 +54,19 @@ export default function StockPage() {
       },
       { header: "SKU", accessorKey: "sku", cell: ({ row }) => <code className="text-xs">{row.original.sku}</code> },
       { header: "Category", accessorKey: "categoryName", cell: ({ row }) => row.original.categoryName ?? "—" },
+      {
+        header: "Tracking",
+        id: "tracking",
+        cell: ({ row }) => (
+          <Badge variant="outline" className="text-xs">
+            {row.original.isSerialised ? (
+              <><ScanLine className="h-3 w-3 mr-1" /> Serialised</>
+            ) : (
+              <><Package className="h-3 w-3 mr-1" /> Qty-based</>
+            )}
+          </Badge>
+        ),
+      },
       { header: "On hand", accessorKey: "onHand", cell: ({ row }) => <span className="tabular-nums font-medium">{row.original.onHand}</span> },
       { header: "Safety", accessorKey: "safetyStock", cell: ({ row }) => <span className="tabular-nums text-muted-foreground">{row.original.safetyStock}</span> },
       { header: "Last cost", accessorKey: "lastCost", cell: ({ row }) => (row.original.lastCost ? formatBDT(row.original.lastCost) : "—") },

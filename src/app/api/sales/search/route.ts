@@ -5,18 +5,23 @@
  * Returns grouped results: each product card shows available IN_STOCK serials.
  * Out-of-stock products are included but flagged (so UI can disable them).
  *
+ * F1-S2: each product carries `isSerialised`. Non-serialised products (cables/PSU)
+ * return `serials: []` but compute onHand from PurchaseItem.qty − SaleItem.qty.
+ * `outOfStock` is based on that qty-based onHand for non-serialised products.
+ *
  * Response shape:
  *   [
  *     {
- *       productId, name, model, sku, defaultPrice,
+ *       productId, name, model, sku, defaultPrice, isSerialised,
  *       onHand, outOfStock: boolean,
- *       serials: [{ id, serialNo }]  // IN_STOCK serials for this product
+ *       serials: [{ id, serialNo }]  // IN_STOCK serials (empty for non-serialised)
  *     }
  *   ]
  */
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { withTenant } from "@/lib/session";
+import { computeOnHandBatch } from "@/lib/onhand";
 
 export const GET = withTenant(async (user, req: Request) => {
   const url = new URL(req.url);
@@ -35,7 +40,7 @@ export const GET = withTenant(async (user, req: Request) => {
     },
     include: {
       product: {
-        select: { id: true, name: true, model: true, sku: true, defaultPrice: true },
+        select: { id: true, name: true, model: true, sku: true, defaultPrice: true, isSerialised: true },
       },
     },
     take: 100,
@@ -51,7 +56,7 @@ export const GET = withTenant(async (user, req: Request) => {
         { sku: { contains: q } },
       ],
     },
-    select: { id: true, name: true, model: true, sku: true, defaultPrice: true },
+    select: { id: true, name: true, model: true, sku: true, defaultPrice: true, isSerialised: true },
   });
 
   // Merge: collect all product IDs from both sources.
@@ -61,6 +66,7 @@ export const GET = withTenant(async (user, req: Request) => {
     model: string | null;
     sku: string;
     defaultPrice: number | null;
+    isSerialised: boolean;
     serials: { id: string; serialNo: string }[];
   }>();
 
@@ -74,15 +80,16 @@ export const GET = withTenant(async (user, req: Request) => {
         model: p.model,
         sku: p.sku,
         defaultPrice: p.defaultPrice,
+        isSerialised: p.isSerialised,
         serials: [],
       });
     }
     productMap.get(p.id)!.serials.push({ id: unit.id, serialNo: unit.serialNo });
   }
 
-  // Add products from name/model/sku matches (fetch their serials separately).
+  // Add products from name/model/sku matches (fetch their serials separately, serialised only).
   const productIdsNeedingSerials = matchingProducts
-    .filter((p) => !productMap.has(p.id))
+    .filter((p) => p.isSerialised && !productMap.has(p.id))
     .map((p) => p.id);
 
   if (productIdsNeedingSerials.length > 0) {
@@ -105,26 +112,50 @@ export const GET = withTenant(async (user, req: Request) => {
       serialsByProduct.get(u.productId)!.push({ id: u.id, serialNo: u.serialNo });
     }
 
-    for (const p of matchingProducts.filter((p) => !productMap.has(p.id))) {
+    for (const p of matchingProducts.filter((p) => p.isSerialised && !productMap.has(p.id))) {
       productMap.set(p.id, {
         productId: p.id,
         name: p.name,
         model: p.model,
         sku: p.sku,
         defaultPrice: p.defaultPrice,
+        isSerialised: p.isSerialised,
         serials: serialsByProduct.get(p.id) ?? [],
       });
     }
   }
 
-  // Build final results: sort by name, flag out-of-stock.
+  // Add non-serialised matches (no serials, but valid stock).
+  for (const p of matchingProducts.filter((p) => !p.isSerialised && !productMap.has(p.id))) {
+    productMap.set(p.id, {
+      productId: p.id,
+      name: p.name,
+      model: p.model,
+      sku: p.sku,
+      defaultPrice: p.defaultPrice,
+      isSerialised: p.isSerialised,
+      serials: [],
+    });
+  }
+
+  // Compute onHand via shared helper (handles both modes).
+  const onHandMap = await computeOnHandBatch(
+    db,
+    user.tenantId!,
+    Array.from(productMap.values()).map((p) => ({ id: p.productId, isSerialised: p.isSerialised }))
+  );
+
+  // Build final results: sort by name, flag out-of-stock based on onHand.
   const results = Array.from(productMap.values())
     .sort((a, b) => a.name.localeCompare(b.name))
-    .map((p) => ({
-      ...p,
-      onHand: p.serials.length,
-      outOfStock: p.serials.length === 0,
-    }));
+    .map((p) => {
+      const onHand = onHandMap.get(p.productId) ?? 0;
+      return {
+        ...p,
+        onHand,
+        outOfStock: onHand <= 0,
+      };
+    });
 
   return NextResponse.json({ results });
 });

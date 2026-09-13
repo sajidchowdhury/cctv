@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/layout/confirm-dialog";
-import { ArrowLeft, Save, Trash2, Printer, Loader2, AlertTriangle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { ArrowLeft, Save, Trash2, Printer, Loader2, AlertTriangle, ScanLine, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT } from "@/lib/format";
 
@@ -21,6 +22,7 @@ type Product = {
   id: string; name: string; sku: string; model: string | null;
   categoryId: string | null; unitId: string | null;
   safetyStock: number; defaultPrice: number | null; imageUrl: string | null;
+  isSerialised: boolean;
   onHand: number; lowStock: boolean;
 };
 
@@ -65,6 +67,7 @@ export default function ProductDetailPage() {
           unitId: form.unitId || null,
           safetyStock: Number(form.safetyStock ?? 0),
           defaultPrice: form.defaultPrice ? Number(form.defaultPrice) : null,
+          isSerialised: form.isSerialised,
         }),
       });
       const data = await res.json();
@@ -101,9 +104,19 @@ export default function ProductDetailPage() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-4">
         <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">On hand</p><p className="text-2xl font-bold tabular-nums">{product.onHand}</p></CardContent></Card>
         <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Safety stock</p><p className="text-2xl font-bold tabular-nums">{product.safetyStock}</p></CardContent></Card>
+        <Card><CardContent className="py-4">
+          <p className="text-xs text-muted-foreground">Tracking</p>
+          <Badge variant="outline" className="mt-1">
+            {product.isSerialised ? (
+              <><ScanLine className="h-3 w-3 mr-1" /> Serialised</>
+            ) : (
+              <><Package className="h-3 w-3 mr-1" /> Qty-based</>
+            )}
+          </Badge>
+        </CardContent></Card>
         <Card><CardContent className="py-4">
           <p className="text-xs text-muted-foreground">Status</p>
           {product.lowStock ? (
@@ -157,6 +170,35 @@ export default function ProductDetailPage() {
                 <Label htmlFor="defaultPrice">Default price (BDT)</Label>
                 <Input id="defaultPrice" type="number" min={0} step="0.01" value={form.defaultPrice ?? ""} onChange={(e) => setForm((f) => ({ ...f, defaultPrice: e.target.value ? Number(e.target.value) : null }))} />
               </div>
+
+              {/* F1-S2: Serialised toggle */}
+              <div className="rounded-lg border p-4 space-y-2 bg-muted/30">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      {form.isSerialised ? (
+                        <ScanLine className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      ) : (
+                        <Package className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      )}
+                      <Label htmlFor="isSerialised" className="font-medium cursor-pointer">
+                        {form.isSerialised ? "Serialised product" : "Non-serialised product"}
+                      </Label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {form.isSerialised
+                        ? "Tracks per-unit via serial numbers. Stock = count of IN_STOCK units."
+                        : "Qty-based stock tracking. Stock = ΣPurchase qty − ΣSale qty. No serial entry at purchase."}
+                    </p>
+                  </div>
+                  <Switch
+                    id="isSerialised"
+                    checked={!!form.isSerialised}
+                    onCheckedChange={(v) => setForm((f) => ({ ...f, isSerialised: v }))}
+                  />
+                </div>
+              </div>
+
               <Button type="submit" disabled={saving}>{saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save</Button>
             </form>
           </CardContent>

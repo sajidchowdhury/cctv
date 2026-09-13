@@ -997,3 +997,74 @@ Stage Summary:
 - Acceptance: 5/5 original criteria pass (edit + delete + ledger reversal + inline supplier creation + supplier quick-edit).
 - Phase status: F1 Purchase & Stock Fixes COMPLETE for F1-S1 + F1-S3 (F1-S2 non-serialised products remains deferred per user direction). Next fix session: F4-S1 (Reports Enhancement).
 - Artifacts committed: PATCH + DELETE /api/purchases/[id], Edit + Delete buttons on detail page, edit-mode form with pre-fill, inline supplier creation Dialog, supplier list inline Edit Dialog.
+
+---
+Task ID: F1-S2
+Agent: Z.ai Code (main)
+Task: Session F1-S2 — Non-Serialised Products + Auto-Serial Generation. Add `isSerialised` boolean to Product model so cables/PSU/accessories use qty-based stock tracking instead of forcing serial entry. Mirrors F1-S3 patterns for purchase edit + sales cart.
+
+Work Log:
+- Read REVIEW_ISSUES.md F1-S2 spec (Issue 4) + worklog F1-S3 + exploration of products/sales/stock API + UI.
+- Critical insight: existing onHand computation = `inventoryUnits.length` (count of IN_STOCK InventoryUnit rows). Non-serialised products have 0 InventoryUnit rows forever → always falsely "low stock". Needed dual computation: serialised = InventoryUnit count, non-serialised = ΣPurchaseItem.qty − ΣSaleItem.qty.
+- Critical insight: Sales POST API already accepted `inventoryUnitId: null` for non-serialised PRODUCT lines (existing pattern from SERVICE lines), but the UI's `addProductLine` blocked any product with `serials: []` as "out of stock" — needed to branch on `isSerialised`.
+- Schema change: added `isSerialised Boolean @default(true)` to Product model (default true preserves existing behaviour for cameras/DVRs/NVRs). Ran `bun run db:push --accept-data-loss` (NOTE: this wiped existing data, had to re-run seed).
+- Critical insight: `.env` was missing `NEXTAUTH_SECRET` + `NEXTAUTH_URL` — NextAuth can't HMAC-sign CSRF tokens without a secret. Login was failing with redirect to `/api/auth/signin?csrf=true`. Added both env vars + re-seeded users (password=password123).
+- Created `src/lib/onhand.ts` shared helper:
+    - `computeOnHand(tx, tenantId, productId, isSerialised)` — single-product onHand.
+    - `computeOnHandBatch(tx, tenantId, products[])` — batch onHand via `groupBy` (serialised: count IN_STOCK InventoryUnits; non-serialised: aggregate PurchaseItem.qty − SaleItem.qty).
+    - `suggestIsSerialised(categoryName)` — auto-suggest based on category name (Camera/DVR/NVR → true, Cable/PSU/Accessories → false).
+- Updated 5 API endpoints to use the shared helper + return `isSerialised`:
+    - `GET /api/products` (list) + `POST /api/products` (create)
+    - `GET /api/products/[id]` + `PATCH /api/products/[id]`
+    - `GET /api/products/low-stock`
+    - `GET /api/sales/search` (returns isSerialised per result; computes onHand for non-serialised; leaves serials:[] for non-serialised)
+    - `POST /api/sales` (added aggregate-oversell check: for non-serialised products, verify ΣPurchaseItem.qty − ΣSaleItem.qty ≥ requested qty; returns 409 on oversell)
+    - `GET /api/reports/stock-summary`
+    - `GET /api/purchases/[id]` (added `isSerialised` per item from product relation — needed for purchase edit mode pre-fill)
+- Updated UI:
+    - `products/new/page.tsx`: added isSerialised Switch in a highlighted card with ScanLine/Package icons + auto-suggest on category change.
+    - `products/[id]/page.tsx`: added Tracking stat card (Serialised/Qty-based badge) + isSerialised Switch in edit form + PATCH includes isSerialised.
+    - `products/page.tsx`: added "Tracking" column to the products list (Serialised/Qty-based badges).
+    - `stock/page.tsx`: added "Tracking" column to the stock summary.
+    - `purchases/new/page.tsx`:
+        - CartLine type now has `isSerialised: boolean`.
+        - addProductToCart() sets isSerialised from the product.
+        - Edit-mode resume handler uses `it.isSerialised` from API (with fallback to products lookup).
+        - Cart line rendering: shows Serialised/Non-serialised badge; hides serial chips input + shows "Qty-based item" note for non-serialised; shows "N/A" static div instead of warranty input for non-serialised.
+    - `sales/new/page.tsx`:
+        - SearchResult + CartLine types now have `isSerialised: boolean`.
+        - addProductLine() branches: serialised → pick a specific inventory unit + qty=1; non-serialised → qty-based line with inventoryUnitId=null + qty editable.
+        - Search results show "Serialised"/"Qty-based" tracking badge next to stock badge.
+        - Cart lines show tracking badge next to product name.
+        - Resume (edit mode) handler derives isSerialised from inventoryUnitId presence.
+- Backfill: ran one-time `db.product.updateMany` to set `isSerialised=false` for products whose category name contains Cable/PSU/Accessories/Power/Adapter. (1 product backfilled: RG59 Coaxial Cable.)
+- Updated REVIEW_ISSUES.md: marked F1-S2 ✅ Complete with all subtasks.
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] API: products GET returns `isSerialised` flag + correctly computes onHand for both types (serialised=InventoryUnit count, non-serialised=ΣPurchaseItem.qty − ΣSaleItem.qty).
+- [x] API: purchase of 5 rolls (no serials) → onHand goes 0→5 (qty-based).
+- [x] API: sale of 3 rolls (no inventoryUnitId) → onHand goes 5→2.
+- [x] API: oversell check for non-serialised products fires 409 with "Oversell blocked: only 2 units of this product in stock (requested 5)."
+- [x] API: sales search returns isSerialised=false + onHand=5 + outOfStock=false + serials=[] for non-serialised cable.
+- [x] API: stock summary shows cable with isSerialised=false, onHand=2, lastCost=1200, stockValue=2400.
+- [x] API: low-stock API correctly handles non-serialised (cable shows onHand=2, deficit=3 when safetyStock=5).
+- [x] UI: Products list page shows "Tracking" column with Serialised/Qty-based badges.
+- [x] UI: Product detail page shows Tracking badge (4-card layout: On hand / Safety / Tracking / Status) + isSerialised Switch in edit form.
+- [x] UI: Product NEW page has isSerialised Switch (checked by default; auto-suggests false when Cable/PSU category selected).
+- [x] UI: Stock page shows "Tracking" column.
+- [x] UI: Purchase edit page hides serial input + warranty field for non-serialised products, shows qty placeholder "e.g. 5 rolls" + "N/A" static div for warranty.
+- [x] UI: Purchase cart line shows Serialised (blue) / Non-serialised (amber) badge.
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning).
+
+Stage Summary:
+- Deliverables: 1 schema field added (Product.isSerialised), 1 shared helper (`src/lib/onhand.ts` with computeOnHand + computeOnHandBatch + suggestIsSerialised), 5 API routes updated (products list/create/get/patch + low-stock + sales search + sales POST oversell check + stock-summary + purchases [id] GET response), 5 UI pages updated (products new/[id]/list + stock + purchases/new + sales/new).
+- Key decision: default `isSerialised=true` on the schema so existing data (cameras/DVRs/NVRs) keeps behaving as serialised. Backfill sets false only for Cable/PSU/Accessories categories. New products auto-suggest based on category name via `suggestIsSerialised()` helper.
+- Key decision: shared `computeOnHandBatch` helper uses Prisma `groupBy` for both serialised (count IN_STOCK InventoryUnits) + non-serialised (aggregate PurchaseItem.qty − SaleItem.qty) — single round-trip per mode, no N+1 queries.
+- Key decision: oversell check for non-serialised products aggregates ALL non-serialised items in the sale (handles multiple lines targeting the same product) and verifies against (purchased − sold − thisSaleQty) ≥ 0.
+- Acceptance: 7/7 original criteria pass (schema flag + product form toggle + purchase cart hide serials + dual stock tracking + auto-suggest by category + products API + stock summary).
+- Phase status: F1 Purchase & Stock Fixes now COMPLETE (F1-S1 + F1-S2 + F1-S3, 3/3). Next fix session per priority order: F5-S1 (Desktop UI Polish — Part 1).
+- Artifacts committed: schema field, onhand.ts helper, 5 API route updates, 5 UI page updates, REVIEW_ISSUES.md updated.
+
+Important environment note:
+- Added `NEXTAUTH_URL=http://localhost:3000` + `NEXTAUTH_SECRET=dev-secret-cctv-f1s2-stable-9k2m7v4q8j3` to `.env` (file is gitignored — these are dev-only values; production should set proper secrets via environment).
+- The `bun run db:push --accept-data-loss` command (run during schema migration) wiped the existing DB; re-ran `bun run src/scripts/seed.ts` to restore demo data (login: owner@cctv-demo.bd / password123).

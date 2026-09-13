@@ -109,6 +109,8 @@ export const POST = withTenant(async (user, req: Request) => {
   const due = Math.max(0, total - paid);
 
   // Validate inventory units are IN_STOCK + belong to the right product (oversell block).
+  // F1-S2: also oversell-check non-serialised products (no InventoryUnit, qty-based stock).
+  const nonSerialProductIds = new Set<string>();
   for (const item of items) {
     if (item.inventoryUnitId) {
       const unit = await adminDb.inventoryUnit.findUnique({
@@ -128,6 +130,47 @@ export const POST = withTenant(async (user, req: Request) => {
         return NextResponse.json(
           { error: `Inventory unit does not belong to the selected product.` },
           { status: 422 }
+        );
+      }
+    } else if (item.lineType === "PRODUCT" && item.productId) {
+      // Non-serialised PRODUCT line — collect productIds to validate aggregate stock.
+      nonSerialProductIds.add(item.productId);
+    }
+  }
+
+  // F1-S2: aggregate-oversell check for non-serialised products.
+  // For each non-serialised product, verify (purchasedQty − soldQty − alreadyInThisSale) ≥ 0.
+  if (nonSerialProductIds.size > 0) {
+    const ids = Array.from(nonSerialProductIds);
+    const [purchasedAgg, soldAgg] = await Promise.all([
+      adminDb.purchaseItem.groupBy({
+        by: ["productId"],
+        where: { tenantId, productId: { in: ids }, purchase: { deletedAt: null } },
+        _sum: { qty: true },
+      }),
+      adminDb.saleItem.groupBy({
+        by: ["productId"],
+        where: { tenantId, productId: { in: ids }, sale: { deletedAt: null } },
+        _sum: { qty: true },
+      }),
+    ]);
+    const purchasedMap = new Map(purchasedAgg.map((r) => [r.productId, r._sum.qty ?? 0]));
+    const soldMap = new Map(soldAgg.map((r) => [r.productId, r._sum.qty ?? 0]));
+    // Tally this sale's qty per non-serialised product (multiple lines could target same product).
+    const thisSaleQtyMap = new Map<string, number>();
+    for (const item of items) {
+      if (!item.inventoryUnitId && item.lineType === "PRODUCT" && item.productId) {
+        thisSaleQtyMap.set(item.productId, (thisSaleQtyMap.get(item.productId) ?? 0) + item.qty);
+      }
+    }
+    for (const [pid, requestedQty] of thisSaleQtyMap.entries()) {
+      const purchased = purchasedMap.get(pid) ?? 0;
+      const sold = soldMap.get(pid) ?? 0;
+      const available = purchased - sold;
+      if (requestedQty > available) {
+        return NextResponse.json(
+          { error: `Oversell blocked: only ${available} units of this product in stock (requested ${requestedQty}).` },
+          { status: 409 }
         );
       }
     }
