@@ -329,6 +329,8 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **Acceptance criteria:** buying a product to below safety stock fires an owner SMS within 60s.
 
+**Status:** ✅ Complete (S09) — verified via curl (stock-summary, low-stock silent + notify=1 SMS) + Agent Browser (dashboard stock widget, /stock page). SMS fires only with ?notify=1 (after a sale in S11), not on every dashboard read.
+
 ---
 
 ## 5. Phase P2 — Sales & Invoicing (Sessions S10–S14)
@@ -680,7 +682,7 @@ After each phase is complete:
 | Phase | Status | Sessions done | Pushed (commit) |
 |-------|--------|---------------|------------------|
 | P0 Foundation | ✅ Done (S01 ✅, S02 ✅, S03 ✅, S04 ✅, S05 ✅) | 5/5 | session(S05) |
-| P1 Catalogue & Stock | 🔄 In progress (S06 ✅, S07 ✅, S08 ✅) | 3/4 | session(S08) |
+| P1 Catalogue & Stock | ✅ Done (S06 ✅, S07 ✅, S08 ✅, S09 ✅) | 4/4 | session(S09) |
 | P2 Sales & Invoicing | ☐ Not started | 0/5 | — |
 | P3 Accounting | ☐ Not started | 0/2 | — |
 | P4 Employees & Payroll | ☐ Not started | 0/1 | — |
@@ -692,4 +694,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Phase P0 Foundation complete. Phase P1 in progress (S06–S08 ✅). Next: S09 — Stock Summary & Low-Stock Alerts (completes P1).*
+*End of implementation plan. Phase P0 Foundation complete. Phase P1 Catalogue & Stock complete (S06–S09 ✅). Next: Phase P2 — Sales & Invoicing (Session S10).*

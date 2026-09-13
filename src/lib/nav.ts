@@ -91,6 +91,13 @@ export const NAV_ITEMS: NavItem[] = [
     phase: "S07",
   },
   {
+    href: "/stock",
+    label: "Stock",
+    labelBn: "স্টক",
+    icon: Boxes,
+    phase: "S09",
+  },
+  {
     href: "/quotations",
     label: "Quotations",
     labelBn: "কোটেশন",

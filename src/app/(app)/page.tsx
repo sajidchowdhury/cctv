@@ -1,6 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +18,9 @@ import {
   Bell,
   Wrench,
   ArrowRight,
+  AlertTriangle,
+  TrendingUp,
+  Package,
 } from "lucide-react";
 import { formatBDT } from "@/lib/format";
 
@@ -31,13 +35,22 @@ const QUICK_LINKS = [
   { href: "/sales", label: "New Sale", icon: ShoppingCart, phase: "S11" },
   { href: "/purchases", label: "New Purchase", icon: PackagePlus, phase: "S08" },
   { href: "/products", label: "Products", icon: Boxes, phase: "S06" },
+  { href: "/stock", label: "Stock", icon: Package, phase: "S09" },
   { href: "/ledger", label: "Ledger", icon: BookOpen, phase: "S15" },
   { href: "/rma", label: "RMA", icon: Wrench, phase: "S21" },
-  { href: "/reminders", label: "Reminders", icon: Bell, phase: "S22" },
 ];
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
+
+  const { data: stockData } = useQuery({
+    queryKey: ["stock-summary-dashboard"],
+    queryFn: async () => {
+      const r = await fetch("/api/reports/stock-summary");
+      return await r.json();
+    },
+    enabled: status === "authenticated" && session?.user?.role !== "SUPER_ADMIN",
+  });
 
   if (status === "loading") {
     return (
@@ -49,11 +62,14 @@ export default function DashboardPage() {
   if (!session?.user) return null;
   const u = session.user;
 
+  const totals = stockData?.totals;
+  const lowStockItems = (stockData?.rows ?? []).filter((r: any) => r.lowStock).slice(0, 5);
+
   return (
     <div className="space-y-6">
       <PageHeader
         title={`Welcome, ${u.name}`}
-        description="Your workspace is ready. Modules fill in over the coming sessions."
+        description="Your workspace overview."
         action={
           <Button asChild variant="outline" size="sm">
             <Link href="/payment">
@@ -63,40 +79,46 @@ export default function DashboardPage() {
         }
       />
 
-      {/* Account + subscription snapshot */}
+      {/* Stock snapshot */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Role</CardDescription>
-            <CardTitle className="text-base flex items-center gap-2">
-              <LayoutDashboard className="h-4 w-4" /> {u.role}
+            <CardDescription className="flex items-center gap-1.5">
+              <Package className="h-3.5 w-3.5" /> Stock value
+            </CardDescription>
+            <CardTitle className="text-xl tabular-nums">{formatBDT(totals?.totalValue ?? 0)}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-1.5">
+              <Boxes className="h-3.5 w-3.5" /> Units on hand
+            </CardDescription>
+            <CardTitle className="text-xl tabular-nums">{totals?.totalUnits ?? 0}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5" /> Low-stock items
+            </CardDescription>
+            <CardTitle className={`text-xl tabular-nums ${(totals?.lowStockCount ?? 0) > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}>
+              {totals?.lowStockCount ?? 0}
             </CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Subscription</CardDescription>
+            <CardDescription className="flex items-center gap-1.5">
+              <LayoutDashboard className="h-3.5 w-3.5" /> Subscription
+            </CardDescription>
             <CardTitle className="text-base flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4" /> Plan
+              <span className="flex items-center gap-1.5">
+                <CreditCard className="h-4 w-4" />
               </span>
-              <Badge className={STATUS_TONE[u.subscriptionStatus] ?? ""} variant="secondary">
-                {u.subscriptionStatus}
+              <Badge className={STATUS_TONE[u.subscriptionStatus ?? ""] ?? ""} variant="secondary">
+                {u.subscriptionStatus ?? "—"}
               </Badge>
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Monthly fee</CardDescription>
-            <CardTitle className="text-base">{formatBDT(500)}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Email</CardDescription>
-            <CardTitle className="text-sm font-medium truncate" title={u.email}>
-              {u.email}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -106,10 +128,10 @@ export default function DashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Quick actions</CardTitle>
-          <CardDescription>Jump into a module (lands across S06–S22).</CardDescription>
+          <CardDescription>Jump into a module.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
             {QUICK_LINKS.map((q) => {
               const Icon = q.icon;
               return (
@@ -120,7 +142,6 @@ export default function DashboardPage() {
                 >
                   <Icon className="h-6 w-6 text-muted-foreground group-hover:text-foreground" />
                   <span className="text-xs font-medium">{q.label}</span>
-                  <span className="text-[10px] text-muted-foreground">{q.phase}</span>
                 </Link>
               );
             })}
@@ -128,19 +149,42 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Empty placeholder widgets — wired in later sessions */}
+      {/* Low stock + reminders widgets */}
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-base">Low stock</CardTitle>
-            <CardDescription>Items at or below safety stock (S09).</CardDescription>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/stock">View all <ArrowRight className="ml-1 h-3 w-3" /></Link>
+            </Button>
           </CardHeader>
           <CardContent>
-            <EmptyState
-              icon={Boxes}
-              title="No low-stock alerts"
-              description="Stock summary lands in Session S09. Add products in S06 to see alerts here."
-            />
+            {lowStockItems.length === 0 ? (
+              <EmptyState
+                icon={Boxes}
+                title="No low-stock alerts"
+                description="All products are above their safety stock threshold."
+              />
+            ) : (
+              <ul className="space-y-2">
+                {lowStockItems.map((item: any) => (
+                  <li key={item.id} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2">
+                    <div className="min-w-0">
+                      <Link href={`/products/${item.id}`} className="text-sm font-medium hover:underline truncate block">
+                        {item.name}
+                      </Link>
+                      <p className="text-xs text-muted-foreground">{item.sku} · {item.categoryName ?? "Uncategorised"}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                        {item.onHand}/{item.safetyStock}
+                      </Badge>
+                      <p className="text-xs text-muted-foreground mt-1">restock {item.deficit}+</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -164,10 +208,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-
-      <p className="text-center text-xs text-muted-foreground pt-2">
-        Session S04 — base UI shell established. Next sessions add module data.
-      </p>
     </div>
   );
 }

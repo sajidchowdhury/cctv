@@ -1,14 +1,19 @@
 /**
  * GET /api/products/low-stock — products at or below safety stock (doc §4.1).
- * Fires the low-stock alert event via INotifier (doc §4.1 "push + SMS to owner").
+ *
+ * Pass ?notify=1 to fire the digest SMS to the owner (use after a sale reduces
+ * stock, not on every dashboard read — otherwise the owner gets spammed).
+ * Default (no param) is a silent read for the dashboard widget.
  */
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
-import { adminDb } from "@/lib/db";
+import { db, adminDb } from "@/lib/db";
 import { withTenant } from "@/lib/session";
 import { getNotifier } from "@/lib/adapters/notifier";
 
-export const GET = withTenant(async (user) => {
+export const GET = withTenant(async (user, req: Request) => {
+  const url = new URL(req.url);
+  const notify = url.searchParams.get("notify") === "1";
+
   const products = await db.product.findMany({
     where: { deletedAt: null },
     include: {
@@ -27,10 +32,11 @@ export const GET = withTenant(async (user) => {
       safetyStock: p.safetyStock,
       deficit: p.safetyStock - p.inventoryUnits.length,
     }))
-    .filter((p) => p.onHand <= p.safetyStock && p.safetyStock > 0);
+    .filter((p) => p.onHand <= p.safetyStock && p.safetyStock > 0)
+    .sort((a, b) => b.deficit - a.deficit);
 
-  // Fire a single digest SMS to the owner if any low-stock (doc §4.1).
-  if (lowStock.length > 0) {
+  // Fire digest SMS only when explicitly requested (e.g. after a sale in S11).
+  if (notify && lowStock.length > 0) {
     const tenant = await adminDb.tenant.findUnique({
       where: { id: user.tenantId },
       select: { phone: true, name: true },

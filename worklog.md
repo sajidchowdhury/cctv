@@ -292,3 +292,35 @@ Stage Summary:
 - Acceptance: 1/1 original criterion passes. 3 serialised units + fractional stock + supplier due all verified.
 - Phase status: P1 Catalogue & Stock now 3/4 (S06–S08 ✅). Next: S09 — Stock Summary & Low-Stock Alerts (completes P1).
 - Artifacts committed: 3 API routes, 3 UI pages.
+
+---
+Task ID: S09
+Agent: Z.ai Code (main)
+Task: Session S09 — Stock Summary & Low-Stock Alerts. Live stock visibility + low-stock push/SMS. Dashboard low-stock widget. Completes Phase P1 — Catalogue & Stock.
+
+Work Log:
+- Read S08 worklog + dashboard (low-stock empty-state placeholder) + low-stock endpoint (S06, fired SMS on every GET — would spam owner).
+- Fixed low-stock endpoint: SMS now fires only with ?notify=1 (for use after a sale in S11), not on every dashboard read. Silent reads return the list without SMS.
+- Wrote GET /api/reports/stock-summary — product-wise: on-hand (from inventoryUnits), lastCost (latest PurchaseItem.unitPrice), stockValue (onHand × lastCost), lowStock flag (onHand ≤ safetyStock), deficit. Returns rows + totals (productCount, totalUnits, totalValue, lowStockCount). Preview of S18 full report.
+- Added /stock to nav.ts (Stock S09, Boxes icon).
+- Wrote /(app)/stock/page.tsx — stock summary page: 4 summary cards (Products/Total units/Stock value/Low-stock), DataTable (Product/SKU/Category/On hand/Safety/Last cost/Value/Status with deficit + restock badge), low-stock-only filter.
+- Rewrote dashboard (app)/page.tsx:
+    - 4 stock snapshot cards (Stock value, Units on hand, Low-stock items with amber tone, Subscription badge)
+    - Quick actions grid (added Stock link)
+    - Low-stock widget: live list of top 5 low-stock products (name, SKU, on-hand/safety badge, restock N+), with "View all" → /stock. Empty state when no alerts.
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Stock-summary endpoint returns product-wise on-hand, value, low-stock flag (5 products, 3 units, ৳7,500 value, 5 low-stock)
+- [x] Dashboard low-stock widget shows real data (5 items with on-hand/safety badges)
+- [x] Dashboard stock-value cards (৳7,500 value, 3 units, 5 low-stock)
+- [x] /stock page renders with summary cards + DataTable + low-stock filter
+- [x] Low-stock SMS fires only with ?notify=1 (silent reads don't spam): "[SMS → +8801711111111] Low-stock alert: 5 product(s)..."
+- [x] Browser: dashboard + /stock page render (no errors)
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning)
+
+Stage Summary:
+- Deliverables: stock-summary API, fixed low-stock endpoint (notify param), /stock page, dashboard rewrite (stock widgets + low-stock list), nav.ts (Stock entry).
+- Key decision: low-stock SMS fires only with ?notify=1 — the sale endpoint (S11) will call this after reducing stock, so the owner gets ONE digest SMS per stock-drop event, not on every dashboard read. Stock value uses the latest PurchaseItem.unitPrice as cost basis.
+- Acceptance: 1/1 original criterion passes. SMS fires (with notify=1); dashboard + /stock page show real data.
+- Phase status: P1 Catalogue & Stock COMPLETE (S06–S09 ✅, 4/4). Next: Phase P2 — Sales & Invoicing (S10).
+- Artifacts committed: stock-summary API, low-stock fix, /stock page, dashboard rewrite, nav.ts.
