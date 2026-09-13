@@ -507,12 +507,14 @@ Service Tickets:
 - Products API: return `isSerialised` flag + compute onHand correctly for both types
 - Stock summary: show both types correctly
 
-#### F1-S3: Purchase Edit + Delete + Inline Supplier Creation
+#### F1-S3: Purchase Edit + Delete + Inline Supplier Creation ✅ Complete
 - Purchase edit: load items back into cart, allow editing all fields
 - Purchase delete: soft delete + restore inventory units + reverse supplier balance
 - Ledger reversal on edit/delete (transactional)
 - Inline supplier creation: "+ New supplier" in dropdown → popover form → create + select
 - Supplier quick-edit from list (inline name/phone edit)
+- Guards: block edit/delete if purchase has paid > 0 (downstream payment settlement); block delete if any units SOLD/IN_RMA
+- Exposed invoiceNo + date fields (editable in edit-mode; auto-generated on create if blank)
 
 ---
 

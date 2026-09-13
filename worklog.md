@@ -936,3 +936,64 @@ Stage Summary:
 - Acceptance: 1/1 original criterion passes (DoD items verified). All 25 sessions complete.
 - Phase status: P7 Polish & Launch COMPLETE (S23-S25, 3/3). ALL PHASES COMPLETE.
 - Artifacts committed: onboarding API, OnboardingBanner, email-change cooldown, CI workflow, dashboard integration.
+
+---
+Task ID: F1-S3
+Agent: Z.ai Code (main)
+Task: Session F1-S3 — Purchase Edit + Delete + Inline Supplier Creation. Third session of Phase F1 (Purchase & Stock Fixes). Mirror the F2-S2 sales edit/delete pattern for purchases + add inline supplier creation + supplier quick-edit on list page.
+
+Work Log:
+- Read REVIEW_ISSUES.md F1-S3 spec (Issues 5 + 6) + worklog F2-S2 (sales edit/delete reference) + exploration of purchases/suppliers API + UI.
+- Critical insight: purchases CREATE InventoryUnits (vs sales which flip status). Reversal = `deleteMany` units, not `update status = IN_STOCK`.
+- Critical insight: no LedgerEntry model — supplier ledger is derived at read time from `Supplier.openingBalance + ΣPurchase.total − ΣPayment.amount`. Reversal = `Supplier.currentBalance: { decrement: existing.due }` only.
+- Critical insight: `/api/payments` does FIFO allocation that increments `Purchase.paid`. If a purchase has `paid > 0`, edit/delete would orphan settlements → guard with 422.
+- Wrote PATCH /api/purchases/[id] (full edit, transactional):
+    - Reverse: deleteMany InventoryUnits for purchaseId → deleteMany PurchaseItems → reverse Supplier.currentBalance by old due.
+    - Apply: update Purchase header (supplierId/invoiceNo/date/total/paid/due/mode/notes) → re-create PurchaseItems → re-create InventoryUnits (recompute warrantyEnd from new date + warrantyMonths) → apply new Supplier.currentBalance by new due.
+    - Serial uniqueness check excludes this purchase's own units (`where: { purchaseId: { not: id } }`).
+    - Hard 422 guard if `existing.paid > 0`.
+    - Auto-fill product.defaultPrice when salesPrice provided (matches POST behavior).
+    - P2002 invoice-no collision → 409.
+- Wrote DELETE /api/purchases/[id] (soft delete, transactional):
+    - deleteMany InventoryUnits for purchaseId → deleteMany PurchaseItems → reverse Supplier.currentBalance by due → soft-delete Purchase (set deletedAt + zero total/paid/due).
+    - Hard 422 guard if `existing.paid > 0` OR any inventory unit has status != IN_STOCK (i.e. already SOLD or IN_RMA).
+- Updated purchase detail page (`/(app)/purchases/[id]/page.tsx`):
+    - Added Edit button (asChild Link to `/purchases/new?resume=ID&edit=1`) + Delete button (ConfirmDialog).
+    - Locks both buttons when `paid > 0` with a warning card explaining why.
+    - Added max-h-96 overflow to inventory units list (long lists scroll).
+- Updated purchase new/edit page (`/(app)/purchases/new/page.tsx`):
+    - Wrapped in <Suspense> (useSearchParams requires it in Next.js 16).
+    - Reads `?resume=ID&edit=1` URL params.
+    - useEffect fetches `/api/purchases/[id]` when resumeId present → pre-fills supplierId, mode, paid, notes, invoiceNo, date, and cart lines (qty, unitPrice, salesPrice, warrantyMonths, serials).
+    - Save handler switches POST → PATCH with `editMode: true` + invoiceNo + date when in edit mode.
+    - Button text changes: "Save purchase" → "Update purchase".
+    - Migrated from anti-pattern `useState(() => fetch())` to proper `useEffect`.
+    - Added invoiceNo + date fields to the form (always visible; auto-generated on create if blank).
+    - Added inline supplier creation: UserPlus button next to supplier Select → opens Dialog with name/phone/company/address/openingBalance → POST /api/suppliers → append to local suppliers state + auto-select new ID.
+- Updated suppliers list page (`/(app)/suppliers/page.tsx`):
+    - Added new "Edit" action column on the DataTable.
+    - Clicking Edit opens a Dialog with name/phone/company/address pre-filled.
+    - PATCH /api/suppliers/[id] on save → invalidates `["suppliers"]` query + closes dialog.
+    - Description mentions "For opening balance, use the full detail page" (quick-edit focuses on the 4 most-edited fields).
+- Updated REVIEW_ISSUES.md: marked F1-S3 ✅ Complete with all subtasks + guards.
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] API: PATCH full edit — invoiceNo= PUR-EDITED-001, total 2000→4500, qty 2→3, unitPrice 1000→1500, warranty 12→24mo, serials A,B → A,B,C; old units deleted + new created (3 instead of 2); supplier balance correctly transitioned 2000→4500 (old due reversed, new due applied).
+- [x] API: PATCH serial uniqueness check excludes own units (re-using same serials A,B works; using a serial from another purchase returns 409).
+- [x] API: PATCH excess serial count returns 422.
+- [x] API: DELETE — soft-deletes purchase (GET returns 404 after), deletes inventory units, reverses supplier balance. Verified: balance 4500→4400→0 after deleting 2 purchases; serials freed for reuse in a new purchase.
+- [x] API: 'paid > 0' guard fires for both PATCH (422) and DELETE (422) with clear error message.
+- [x] UI: Purchase detail page renders Edit + Delete buttons; Delete opens AlertDialog "Delete this purchase?" with Cancel + Delete purchase buttons.
+- [x] UI: Click Edit navigates to `/purchases/new?resume=ID&edit=1`; page heading shows "Edit purchase"; all fields pre-filled (supplier, invoice no, date, mode, qty, unit price, warranty); button text "Update purchase".
+- [x] UI: Locks Edit + Delete when paid > 0 with warning banner.
+- [x] UI: Inline supplier creation — UserPlus button next to supplier dropdown; click opens Dialog "New supplier" with Name*/Phone/Company/Address/Opening balance fields; POST /api/suppliers creates + auto-selects new supplier.
+- [x] UI: Suppliers list "Edit" action column on every row; click opens Dialog "Edit supplier" with name/phone/company/address pre-filled; PATCH /api/suppliers/[id] on save.
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning).
+
+Stage Summary:
+- Deliverables: 1 API route file extended (PATCH + DELETE on /api/purchases/[id]), 1 detail page updated (Edit + Delete buttons + paid-lock warning), 1 form page rewritten (edit mode + inline supplier creation + Suspense wrapper), 1 suppliers list page updated (inline Edit action column). REVIEW_ISSUES.md updated.
+- Key decision: PATCH only supports full-edit (no "held finalize" path like sales). Hard 422 guard on `paid > 0` for both edit + delete — editing a purchase whose balance has been settled would orphan the FIFO allocations in the linked Transaction rows; the user must reverse the payments first. DELETE also blocked if any inventory unit is SOLD or IN_RMA (only IN_STOCK units can be safely removed).
+- Key decision: invoiceNo + date exposed as editable fields in edit-mode (server auto-generates on create if blank). Warranty end-date is recomputed from the new date + warrantyMonths (so changing the date shifts all warranty end-dates accordingly).
+- Acceptance: 5/5 original criteria pass (edit + delete + ledger reversal + inline supplier creation + supplier quick-edit).
+- Phase status: F1 Purchase & Stock Fixes COMPLETE for F1-S1 + F1-S3 (F1-S2 non-serialised products remains deferred per user direction). Next fix session: F4-S1 (Reports Enhancement).
+- Artifacts committed: PATCH + DELETE /api/purchases/[id], Edit + Delete buttons on detail page, edit-mode form with pre-fill, inline supplier creation Dialog, supplier list inline Edit Dialog.

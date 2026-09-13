@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchScanInput } from "@/components/layout/search-scan-input";
@@ -13,7 +13,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Save, Loader2, ArrowLeft, ScanLine, Search, X, AlertTriangle } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import { Plus, Trash2, Save, Loader2, ArrowLeft, ScanLine, Search, X, AlertTriangle, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT } from "@/lib/format";
 
@@ -27,28 +30,88 @@ type CartLine = {
   unitPrice: string;
   salesPrice: string;
   warrantyMonths: string;
-  serialInput: string; // current text in the serial input field
-  serials: string[]; // parsed serial chips
+  serialInput: string;
+  serials: string[];
 };
 
-export default function NewPurchasePage() {
+function toIsoLocal(d: Date): string {
+  // YYYY-MM-DD for <input type="date"> value.
+  const tz = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return tz.toISOString().slice(0, 10);
+}
+
+function NewPurchaseForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
+
+  const resumeId = searchParams.get("resume");
+  const isEditMode = searchParams.get("edit") === "1";
+
   const [saving, setSaving] = useState(false);
+  const [loadingResume, setLoadingResume] = useState(!!resumeId);
   const [supplierId, setSupplierId] = useState("");
   const [mode, setMode] = useState("CASH");
   const [paid, setPaid] = useState("");
   const [notes, setNotes] = useState("");
+  const [invoiceNo, setInvoiceNo] = useState(""); // editable on edit-mode (auto-gen on create if blank)
+  const [date, setDate] = useState(toIsoLocal(new Date()));
   const [lines, setLines] = useState<CartLine[]>([]);
   const [productSearch, setProductSearch] = useState("");
   const [showProductPicker, setShowProductPicker] = useState(false);
 
+  // Inline supplier creation dialog state.
+  const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
+  const [creatingSupplier, setCreatingSupplier] = useState(false);
+  const [newSupplier, setNewSupplier] = useState({
+    name: "", phone: "", company: "", address: "", openingBalance: "",
+  });
+
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  useState(() => {
+
+  useEffect(() => {
     fetch("/api/products").then((r) => r.json()).then((d) => setProducts(d.products ?? []));
     fetch("/api/suppliers").then((r) => r.json()).then((d) => setSuppliers(d.suppliers ?? []));
-  });
+  }, []);
+
+  // Pre-fill from existing purchase when ?resume=ID&edit=1.
+  useEffect(() => {
+    if (!resumeId) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/purchases/${resumeId}`);
+        const data = await res.json();
+        const purchase = data.purchase;
+        if (!purchase) {
+          toast({ title: "Not found", description: "Could not load purchase for edit.", variant: "destructive" });
+          setLoadingResume(false);
+          return;
+        }
+        setSupplierId(purchase.supplierId ?? "");
+        setMode(purchase.mode);
+        setPaid(String(purchase.paid || ""));
+        setNotes(purchase.notes ?? "");
+        setInvoiceNo(purchase.invoiceNo ?? "");
+        setDate(toIsoLocal(new Date(purchase.date)));
+        setLines(
+          (purchase.items as any[]).map((it) => ({
+            key: `${it.productId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            productId: it.productId,
+            productName: it.productName,
+            qty: String(it.qty),
+            unitPrice: String(it.unitPrice),
+            salesPrice: it.salesPrice != null ? String(it.salesPrice) : "",
+            warrantyMonths: String(it.warrantyMonths || 0),
+            serialInput: "",
+            serials: Array.isArray(it.serials) ? it.serials : [],
+          }))
+        );
+      } finally {
+        setLoadingResume(false);
+      }
+    })();
+  }, [resumeId, toast]);
 
   const filteredProducts = products.filter((p) =>
     !productSearch ||
@@ -91,13 +154,11 @@ export default function NewPurchasePage() {
     if (!trimmed) return;
     setLines((l) => l.map((line) => {
       if (line.key !== key) return line;
-      // Check duplicate within same line
       if (line.serials.includes(trimmed)) {
         toast({ title: "Duplicate serial", description: `${trimmed} already added.`, variant: "destructive" });
         return line;
       }
       const newSerials = [...line.serials, trimmed];
-      // Auto-set qty to match serial count (if qty < serial count)
       const currentQty = Number(line.qty) || 0;
       const newQty = currentQty < newSerials.length ? String(newSerials.length) : line.qty;
       return { ...line, serials: newSerials, serialInput: "", qty: newQty };
@@ -108,7 +169,6 @@ export default function NewPurchasePage() {
     setLines((l) => l.map((line) => {
       if (line.key !== key) return line;
       const newSerials = line.serials.filter((_, i) => i !== index);
-      // Auto-reduce qty if it was auto-set from serial count
       const currentQty = Number(line.qty) || 0;
       const newQty = currentQty > newSerials.length ? String(newSerials.length || 1) : line.qty;
       return { ...line, serials: newSerials, qty: newQty };
@@ -120,15 +180,11 @@ export default function NewPurchasePage() {
       e.preventDefault();
       const value = (e.target as HTMLInputElement).value.trim();
       if (value) {
-        // Handle paste with multiple serials (comma/newline separated)
         const parts = value.split(/[\n,;]/).map(s => s.trim()).filter(Boolean);
-        for (const part of parts) {
-          addSerial(key, part);
-        }
+        for (const part of parts) addSerial(key, part);
       }
     }
     if (e.key === "Backspace" && !(e.target as HTMLInputElement).value) {
-      // Remove last serial on backspace in empty input
       setLines((l) => l.map((line) => {
         if (line.key !== key || line.serials.length === 0) return line;
         const newSerials = line.serials.slice(0, -1);
@@ -142,33 +198,25 @@ export default function NewPurchasePage() {
   function handleSerialInputBlur(key: string, value: string) {
     if (value.trim()) {
       const parts = value.split(/[\n,;]/).map(s => s.trim()).filter(Boolean);
-      for (const part of parts) {
-        addSerial(key, part);
-      }
+      for (const part of parts) addSerial(key, part);
     }
   }
 
-  // ─── Validation helpers ──────────────────────────────────
-  function getSerialErrors(line: CartLine): { excess: boolean; deficit: boolean; duplicateInDb: boolean } {
+  function getSerialErrors(line: CartLine) {
     const qty = Number(line.qty) || 0;
     const serialCount = line.serials.length;
     return {
       excess: serialCount > qty,
       deficit: serialCount > 0 && serialCount < qty,
-      duplicateInDb: false, // TODO: debounced DB check (API already validates on save)
     };
   }
 
-  // Check for duplicate serials across all lines (same serial in different products)
   function isDuplicateAcrossLines(serial: string, currentKey: string): boolean {
     return lines.some((l) => l.key !== currentKey && l.serials.includes(serial));
   }
 
   function hasSaveErrors(): boolean {
-    return lines.some((line) => {
-      const errors = getSerialErrors(line);
-      return errors.excess;
-    });
+    return lines.some((line) => getSerialErrors(line).excess);
   }
 
   const total = lines.reduce((sum, l) => sum + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0);
@@ -176,12 +224,47 @@ export default function NewPurchasePage() {
   const due = Math.max(0, total - paidNum);
   const totalSerials = lines.reduce((sum, l) => sum + l.serials.length, 0);
 
+  // ─── Inline supplier creation ───────────────────────────────
+  async function onCreateSupplier() {
+    if (newSupplier.name.trim().length < 2) {
+      toast({ title: "Name required", description: "Supplier name must be at least 2 chars.", variant: "destructive" });
+      return;
+    }
+    setCreatingSupplier(true);
+    try {
+      const payload = {
+        name: newSupplier.name.trim(),
+        phone: newSupplier.phone.trim() || null,
+        company: newSupplier.company.trim() || null,
+        address: newSupplier.address.trim() || null,
+        openingBalance: Number(newSupplier.openingBalance) || 0,
+      };
+      const res = await fetch("/api/suppliers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Failed", description: data.error ?? "Could not create supplier.", variant: "destructive" });
+        return;
+      }
+      const created = data.supplier;
+      setSuppliers((s) => [...s, { id: created.id, name: created.name, company: created.company ?? null }]);
+      setSupplierId(created.id);
+      setSupplierDialogOpen(false);
+      setNewSupplier({ name: "", phone: "", company: "", address: "", openingBalance: "" });
+      toast({ title: "Supplier added", description: `${created.name} ready for this purchase.` });
+    } finally {
+      setCreatingSupplier(false);
+    }
+  }
+
   async function onSave() {
     if (lines.length === 0) {
       toast({ title: "Empty cart", description: "Add at least one product.", variant: "destructive" });
       return;
     }
-    // Hard block: serial count > qty
     for (const line of lines) {
       const qty = Number(line.qty) || 0;
       if (line.serials.length > qty) {
@@ -191,7 +274,7 @@ export default function NewPurchasePage() {
     }
     setSaving(true);
     try {
-      const payload = {
+      const payload: any = {
         supplierId: supplierId || null,
         mode,
         paid: paidNum,
@@ -205,29 +288,47 @@ export default function NewPurchasePage() {
           serials: l.serials,
         })),
       };
-      const res = await fetch("/api/purchases", {
-        method: "POST",
+      // Edit-mode includes editMode + invoiceNo + date; create-mode omits them (server auto-generates).
+      if (isEditMode && resumeId) {
+        payload.editMode = true;
+        payload.invoiceNo = invoiceNo.trim() || null;
+        payload.date = date ? new Date(date).toISOString() : null;
+      }
+      const url = isEditMode && resumeId ? `/api/purchases/${resumeId}` : "/api/purchases";
+      const method = isEditMode && resumeId ? "PATCH" : "POST";
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
-        toast({ title: "Failed", description: data.error ?? "Could not create purchase.", variant: "destructive" });
+        toast({ title: "Failed", description: data.error ?? "Could not save purchase.", variant: "destructive" });
         setSaving(false);
         return;
       }
-      toast({ title: "Purchase saved", description: `${data.invoiceNo} — ${data.inventoryUnitsCreated} serialised units created.` });
+      if (isEditMode) {
+        toast({ title: "Purchase updated", description: data.message ?? "Saved." });
+      } else {
+        toast({ title: "Purchase saved", description: `${data.invoiceNo} — ${data.inventoryUnitsCreated} serialised units created.` });
+      }
       router.push("/purchases");
     } finally {
       setSaving(false);
     }
   }
 
+  if (loadingResume) {
+    return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
   return (
     <div className="space-y-6 pb-24 md:pb-6">
       <PageHeader
-        title="New purchase"
-        description="Multi-row cart with serial capture. Scan or type serials — they appear as removable chips."
+        title={isEditMode ? "Edit purchase" : "New purchase"}
+        description={isEditMode
+          ? "Edit items, supplier, prices. Old inventory units + supplier balance are reversed + reapplied transactionally."
+          : "Multi-row cart with serial capture. Scan or type serials — they appear as removable chips."}
         action={
           <Button asChild variant="outline" size="sm">
             <Link href="/purchases"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
@@ -242,12 +343,41 @@ export default function NewPurchasePage() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label>Supplier</Label>
-              <Select value={supplierId} onValueChange={setSupplierId}>
-                <SelectTrigger><SelectValue placeholder="Walk-in / select…" /></SelectTrigger>
-                <SelectContent>
-                  {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Select value={supplierId} onValueChange={setSupplierId}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="Walk-in / select…" /></SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}{s.company ? ` · ${s.company}` : ""}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setSupplierDialogOpen(true)}
+                  title="Create new supplier inline"
+                >
+                  <UserPlus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="invoiceNo">Invoice no.</Label>
+              <Input
+                id="invoiceNo"
+                value={invoiceNo}
+                onChange={(e) => setInvoiceNo(e.target.value)}
+                placeholder={isEditMode ? "" : "Auto-generated if blank"}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="date">Date</Label>
+              <Input
+                id="date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label>Payment mode</Label>
@@ -419,7 +549,7 @@ export default function NewPurchasePage() {
                         className="flex-1 min-w-[120px] bg-transparent text-xs font-mono outline-none"
                       />
                     </div>
-                    {isDuplicateAcrossLines("", line.key) && line.serials.some(s => isDuplicateAcrossLines(s, line.key)) && (
+                    {line.serials.some((s) => isDuplicateAcrossLines(s, line.key)) && (
                       <p className="text-xs text-red-600">Duplicate serial detected across products — will be rejected on save.</p>
                     )}
                   </div>
@@ -451,15 +581,75 @@ export default function NewPurchasePage() {
       <StickyActionBar>
         <Button onClick={onSave} disabled={saving || lines.length === 0 || hasSaveErrors()} className="flex-1">
           {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-          Save purchase
+          {isEditMode ? "Update purchase" : "Save purchase"}
         </Button>
       </StickyActionBar>
       <div className="hidden md:flex md:justify-end">
         <Button onClick={onSave} disabled={saving || lines.length === 0 || hasSaveErrors()}>
           {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-          Save purchase
+          {isEditMode ? "Update purchase" : "Save purchase"}
         </Button>
       </div>
+
+      {/* Inline supplier creation dialog */}
+      <Dialog open={supplierDialogOpen} onOpenChange={setSupplierDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New supplier</DialogTitle>
+            <DialogDescription>Create a supplier without leaving the purchase form. The new supplier is auto-selected when saved.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="sup-name">Name *</Label>
+              <Input id="sup-name" value={newSupplier.name}
+                onChange={(e) => setNewSupplier({ ...newSupplier, name: e.target.value })}
+                placeholder="e.g. Hikvision Bangladesh" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="sup-phone">Phone</Label>
+                <Input id="sup-phone" value={newSupplier.phone}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, phone: e.target.value })}
+                  placeholder="01xxxxxxxxx" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="sup-company">Company</Label>
+                <Input id="sup-company" value={newSupplier.company}
+                  onChange={(e) => setNewSupplier({ ...newSupplier, company: e.target.value })}
+                  placeholder="optional" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="sup-address">Address</Label>
+              <Input id="sup-address" value={newSupplier.address}
+                onChange={(e) => setNewSupplier({ ...newSupplier, address: e.target.value })}
+                placeholder="optional" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="sup-ob">Opening balance (BDT)</Label>
+              <Input id="sup-ob" type="number" step="0.01" value={newSupplier.openingBalance}
+                onChange={(e) => setNewSupplier({ ...newSupplier, openingBalance: e.target.value })}
+                placeholder="0 — positive = payable, negative = advance" />
+              <p className="text-xs text-muted-foreground">Use positive for payable, negative for advance.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSupplierDialogOpen(false)}>Cancel</Button>
+            <Button onClick={onCreateSupplier} disabled={creatingSupplier}>
+              {creatingSupplier ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+              Create supplier
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+export default function NewPurchasePage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
+      <NewPurchaseForm />
+    </Suspense>
   );
 }
