@@ -16,7 +16,16 @@ import { Plus, Trash2, Save, Loader2, ArrowLeft, Package, Wrench, RotateCcw, Era
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT } from "@/lib/format";
 
-type Product = { id: string; name: string; model: string | null; sku: string; defaultPrice: number | null; unitName: string | null; onHand: number };
+type SearchResult = {
+  productId: string;
+  name: string;
+  model: string | null;
+  sku: string;
+  defaultPrice: number | null;
+  onHand: number;
+  outOfStock: boolean;
+  serials: { id: string; serialNo: string }[];
+};
 type Customer = { id: string; name: string; phone: string | null };
 type CartLine = {
   key: string;
@@ -57,14 +66,24 @@ function NewSalePage() {
   const [productSearch, setProductSearch] = useState("");
   const [hydrated, setHydrated] = useState(false);
 
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<SearchResult[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
 
-  // Load products + customers once.
+  // Load customers once.
   useEffect(() => {
-    fetch("/api/products").then((r) => r.json()).then((d) => setProducts(d.products ?? []));
     fetch("/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers ?? []));
   }, []);
+
+  // Search products + serials via API (debounced).
+  useEffect(() => {
+    if (!productSearch.trim()) { setProducts([]); return; }
+    const timer = setTimeout(() => {
+      fetch(`/api/sales/search?q=${encodeURIComponent(productSearch.trim())}`)
+        .then((r) => r.json())
+        .then((d) => setProducts(d.results ?? []));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [productSearch]);
 
   // Resume: load a held sale's items into the cart.
   useEffect(() => {
@@ -126,21 +145,26 @@ function NewSalePage() {
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
   }, [customerId, mode, paid, discount, notes, lines, hydrated, resumeId]);
 
-  const filteredProducts = products.filter((p) =>
-    !productSearch ||
-    p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-    (p.model ?? "").toLowerCase().includes(productSearch.toLowerCase()) ||
-    p.sku.toLowerCase().includes(productSearch.toLowerCase())
-  );
+  const filteredProducts = products; // already filtered by API
 
-  function addProductLine(p: Product) {
+  function addProductLine(p: SearchResult, serialId?: string, serialNo?: string) {
+    // Stock check: block out-of-stock products.
+    if (p.outOfStock || p.serials.length === 0) {
+      toast({ title: "Out of stock", description: `${p.name} has no available stock. Create a purchase first.`, variant: "destructive" });
+      return;
+    }
+    // For serialised products: use the specified serial or auto-select first available.
+    const selectedSerial = serialId
+      ? { id: serialId, serialNo: serialNo ?? "" }
+      : p.serials[0];
+
     setLines((l) => [...l, {
-      key: `${p.id}-${Date.now()}`,
-      productId: p.id,
+      key: `${p.productId}-${Date.now()}`,
+      productId: p.productId,
       productName: p.name,
       productModel: p.model,
-      inventoryUnitId: "",
-      serialNo: "",
+      inventoryUnitId: selectedSerial?.id ?? "",
+      serialNo: selectedSerial?.serialNo ?? "",
       qty: "1",
       unitPrice: p.defaultPrice ? String(p.defaultPrice) : "",
       discount: "0",
@@ -324,32 +348,65 @@ function NewSalePage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Add items</CardTitle>
-          <CardDescription>Search by name, model, or SKU. Add a service line for installation charges.</CardDescription>
+          <CardDescription>Search by product name, model, SKU, or serial number.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex gap-2">
-            <SearchScanInput value={productSearch} onChange={setProductSearch} placeholder="Search name / model / SKU…" className="flex-1" />
+            <SearchScanInput value={productSearch} onChange={setProductSearch} placeholder="Search name / model / SKU / serial…" className="flex-1" />
             <Button variant="outline" type="button" onClick={addServiceLine}><Wrench className="mr-2 h-4 w-4" /> Service line</Button>
           </div>
           {productSearch && (
-            <div className="rounded-lg border max-h-60 overflow-y-auto scroll-area-thin">
+            <div className="rounded-lg border max-h-96 overflow-y-auto scroll-area-thin divide-y">
               {filteredProducts.length === 0 ? (
-                <p className="p-3 text-sm text-muted-foreground">No products match.</p>
+                <p className="p-4 text-sm text-muted-foreground text-center">No products found. Try a different search.</p>
               ) : (
-                filteredProducts.slice(0, 20).map((p) => (
-                  <button key={p.id} type="button" onClick={() => addProductLine(p)}
-                    className="flex w-full items-center justify-between border-b last:border-0 px-3 py-2 text-left hover:bg-accent">
-                    <div>
-                      <p className="text-sm font-medium">{p.name}</p>
-                      <p className="text-xs text-muted-foreground">{p.model ?? "—"} · {p.sku}</p>
-                    </div>
-                    <div className="text-right">
-                      <Badge variant="secondary" className={p.onHand > 0 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"}>
-                        {p.onHand} in stock
-                      </Badge>
-                      {p.defaultPrice && <p className="text-xs text-muted-foreground mt-1">{formatBDT(p.defaultPrice)}</p>}
-                    </div>
-                  </button>
+                filteredProducts.map((p) => (
+                  <div key={p.productId} className={`p-3 ${p.outOfStock ? "opacity-50" : "hover:bg-accent/50"} transition-opacity`}>
+                    {/* Product header row — click adds to cart with auto-selected first serial */}
+                    <button
+                      type="button"
+                      disabled={p.outOfStock}
+                      onClick={() => addProductLine(p)}
+                      className="flex w-full items-start justify-between gap-2 text-left disabled:cursor-not-allowed"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">{p.name}</p>
+                        <p className="text-xs text-muted-foreground">{p.model ?? "—"} · {p.sku}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        {p.outOfStock ? (
+                          <Badge variant="secondary" className="bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">
+                            Out of stock
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                            {p.onHand} in stock
+                          </Badge>
+                        )}
+                        {p.defaultPrice && (
+                          <p className="text-xs text-muted-foreground mt-1">{formatBDT(p.defaultPrice)}</p>
+                        )}
+                      </div>
+                    </button>
+                    {/* Available serials — click a specific serial to add that exact unit */}
+                    {p.serials.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1 pl-1">
+                        {p.serials.slice(0, 10).map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => addProductLine(p, s.id, s.serialNo)}
+                            className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-900 px-2 py-0.5 text-xs font-mono text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                          >
+                            {s.serialNo}
+                          </button>
+                        ))}
+                        {p.serials.length > 10 && (
+                          <span className="text-xs text-muted-foreground self-center">+{p.serials.length - 10} more</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 ))
               )}
             </div>
@@ -386,10 +443,12 @@ function NewSalePage() {
                   ) : (
                     <Input placeholder="Service description (e.g. Installation charge)" value={line.description} onChange={(e) => updateLine(line.key, "description", e.target.value)} />
                   )}
-                  {line.lineType === "PRODUCT" && (
-                    <div className="space-y-1">
-                      <Label className="text-xs">Serial number (optional — for serialised stock)</Label>
-                      <Input placeholder="Scan or type serial" value={line.serialNo} onChange={(e) => updateLine(line.key, "serialNo", e.target.value)} className="font-mono text-xs" />
+                  {line.lineType === "PRODUCT" && line.serialNo && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Serial:</span>
+                      <Badge variant="outline" className="font-mono text-xs border-blue-200 text-blue-700 dark:border-blue-900 dark:text-blue-300">
+                        {line.serialNo}
+                      </Badge>
                     </div>
                   )}
                   <div className="grid grid-cols-3 gap-2">

@@ -518,7 +518,7 @@ Service Tickets:
 
 ### Phase F2: Sales & Cart Overhaul (3 sessions)
 
-#### F2-S1: Sales Search Overhaul + Stock Check
+#### F2-S1: Sales Search Overhaul + Stock Check ✅ Complete
 - Search by serial number (expand query to InventoryUnit.serialNo)
 - Organized search results: grouped by product, showing available serials
 - Stock check: disable out-of-stock products in search results
