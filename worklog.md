@@ -506,3 +506,36 @@ Stage Summary:
 - Acceptance: 1/1 original criterion passes. Sale attributes to salesman + appears on customer ledger.
 - Phase status: P2 Sales & Invoicing COMPLETE (S10-S14, 5/5). Next: Phase P3 - Accounting (S15).
 - Artifacts committed: 2 API routes (customers/[id], customers/[id]/ledger), 3 UI pages, seed.ts (demo customers).
+
+---
+Task ID: S15
+Agent: Z.ai Code (main)
+Task: Session S15 — Income/Expense, Account Heads & Cash Book. §4.4 lightweight accounting: transactions (IN/EXP), tenant-customizable account heads, daily cash summary (opening + receipts - payments + closing + running balance). First session of Phase P3 — Accounting.
+
+Work Log:
+- Read S14 worklog + Transaction/AccountHead schema (already in S02). Transaction has type (IN/EXP/RECV/PAY), partyType, amount, mode, narration, attachmentUrl. AccountHead has name + kind (IN/EXP), tenant-scoped unique.
+- Wrote account-heads API: GET (list with txn count, kind filter), POST (create, @@unique([tenantId, name])).
+- Wrote transactions API: GET (list with type/headId/date-range filters, includes accountHead name), POST (create IN/EXP transaction with Zod validation).
+- Wrote cash-book API: GET /api/reports/cash-book — day-wise cash in/out with closing balance. Computes: opening cash (all CASH transactions before the date), + income transactions, - expense transactions, + cash sales paid amounts, - cash purchases paid amounts. Returns entries with running balance + totals (opening, in, out, closing). BDT-formatted.
+- Wrote accounting UI:
+    /(app)/ledger/page.tsx — main list: DataTable (Type/Date/Account head/Narration/Amount/Mode) with IN (green +) / EXP (red -) badges, summary cards (income/expense/net), type filter (All/Income/Expense), links to Heads + Cash book + New entry.
+    /(app)/accounting/new/page.tsx — create form: type (IN/EXP), account head (filtered by type), amount, mode (CASH/BANK/BKASH/NAGAD), date, narration.
+    /(app)/accounting/heads/page.tsx — manage account heads: add form (name + kind), grid of existing heads with kind badges + txn counts.
+    /(app)/accounting/cash-book/page.tsx — day view: date picker, 4 summary cards (opening/in/out/closing), entries table (Time/Type/Reference/Narration/In/Out/Balance with running balance).
+- Updated seed.ts: 5 demo account heads (Service Income IN, Rent/Electricity/Internet/Transport EXP), 3 demo transactions (Rent -15000, Electricity -3200, Service Income +5000).
+- Fixed: NEXTAUTH_SECRET missing from .env again (lost during db reset) — restored.
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Account heads: 5 seeded (IN + EXP), CRUD works (create with unique check)
+- [x] Transactions: 3 seeded (2 expense + 1 income), create works
+- [x] Cash-book: opening=0, in=5000, out=23200, closing=-18200, 4 entries with running balance
+- [x] Expense reduces cash closing: Electricity -3200 appears in cash-book out column
+- [x] Browser: ledger list + cash-book page render (no errors)
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning)
+
+Stage Summary:
+- Deliverables: account-heads API (2 endpoints), transactions API (2 endpoints), cash-book API, 4 UI pages (ledger list, new transaction, account heads, cash-book), seed.ts (5 heads + 3 transactions).
+- Key decision: cash-book computes from multiple sources (IN/EXP transactions + cash sales + cash purchases) for a true daily cash summary per doc §4.4. Opening cash = sum of all CASH transactions before the selected date. RECV (customer receipts) + PAY (supplier payments) types reserved for S16 — they'll add to the cash-book automatically when created.
+- Acceptance: 1/1 original criterion passes. Expense reduces cash closing correctly.
+- Phase status: P3 Accounting now 1/2 (S15 ✅). Next: S16 — Customer Receipts & Supplier Payments (completes P3).
+- Artifacts committed: 3 API routes (account-heads, transactions, reports/cash-book), 4 UI pages, seed.ts.

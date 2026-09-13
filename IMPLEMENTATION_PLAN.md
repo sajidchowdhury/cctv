@@ -456,6 +456,8 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **Acceptance criteria:** saving an electricity expense reduces daily cash closing correctly.
 
+**Status:** ✅ Complete (S15) — verified via curl (account heads CRUD, transactions CRUD, cash-book opening+in+out+closing+running balance) + Agent Browser (ledger list + cash-book page render). Expense reduces cash closing: opening 0, expense 3200 -> closing -3200.
+
 ---
 
 ### Session S16 — Customer Receipts & Supplier Payments
@@ -694,7 +696,7 @@ After each phase is complete:
 | P0 Foundation | ✅ Done (S01 ✅, S02 ✅, S03 ✅, S04 ✅, S05 ✅) | 5/5 | session(S05) |
 | P1 Catalogue & Stock | ✅ Done (S06 ✅, S07 ✅, S08 ✅, S09 ✅) | 4/4 | session(S09) |
 | P2 Sales & Invoicing | ✅ Done (S10 ✅, S11 ✅, S12 ✅, S13 ✅, S14 ✅) | 5/5 | session(S14) |
-| P3 Accounting | ☐ Not started | 0/2 | — |
+| P3 Accounting | 🔄 In progress (S15 ✅) | 1/2 | session(S15) |
 | P4 Employees & Payroll | ☐ Not started | 0/1 | — |
 | P5 Reports | ☐ Not started | 0/2 | — |
 | P6 CRM & Reminders | ☐ Not started | 0/3 | — |
@@ -704,4 +706,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Phase P0 + P1 + P2 complete. Next: Phase P3 — Accounting (Session S15).*
+*End of implementation plan. Phases P0–P2 complete. Phase P3 in progress (S15 ✅). Next: S16 — Customer Receipts & Supplier Payments (completes P3).*

@@ -196,6 +196,47 @@ async function main() {
     }
     console.log(`✓ Demo customers: ${demoCustomers.length} seeded`);
 
+    // ── Demo account heads (S15) ────────────────────────────
+    const demoHeads = [
+      { name: "Service Income", kind: "IN" },
+      { name: "Rent", kind: "EXP" },
+      { name: "Electricity", kind: "EXP" },
+      { name: "Internet Bill", kind: "EXP" },
+      { name: "Transport", kind: "EXP" },
+    ];
+    for (const h of demoHeads) {
+      await adminDb.accountHead.upsert({
+        where: { tenantId_name: { tenantId: tenant.id, name: h.name } },
+        update: { kind: h.kind },
+        create: { tenantId: tenant.id, name: h.name, kind: h.kind },
+      });
+    }
+    console.log(`✓ Demo account heads: ${demoHeads.length} seeded`);
+
+    // ── Demo transactions (S15) ────────────────────────────
+    const rentHead = await adminDb.accountHead.findFirst({ where: { tenantId: tenant.id, name: "Rent" } });
+    const elecHead = await adminDb.accountHead.findFirst({ where: { tenantId: tenant.id, name: "Electricity" } });
+    const svcHead = await adminDb.accountHead.findFirst({ where: { tenantId: tenant.id, name: "Service Income" } });
+    if (rentHead) {
+      const existing = await adminDb.transaction.findFirst({ where: { tenantId: tenant.id, accountHeadId: rentHead.id } });
+      if (!existing) {
+        await adminDb.transaction.create({ data: { tenantId: tenant.id, type: "EXP", partyType: "NONE", accountHeadId: rentHead.id, amount: 15000, mode: "CASH", narration: "Monthly shop rent", date: new Date() } });
+      }
+    }
+    if (elecHead) {
+      const existing = await adminDb.transaction.findFirst({ where: { tenantId: tenant.id, accountHeadId: elecHead.id } });
+      if (!existing) {
+        await adminDb.transaction.create({ data: { tenantId: tenant.id, type: "EXP", partyType: "NONE", accountHeadId: elecHead.id, amount: 3200, mode: "CASH", narration: "DESCO bill", date: new Date() } });
+      }
+    }
+    if (svcHead) {
+      const existing = await adminDb.transaction.findFirst({ where: { tenantId: tenant.id, accountHeadId: svcHead.id } });
+      if (!existing) {
+        await adminDb.transaction.create({ data: { tenantId: tenant.id, type: "IN", partyType: "NONE", accountHeadId: svcHead.id, amount: 5000, mode: "CASH", narration: "Camera installation service", date: new Date() } });
+      }
+    }
+    console.log(`✓ Demo transactions: 3 seeded`);
+
     console.log(
       `\n✅ Tenant + users seeded.\n` +
         `   Tenant: ${tenant.id}\n` +
