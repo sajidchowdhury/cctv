@@ -589,7 +589,9 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **UI screens:** `/(app)/rma` (pipeline board + filters), `/(app)/rma/new`, `/(app)/rma/[id]` (stage timeline).
 
-**Acceptance criteria:** an RMA tracks all 5 stages with timestamped history; ETA miss raises an owner alert.
+**Acceptance criteria:** an RMA tracks all 5 stages with timestamped history and ETA overdue alerts.
+
+**Status:** ✅ Complete (S21) — verified via curl (RMA create with auto-warranty check + inventory unit marked IN_RMA, 5-stage transitions with timestamped history, skip-stage requires note, close restores unit + SMS customer on each transition) + Agent Browser (RMA list with stage badges + progress dots, detail with stage timeline).
 
 ---
 
@@ -709,11 +711,11 @@ After each phase is complete:
 | P3 Accounting | ✅ Done (S15 ✅, S16 ✅) | 2/2 | session(S16) |
 | P4 Employees & Payroll | ✅ Done (S17 ✅) | 1/1 | session(S17) |
 | P5 Reports | ✅ Done (S18 ✅, S19 ✅) | 2/2 | session(S19) |
-| P6 CRM & Reminders | 🔄 In progress (S20 ✅) | 1/3 | session(S20) |
+| P6 CRM & Reminders | 🔄 In progress (S20 ✅, S21 ✅) | 2/3 | session(S21) |
 | P7 Polish & Launch | ☐ Not started | 0/3 | — |
 
 > When all rows read **✅ Done**, the SaaS is workable end-to-end.
 
 ---
 
-*End of implementation plan. Phases P0–P5 complete. Phase P6 in progress (S20 ✅). Next: S21 — Vendor RMA Pipeline.*
+*End of implementation plan. Phases P0–P5 complete. Phase P6 in progress (S20–S21 ✅). Next: S22 — Reminder Engine + SMS Gateway (completes P6).*

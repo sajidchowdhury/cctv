@@ -726,3 +726,49 @@ Stage Summary:
 - Acceptance: 1/1 original criterion passes. Auto 7-day follow-up scheduled + call-list returns right customers.
 - Phase status: P6 CRM & Reminders now 1/3 (S20 ✅). Next: S21 — Vendor RMA Pipeline.
 - Artifacts committed: 4 API routes, 2 UI pages, sales POST auto-follow-up hook.
+
+---
+Task ID: S21
+Agent: Z.ai Code (main)
+Task: Session S21 — Vendor RMA Pipeline. 5-stage repair lifecycle: Received from Customer → Sent to Vendor → Under Repair → Returned from Vendor → Delivered to Customer. Timestamped history, ETA overdue alerts, skip-stage with mandatory note, customer SMS at each transition, auto-warranty check on open. Second session of Phase P6.
+
+Work Log:
+- Read S20 worklog + RmaTicket/RmaHistory schema (already in S02). RmaTicket has stage enum, vendorRmaRef, vendorCharge, eta, closedAt. RmaHistory has stage, notes, actorUserId, timestamp.
+- Wrote 3 API routes:
+    GET  /api/rma — list tickets with stage, customer, product, supplier, overdue flag, stageIndex, historyCount. Stage + search filters.
+    POST /api/rma — create (transactional):
+      - auto-generates RMA-YYMMDD-###
+      - auto-warranty check: if inventoryUnitId provided, checks warrantyEnd > now → inWarranty flag
+      - marks inventory unit status = IN_RMA
+      - creates initial RmaHistory entry (RECEIVED_FROM_CUSTOMER) with warranty status note
+      - SMS customer about receipt
+    GET  /api/rma/[id] — detail with full stage history (timestamped, actor name).
+    POST /api/rma/[id]/transition — advance stage (transactional):
+      - validates not already closed
+      - skip-stage allowed but requires mandatory note (422 if missing)
+      - on DELIVERED_TO_CUSTOMER: sets closedAt + restores inventory unit to DELIVERED status
+      - creates RmaHistory entry with stage + notes + actorUserId
+      - SMS customer at each stage transition (doc §5.7 "auto-notify customer at each stage")
+- Wrote RMA UI (3 pages):
+    /(app)/rma — pipeline board: summary cards (open/overdue/closed), stage filter, search, ticket cards with stage badges + progress dots (5 dots showing stage progress), overdue flag.
+    /(app)/rma/new — create form: serial search (auto-warranty check shows In warranty/Expired), customer select, vendor select, fault reason, vendor RMA ref, vendor charge, ETA.
+    /(app)/rma/[id] — detail: stage progress bar (5 dots), details card, stage actions (Advance to next + Skip to future stages with note + Quick close), stage history timeline (vertical with dots + connecting lines, timestamps, actor names, notes).
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] RMA created with auto-warranty check (inWarranty=True for unit with warrantyEnd > now)
+- [x] Inventory unit marked IN_RMA on create
+- [x] 5-stage transitions work (RECEIVED → SENT → UNDER_REPAIR → RETURNED → DELIVERED)
+- [x] Timestamped history at each transition (stage + notes + actor + timestamp)
+- [x] Skip-stage requires note (422 "Skipping stages requires a note")
+- [x] Close RMA sets closedAt + restores inventory unit to DELIVERED
+- [x] SMS customer on each stage transition (via INotifier)
+- [x] ETA overdue flag (eta < now && stage != DELIVERED)
+- [x] Browser: RMA list renders with stage badges + progress dots (no errors)
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning)
+
+Stage Summary:
+- Deliverables: 3 API routes (rma, rma/[id], rma/[id]/transition), 3 UI pages (list, new, detail with stage timeline), auto-warranty check + inventory unit status management, customer SMS on transitions.
+- Key decision: transitions are forward-only (can't go back). Skip-stage is allowed but requires a mandatory note (doc §5.7 "allow skipping stages with mandatory note"). On DELIVERED_TO_CUSTOMER, the inventory unit status is set to DELIVERED (not back to IN_STOCK — it's been handed back to the customer). The RMA report (S19) automatically picks up these tickets since the API was pre-built.
+- Acceptance: 1/1 original criterion passes. 5 stages with timestamped history + ETA overdue alerts.
+- Phase status: P6 CRM & Reminders now 2/3 (S20–S21 ✅). Next: S22 — Reminder Engine + SMS Gateway (completes P6).
+- Artifacts committed: 3 API routes, 3 UI pages.
