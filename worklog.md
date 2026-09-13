@@ -1198,3 +1198,56 @@ Stage Summary:
 - Acceptance: 5/5 original criteria pass (Cash Book enhanced, Product Movement new, Customer Ledger standalone, Supplier Ledger standalone, all with date range + CSV + print + summary cards).
 - Phase status: F4 Reports Enhancement now 1/2 (F4-S1 ✅). Next: F4-S2 (Detailed + Category Reports).
 - Artifacts committed: 3 API routes, computeOnHandAt helper, 4 UI pages (1 enhanced + 3 new), reports hub updated.
+
+---
+Task ID: F4-S2
+Agent: Z.ai Code (main)
+Task: Session F4-S2 — Reports Enhancement Part 2 (Detailed + Category Reports). Build 5 new reports: Stock by Category, Stock by Model (with serial drill-down), Sales Detailed (line items), Purchase Detailed (line items), Profit/Loss Detailed (per-item cost + margin). All with date range (where applicable), CSV export, print, summary cards, responsive mobile/desktop. Second + final session of Phase F4 (Reports Enhancement).
+
+Work Log:
+- Read REVIEW_ISSUES.md F4-S2 spec (Issue 19) + comprehensive Explore agent audit of 4 existing report APIs (stock-summary, sales, purchase, profit-loss) + UI patterns + Prisma models + reusable helpers.
+- Critical insights:
+    - Stock by Category: reuse stock-summary query (computeOnHandBatch + lastCost) then group by `categoryName` in JS. Snapshot (no date range).
+    - Stock by Model: `Product.model` is a single `String?` per product, not per InventoryUnit. So "group by model" means group all products by their `Product.model` field (analogous to stock-by-category). Drill-down to serial-level when a specific model is selected (query InventoryUnits for products with that model).
+    - DataTable doesn't support expandable rows — use Fragment with `<Fragment key>` + conditional rendering for drill-down instead.
+    - Existing report pages don't have mobile card rendering — net-new pattern (dual-render: desktop table + mobile cards).
+    - Detailed reports should be separate pages (not expandable rows on existing reports) — cleaner for CSV export + print.
+
+- Built 5 new API endpoints:
+    - `GET /api/reports/stock-by-category` — snapshot; reuses `computeOnHandBatch`; groups products by categoryName; each category carries `products[]` for drill-down; returns `categories[]` + `totals { categoryCount, productCount, totalQty, totalValue }`.
+    - `GET /api/reports/stock-by-model` — snapshot; groups products by `Product.model` field (null → "No model"); each model carries `products[]`; optional `?model=X` filter returns `serials[]` (serialNo, productName, status, warrantyEnd, purchaseCost) for all InventoryUnits of products with that model.
+    - `GET /api/reports/sales-detailed?from=&to=` — flat one-row-per-SaleItem list (CSV-friendly); each row: invoiceNo, date, customer, salesman, lineType, productName, serialNo (from inventoryUnit), qty, unitPrice, discount, lineTotal, mode; SERVICE lines included (product = description, serialNo = null); summary with invoiceCount, lineItemCount, totalQty, totalRevenue, totalDiscount.
+    - `GET /api/reports/purchase-detailed?from=&to=` — flat one-row-per-PurchaseItem; each row: invoiceNo, date, supplier, productName, qty, unitPrice, salesPrice, warrantyMonths, lineTotal, serials (JSON-parsed + comma-joined for display, serialCount for badges), mode; summary with totalQty, totalPurchase, totalSerials.
+    - `GET /api/reports/profit-loss-detailed?from=&to=` — flat one-row-per-SaleItem with cost breakdown; each row: invoiceNo, date, customer, productName, serialNo, qty, unitPrice, discount, costPerUnit (last purchase price via `product.purchaseItems[0]?.unitPrice`), lineRevenue (qty × unitPrice × (1 - discount/100)), lineCost (qty × costPerUnit), lineProfit, margin%; SERVICE lines have costPerUnit = 0; summary with totalRevenue, totalCost, totalProfit, margin%.
+
+- Built 5 new report pages (all with PageHeader + summary cards + desktop table + mobile cards + Print + CSV):
+    - `stock-by-category`: expandable category rows (click to show products) + per-product drill-down with low-stock badges + qty-based tracking badges; CSV flattens to one row per product.
+    - `stock-by-model`: model rows + "Serials →" drill-down button per row; clicking switches to serial-level table (serialNo, product, status badge color-coded, warrantyEnd, purchaseCost); back button to return to models view; CSV export adapts (models view → one row per product; serials view → one row per serial).
+    - `sales-detailed`: DateRangePicker + 4 summary cards (Invoices / Line items / Total qty / Total revenue) + desktop table (10 columns: Invoice, Date, Customer, Product/Service with SVC badge, Serial, Qty, Unit, Disc%, Total, Mode) + mobile cards.
+    - `purchase-detailed`: DateRangePicker + 4 summary cards + desktop table (10 columns: Invoice, Date, Supplier, Product, Qty, Unit, Sales, Warranty, Serials with ScanLine badge + first 2 serials, Total) + mobile cards.
+    - `profit-loss-detailed`: DateRangePicker + 4 summary cards (Invoices / Revenue / Cost / Net profit with margin + TrendingUp/Down icon) + desktop table (12 columns: Invoice, Date, Customer, Product, Serial, Qty, Unit price, Cost/unit, Revenue, Cost, Profit color-coded, Margin badge) + mobile cards with 2-col grid.
+
+- Updated reports hub: added 5 new entries (Layers, ListTree, Receipt, PackageSearch, Coins icons; phase "F4-S2"); updated description "All 16 reports" (was "All 11").
+- Updated REVIEW_ISSUES.md: marked F4-S2 ✅ Complete.
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Stock by Category API: groups 5 products into 4 categories (Uncategorised, Camera, DVR/NVR, Cable) with qty + value per category + drill-down to products. Verified with test data: 1 unit in Uncategorised worth ৳5,000.
+- [x] Stock by Model API: groups 5 products by Product.model field (PSU-12V5A, DH-IPC-HDBW2431R, DH-XVR5108H, DS-2CE16D0T, RG59-90M). Drill-down with `?model=X` returns serial-level breakdown (serialNo, status, warrantyEnd, purchaseCost).
+- [x] Sales Detailed API: flat one-row-per-SaleItem. Verified: 1 invoice → 1 line item with productName, serialNo=SN-TEST-A, qty=1, unitPrice=৳7,000, lineTotal=৳7,000.
+- [x] Purchase Detailed API: flat one-row-per-PurchaseItem. Verified: 1 invoice → 1 line item with qty=2, serials=[SN-TEST-A, SN-TEST-B] (JSON-parsed + comma-joined display), unitPrice=৳5,000, lineTotal=৳10,000.
+- [x] Profit/Loss Detailed API: per-item cost breakdown. Verified: revenue=৳7,000, cost=৳5,000 (qty × costPerUnit where costPerUnit = last purchase price), profit=৳2,000, margin=28.6%.
+- [x] Reports hub: all 5 new entries present with "F4-S2" phase badges; "16 reports" in description.
+- [x] All 5 pages render via Agent Browser with correct headings + summary cards + tables.
+- [x] All 5 pages have Print button (window.print + data-print-hidden) + CSV export button.
+- [x] All 5 pages have mobile card fallback (sm:hidden ul + hidden sm:block table).
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning).
+
+Stage Summary:
+- Deliverables: 5 new API routes (stock-by-category, stock-by-model, sales-detailed, purchase-detailed, profit-loss-detailed), 5 new report pages, reports hub updated (16 cards). REVIEW_ISSUES.md updated.
+- Key decision: Stock by Model groups by `Product.model` field (single String? per product) rather than per-InventoryUnit — avoids schema complexity + matches the simpler "group all products" approach. Drill-down to serial-level is a separate view triggered by clicking "Serials →" on a model row.
+- Key decision: detailed reports use FLAT one-row-per-line-item layout (not expandable rows on existing summary reports) — cleaner for CSV export (one row per line item, no nesting), cleaner print, simpler to build. Each row repeats invoice header columns.
+- Key decision: Profit/Loss Detailed uses last purchase price as cost basis (matches existing profit-loss report) — not FIFO/avg. costPerUnit = `product.purchaseItems[0]?.unitPrice` (latest PurchaseItem.unitPrice for that product).
+- Key decision: SERVICE lines in sales-detailed + profit-loss-detailed are included with productName = description, serialNo = null, costPerUnit = 0 (no cost for service lines). Marked with SVC badge in UI.
+- Acceptance: 5/5 original criteria pass (Stock by Category, Stock by Model, Sales Detailed, Purchase Detailed, Profit/Loss Detailed).
+- Phase status: F4 Reports Enhancement COMPLETE (F4-S1 + F4-S2, 2/2). Total reports now 16 (was 11 before F4). Next per priority order: F2-S3 (Purchase Price Visibility + Margin Display).
+- Artifacts committed: 5 API routes, 5 report pages, reports hub updated.

@@ -578,7 +578,7 @@ Service Tickets:
 - Supplier Ledger: standalone report page with date range + print
 - All with: date range picker, CSV export, professional printable layout, summary cards
 
-#### F4-S2: Report Suite — Part 2 (Detailed + Category Reports)
+#### F4-S2: Report Suite — Part 2 (Detailed + Category Reports) ✅ Complete
 - Product Stock by Category: group by category, qty + value, drill-down
 - Product Stock by Model: group by model within product, serial breakdown
 - Invoice-wise Sales Report (detailed): each invoice expanded to line items
