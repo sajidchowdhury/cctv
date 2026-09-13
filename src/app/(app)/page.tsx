@@ -62,8 +62,16 @@ export default function DashboardPage() {
 
   if (status === "loading") {
     return (
-      <div className="flex items-center justify-center py-20">
-        <p className="text-sm text-muted-foreground">Loading…</p>
+      <div className="space-y-6">
+        <div className="h-8 w-64 rounded-lg bg-muted animate-pulse" />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-lg border p-4 space-y-2">
+              <div className="h-3 w-20 rounded bg-muted animate-pulse" />
+              <div className="h-7 w-24 rounded bg-muted animate-pulse" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

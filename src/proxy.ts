@@ -55,6 +55,6 @@ export const config = {
   // Match page routes only. API routes handle auth via withTenant/withRole/withAdmin.
   // Excluded: api, auth pages, admin (self-gates on role), static assets, uploads.
   matcher: [
-    "/((?!api|login|signup|verify-email|change-email|payment|admin|_next/static|_next/image|favicon.ico|logo.svg|robots.txt|uploads).*)",
+    "/((?!api|login|signup|verify-email|change-email|payment|admin|manifest.json|sw.js|_next/static|_next/image|favicon.ico|logo.svg|robots.txt|uploads).*)",
   ],
 };

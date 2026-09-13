@@ -10,3 +10,4 @@ export { DataTable } from "./data-table";
 export { CartTable } from "./cart-table";
 export type { CartLine } from "./cart-table";
 export { ConfirmDialog } from "./confirm-dialog";
+export { TableSkeleton, CardGridSkeleton } from "./skeletons";

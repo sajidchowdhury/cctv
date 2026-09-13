@@ -13,6 +13,7 @@ import { DataTable } from "@/components/layout/data-table";
 import { Boxes, Plus, AlertTriangle, Loader2 } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatBDT } from "@/lib/format";
+import { TableSkeleton, CardGridSkeleton } from "@/components/layout/skeletons";
 
 type Product = {
   id: string;
@@ -112,9 +113,7 @@ export default function ProductsPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <TableSkeleton rows={5} />
       ) : products.length === 0 ? (
         <EmptyState
           icon={Boxes}

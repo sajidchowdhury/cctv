@@ -27,6 +27,16 @@ export const metadata: Metadata = {
     "accounting",
   ],
   authors: [{ name: "CCTV Inventory SaaS" }],
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "CCTV SaaS",
+  },
+};
+
+export const viewport = {
+  themeColor: "#1A73E8",
 };
 
 export default function RootLayout({
