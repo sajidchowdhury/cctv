@@ -211,3 +211,38 @@ Stage Summary:
 - Acceptance: 2/2 original criteria pass. Low-stock alert fires; barcode label prints.
 - Phase status: P1 Catalogue & Stock now 1/4 (S06 ✅). Next: S07 — Suppliers & Opening Balances.
 - Artifacts committed: schema.prisma (tenant-scoped SKU), sku.ts, 8 API routes, providers.tsx (QueryClient), 3 products UI pages, seed.ts (demo products).
+
+---
+Task ID: S07
+Agent: Z.ai Code (main)
+Task: Session S07 — Suppliers & Opening Balances. Supplier master feeding the purchase + supplier-payment ledgers. Party-wise ledger view (opening + purchases − payments + running balance).
+
+Work Log:
+- Read S06 worklog + Supplier schema (already in S02 with openingBalance + currentBalance). Suppliers not in nav → added Truck icon + /suppliers entry.
+- Wrote suppliers API (3 route files, 6 endpoints):
+    GET  /api/suppliers (list with q search on name/company/phone, includes purchase count)
+    POST /api/suppliers (Zod, currentBalance starts = openingBalance)
+    GET  /api/suppliers/[id] (detail with recent purchases + payments arrays)
+    PATCH /api/suppliers/[id] (opening balance change recomputes currentBalance delta)
+    DELETE /api/suppliers/[id] (soft delete)
+    GET  /api/suppliers/[id]/ledger (unified ledger: opening + purchases debit − payments credit, running balance, BDT-formatted display)
+- Added Truck icon import + /suppliers entry to nav.ts (Suppliers S07, between Customers and Quotations).
+- Wrote suppliers UI (3 pages):
+    /(app)/suppliers/page.tsx — list with DataTable (Supplier/Company/Phone/Opening/Balance/Status), summary cards (total payable/advance/count), status badges (Payable amber / Advance emerald / Settled), search.
+    /(app)/suppliers/new/page.tsx — create form (name, company, phone, address, openingBalance with + = payable / − = advance hint).
+    /(app)/suppliers/[id]/page.tsx — detail with 3 stat cards + contact details + edit form + ledger table (Date/Type/Reference/Debit/Credit/Balance with running balance) + delete (ConfirmDialog).
+- Updated seed.ts: 3 demo suppliers (Dahua +15000 payable, Hikvision -5000 advance, RG Cables 0 settled).
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Supplier opening balance persists (create → currentBalance = openingBalance; 15000, -5000, 0)
+- [x] Opening balance shows in ledger summary (OPENING entry with debit=15000, balance=15000, BDT format)
+- [x] Suppliers list with DataTable (3 seeded, status badges, summary cards)
+- [x] Supplier detail renders (contact, edit, ledger table, delete)
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning)
+
+Stage Summary:
+- Deliverables: 6 API endpoints (suppliers CRUD + ledger), 3 UI pages (list/new/detail+ledger), nav.ts (Suppliers entry), seed.ts (3 demo suppliers).
+- Key decision: ledger endpoint computes running balance server-side from opening + purchases (debit) − payments (credit). Structure ready for S08 (purchases) and S16 (payments) to populate automatically. Opening balance change on PATCH recomputes currentBalance delta so historical purchases/payments aren't lost.
+- Acceptance: 1/1 original criterion passes. Opening balance persists + shows in ledger.
+- Phase status: P1 Catalogue & Stock now 2/4 (S06 ✅, S07 ✅). Next: S08 — Purchase Cart + Serial Capture + Inventory Units.
+- Artifacts committed: 3 API routes (suppliers, [id], [id]/ledger), 3 UI pages, nav.ts, seed.ts.

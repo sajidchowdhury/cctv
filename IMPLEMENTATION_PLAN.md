@@ -291,6 +291,8 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **Acceptance criteria:** supplier opening balance persists and shows in ledger summary.
 
+**Status:** ✅ Complete (S07) — verified via curl API tests (create/list/detail/ledger) + Agent Browser (list with summary cards, detail with ledger table).
+
 ---
 
 ### Session S08 — Purchase Cart + Serial Capture + Inventory Units
@@ -676,7 +678,7 @@ After each phase is complete:
 | Phase | Status | Sessions done | Pushed (commit) |
 |-------|--------|---------------|------------------|
 | P0 Foundation | ✅ Done (S01 ✅, S02 ✅, S03 ✅, S04 ✅, S05 ✅) | 5/5 | session(S05) |
-| P1 Catalogue & Stock | 🔄 In progress (S06 ✅) | 1/4 | session(S06) |
+| P1 Catalogue & Stock | 🔄 In progress (S06 ✅, S07 ✅) | 2/4 | session(S07) |
 | P2 Sales & Invoicing | ☐ Not started | 0/5 | — |
 | P3 Accounting | ☐ Not started | 0/2 | — |
 | P4 Employees & Payroll | ☐ Not started | 0/1 | — |
@@ -688,4 +690,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Phase P0 Foundation complete. Phase P1 in progress (S06 ✅). Next: S07 — Suppliers & Opening Balances.*
+*End of implementation plan. Phase P0 Foundation complete. Phase P1 in progress (S06–S07 ✅). Next: S08 — Purchase Cart + Serial Capture + Inventory Units.*

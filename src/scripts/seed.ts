@@ -152,6 +152,28 @@ async function main() {
     }
     console.log(`✓ Demo products: ${demoProducts.length} seeded`);
 
+    // ── Demo suppliers (S07) ────────────────────────────────
+    const demoSuppliers = [
+      { name: "Dahua Distributor BD", company: "Dahua Bangladesh Ltd", phone: "+8801711111222", address: "Karwan Bazar, Dhaka", opening: 15000 },
+      { name: "Hikvision Bangladesh", company: "Hikvision BD", phone: "+8801722222333", address: "Bashundhara, Dhaka", opening: -5000 }, // advance
+      { name: "RG Cables Ltd", company: "RG Cables", phone: "+8801733333444", address: "Mirpur, Dhaka", opening: 0 },
+    ];
+    for (const s of demoSuppliers) {
+      const existing = await adminDb.supplier.findFirst({ where: { tenantId: tenant.id, name: s.name } });
+      if (existing) {
+        await adminDb.supplier.update({ where: { id: existing.id }, data: {
+          company: s.company, phone: s.phone, address: s.address,
+          openingBalance: s.opening, currentBalance: s.opening,
+        }});
+      } else {
+        await adminDb.supplier.create({ data: {
+          tenantId: tenant.id, name: s.name, company: s.company, phone: s.phone,
+          address: s.address, openingBalance: s.opening, currentBalance: s.opening,
+        }});
+      }
+    }
+    console.log(`✓ Demo suppliers: ${demoSuppliers.length} seeded`);
+
     console.log(
       `\n✅ Tenant + users seeded.\n` +
         `   Tenant: ${tenant.id}\n` +

@@ -16,6 +16,7 @@ import {
   BookOpen,
   Boxes,
   Users,
+  Truck,
   FileText,
   Wrench,
   Bell,
@@ -81,6 +82,13 @@ export const NAV_ITEMS: NavItem[] = [
     labelBn: "কাস্টমার",
     icon: Users,
     phase: "S14",
+  },
+  {
+    href: "/suppliers",
+    label: "Suppliers",
+    labelBn: "সাপ্লায়ার",
+    icon: Truck,
+    phase: "S07",
   },
   {
     href: "/quotations",
