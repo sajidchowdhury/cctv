@@ -46,6 +46,14 @@ model Tenant {
   updatedAt  DateTime @updatedAt
   deletedAt  DateTime?
 
+  // F6-S1: Payment settings — platform-wide, stored per-tenant but bulk-edited by SUPER_ADMIN.
+  // Admin settings page reads from the first tenant + writes to ALL tenants (keeping them in sync).
+  // /payment page reads the current tenant's own settings.
+  bkashNumber   String?
+  nagadNumber   String?
+  bankDetails   String? // multi-line free text (bank name + A/C no + branch)
+  monthlyFee    Float   @default(500) // doc §3.2: BDT 500/month flat plan (configurable)
+
   // Relations
   users                 User[]
   subscription          Subscription?

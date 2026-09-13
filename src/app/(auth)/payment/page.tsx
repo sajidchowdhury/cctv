@@ -60,15 +60,34 @@ export default function PaymentPage() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [subscription, setSubscription] = useState<Subscription>(null);
   const [loading, setLoading] = useState(true);
+  // F6-S1: payment settings (bkashNumber, nagadNumber, bankDetails, monthlyFee)
+  const [settings, setSettings] = useState<{
+    bkashNumber: string | null;
+    nagadNumber: string | null;
+    bankDetails: string | null;
+    monthlyFee: number;
+    monthlyFeeDisplay: string;
+  } | null>(null);
 
   async function loadHistory() {
     setLoading(true);
     try {
-      const res = await fetch("/api/billing/history");
-      if (res.ok) {
-        const data = await res.json();
+      const [histRes, setRes] = await Promise.all([
+        fetch("/api/billing/history"),
+        fetch("/api/billing/settings"),
+      ]);
+      if (histRes.ok) {
+        const data = await histRes.json();
         setHistory(data.history);
         setSubscription(data.subscription);
+      }
+      if (setRes.ok) {
+        const setData = await setRes.json();
+        if (setData.settings) {
+          setSettings(setData.settings);
+          // Update the form's amount default to the configured fee.
+          setForm((f) => ({ ...f, amount: setData.settings.monthlyFee ?? 500 }));
+        }
       }
     } finally {
       setLoading(false);
@@ -172,12 +191,43 @@ export default function PaymentPage() {
               <CreditCard className="h-5 w-5" /> Submit payment
             </CardTitle>
             <CardDescription>
-              Pay BDT 500 to the admin&apos;s bKash / Nagad / Bank number, then
-              enter the transaction ID below.
+              Pay {settings?.monthlyFeeDisplay ?? "BDT 500"} to the admin&apos;s bKash / Nagad / Bank number below, then
+              enter the transaction ID.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={onSubmit} className="space-y-4">
+              {/* F6-S1: payment instructions card — show configured numbers */}
+              {settings && (
+                <div className="rounded-lg border bg-muted/30 p-3 space-y-2 text-sm">
+                  <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Send money to</p>
+                  {settings.bkashNumber && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">bKash</span>
+                      <span className="font-mono font-medium">{settings.bkashNumber}</span>
+                    </div>
+                  )}
+                  {settings.nagadNumber && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Nagad</span>
+                      <span className="font-mono font-medium">{settings.nagadNumber}</span>
+                    </div>
+                  )}
+                  {settings.bankDetails && (
+                    <div className="border-t pt-2">
+                      <span className="text-muted-foreground block mb-1">Bank</span>
+                      <pre className="whitespace-pre-wrap font-mono text-xs">{settings.bankDetails}</pre>
+                    </div>
+                  )}
+                  {!settings.bkashNumber && !settings.nagadNumber && !settings.bankDetails && (
+                    <p className="text-xs text-muted-foreground italic">Payment numbers not yet configured by admin.</p>
+                  )}
+                  <div className="flex items-center justify-between border-t pt-2">
+                    <span className="text-muted-foreground">Monthly fee</span>
+                    <span className="font-bold tabular-nums">{settings.monthlyFeeDisplay}</span>
+                  </div>
+                </div>
+              )}
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="method">Payment method</Label>
@@ -282,7 +332,7 @@ export default function PaymentPage() {
 
       <footer className="mt-auto border-t bg-card">
         <div className="mx-auto max-w-2xl px-4 py-4 text-center text-xs text-muted-foreground">
-          CCTV Inventory SaaS · BDT 500/month flat plan
+          CCTV Inventory SaaS · {settings?.monthlyFeeDisplay ?? "BDT 500"}/month flat plan
         </div>
       </footer>
     </main>

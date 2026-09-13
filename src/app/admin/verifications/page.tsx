@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { ShieldAlert, LogOut, CheckCircle2, XCircle, Clock, Loader2, RefreshCw, Unlock } from "lucide-react";
+import { ShieldAlert, LogOut, CheckCircle2, XCircle, Clock, Loader2, RefreshCw, Unlock, Settings } from "lucide-react";
+import Link from "next/link";
 import { formatBDT, formatDateTime } from "@/lib/format";
 
 type QueueItem = {
@@ -158,9 +159,14 @@ export default function AdminVerificationsPage() {
               <p className="text-[11px] text-muted-foreground">{admin.email}</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: "/admin/login", redirect: false })}>
-            <LogOut className="mr-2 h-4 w-4" /> Log out
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href="/admin/settings"><Settings className="mr-2 h-4 w-4" /> Settings</Link>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: "/admin/login", redirect: false })}>
+              <LogOut className="mr-2 h-4 w-4" /> Log out
+            </Button>
+          </div>
         </div>
       </header>
 

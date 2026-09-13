@@ -1300,3 +1300,76 @@ Stage Summary:
 - Acceptance: 4/4 original criteria pass (PP field in cart, margin calculation, PP in search results, SALESMAN role gating).
 - Phase status: F2 Sales & Cart Overhaul COMPLETE (F2-S1 + F2-S2 + F2-S3, 3/3). Next per priority order: F6-S1 (Admin & Subscription — Payment Settings).
 - Artifacts committed: sales search API (purchasePrice field), sales/new page (PP field + margin display + role gating).
+
+---
+Task ID: F6-S1
+Agent: Z.ai Code (main)
+Task: Session F6-S1 — Admin & Subscription (Payment Settings). Add configurable payment settings (bkashNumber, nagadNumber, bankDetails, monthlyFee) to the Tenant model; build admin settings page; update /payment + signup pages to display them. Completes Phase F6 (Admin & Subscription).
+
+Work Log:
+- Read REVIEW_ISSUES.md F6-S1 spec (Issues 21 + 22) + comprehensive Explore agent audit of admin panel + Tenant model + /payment page + signup page + subscription lifecycle.
+- Critical insight: settings are platform-wide (SUPER_ADMIN edits them; all tenants see the same payment numbers + fee). Stored on the Tenant model (as spec requires) but the admin reads from the first tenant + bulk-writes to ALL tenants (keeping them in sync).
+- Critical insight: at signup time the tenant doesn't exist yet — so the signup page fetches the platform default fee via a new public `/api/public/fee` endpoint (no auth) that reads from the first tenant. Falls back to 500 if no tenant exists.
+
+- Schema change: added 4 fields to `model Tenant`:
+    - `bkashNumber String?` (nullable, no default — like phone/address)
+    - `nagadNumber String?`
+    - `bankDetails String?` (multi-line free text)
+    - `monthlyFee Float @default(500)` (schema default 500 so existing rows get the sensible default)
+  Ran `bun run db:push` — non-destructive ALTER TABLE (new nullable columns + one with default).
+
+- Built 3 new API endpoints:
+    - `GET /api/admin/settings` — SUPER_ADMIN-only via `withAdmin`; reads from the first tenant (platform default carrier); returns `{ settings: { bkashNumber, nagadNumber, bankDetails, monthlyFee, monthlyFeeDisplay } }`.
+    - `POST /api/admin/settings` — SUPER_ADMIN-only; zod-validates the 4 fields; bulk-updates ALL tenants via `adminDb.tenant.updateMany({ where: { deletedAt: null }, data: updateData })`; returns `{ ok, updatedTenants, settings, message }`.
+    - `GET /api/billing/settings` — tenant-scoped via `withTenantAny` (allows PENDING/LOCKED users); reads the current tenant's own settings; returns the same settings shape. Used by the /payment page.
+    - `GET /api/public/fee` — public (no auth); reads the first tenant's monthlyFee; used by the signup page pre-tenant-creation. Falls back to 500.
+
+- Built admin settings page (`/admin/settings`):
+    - SUPER_ADMIN role guard (redirects to /admin/login if not SUPER_ADMIN).
+    - Form with bKash number + Nagad number + Bank details (Textarea) + Monthly fee (number).
+    - "Save settings" button POSTs to `/api/admin/settings`; shows success toast with tenant count.
+    - "Verifications" back link to navigate to the queue page.
+    - "Current fee" badge showing the current monthlyFeeDisplay.
+    - Uses the same admin layout pattern (header with ShieldAlert + admin email + Log out) as the verifications page.
+
+- Added "Settings" nav link to the admin verifications page header (next to Log out) — navigates to `/admin/settings`.
+
+- Updated /payment page (`/(auth)/payment`):
+    - Fetches `/api/billing/settings` in parallel with `/api/billing/history` on mount.
+    - Form's amount default now uses `settings.monthlyFee` instead of hardcoded 500.
+    - Added a "Send money to" instructions card above the form showing:
+        - bKash number (if configured)
+        - Nagad number (if configured)
+        - Bank details (multi-line, shown as `<pre>`)
+        - Monthly fee (bold)
+        - Fallback message "Payment numbers not yet configured by admin" if all 3 are null.
+    - Updated the CardDescription to show `{settings.monthlyFeeDisplay}` instead of "BDT 500".
+    - Updated the footer to show `{settings.monthlyFeeDisplay}/month` instead of "BDT 500/month".
+
+- Updated signup page (`/(auth)/signup`):
+    - Added `useEffect` to fetch `/api/public/fee` on mount.
+    - Replaced hardcoded "BDT 500/month" with `{feeDisplay}/month` (falls back to "BDT 500" if the fetch fails).
+    - State: `feeDisplay` initialized to "BDT 500" (sensible default).
+
+- Updated REVIEW_ISSUES.md: marked F6-S1 ✅ Complete.
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Schema: Tenant model has bkashNumber, nagadNumber, bankDetails (nullable String) + monthlyFee (Float @default(500)). db:push succeeded.
+- [x] Admin settings API GET: returns defaults (bkash=null, monthlyFee=500) before any config. Verified via curl.
+- [x] Admin settings API POST: updates bKash=01712-345678, nagad=01812-345678, bank="Bank: DBBL\nA/C: 1234567890123", monthlyFee=750. Returns updatedTenants=1. Verified via curl.
+- [x] Billing settings API GET: owner sees bkash=01712-345678, nagad=01812-345678, monthlyFee=750 (after admin POST). Verified via curl.
+- [x] Public fee API GET: returns monthlyFee=750 (after admin POST). Verified via curl.
+- [x] Admin settings page: renders form with pre-filled values (bKash=01712-345678, Nagad=01812-345678, Bank details, fee=750). Verified via Agent Browser: textbox "bKash number": 01712-345678, spinbutton "Monthly fee (BDT)": 750.
+- [x] Admin verifications page: has "Settings" link in header (navigates to /admin/settings).
+- [x] Payment page: form amount default=750 (configured fee); "Send money to" card shows bKash + Nagad + Bank + fee. Verified via Agent Browser: spinbutton "Amount (BDT)": 750.
+- [x] Signup page: fee text fetches from /api/public/fee (shows "750/month" after config, "BDT 500/month" by default).
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning).
+
+Stage Summary:
+- Deliverables: 1 schema migration (4 Tenant fields), 3 new API endpoints (admin/settings GET+POST, billing/settings GET, public/fee GET), 1 new admin page (settings), 2 updated user-facing pages (payment + signup), 1 nav link added to verifications page. REVIEW_ISSUES.md updated.
+- Key decision: platform-wide settings stored on the Tenant model. The admin reads from the first tenant + bulk-writes to ALL tenants (keeping them in sync). Each tenant's /payment page reads their own tenant's settings (which were bulk-updated by the admin). This matches the spec ("add fields to Tenant") while providing platform-wide consistency.
+- Key decision: `monthlyFee Float @default(500)` — existing rows get 500 automatically; new tenants (created via signup before the admin configures the fee) also get 500. The admin can change it at any time; the change propagates to all tenants immediately via the bulk update.
+- Key decision: public `/api/public/fee` endpoint (no auth) for the signup page — at signup time the tenant doesn't exist yet, so there's no tenant-scoped session. The endpoint reads the first tenant's monthlyFee (platform default). Falls back to 500 if no tenant exists.
+- Acceptance: 5/5 original criteria pass (settings on Tenant model, admin panel section, /payment page reads settings, subscription lifecycle uses configurable fee via display, signup page mentions current fee).
+- Phase status: F6 Admin & Subscription COMPLETE (F6-S1, 1/1). Next per priority order: F7-S1 (Inline Category/Unit Creation + Misc Fixes).
+- Artifacts committed: schema migration (4 Tenant fields), 3 API routes, 1 admin page, 2 updated user pages, 1 nav link.

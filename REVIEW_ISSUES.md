@@ -609,7 +609,7 @@ Service Tickets:
 
 ### Phase F6: Admin & Subscription (1 session)
 
-#### F6-S1: Admin Panel — Payment Settings
+#### F6-S1: Admin Panel — Payment Settings ✅ Complete
 - Create Settings table (or add fields to Tenant): `bkashNumber`, `nagadNumber`, `bankDetails`, `monthlyFee`
 - Admin panel: "Payment Settings" section with editable fields
 - `/payment` page: reads settings, displays current payment number + fee

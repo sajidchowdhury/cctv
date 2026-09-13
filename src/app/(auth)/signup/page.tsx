@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -21,6 +21,15 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailTaken, setEmailTaken] = useState(false);
+  // F6-S1: fetch the platform's configured monthly fee for display.
+  const [feeDisplay, setFeeDisplay] = useState("BDT 500");
+
+  useEffect(() => {
+    fetch("/api/public/fee")
+      .then((r) => r.json())
+      .then((d) => { if (d.monthlyFeeDisplay) setFeeDisplay(d.monthlyFeeDisplay); })
+      .catch(() => {}); // fall back to default
+  }, []);
 
   function update(k: keyof typeof form, v: string) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -66,7 +75,7 @@ export default function SignupPage() {
           </div>
           <h1 className="text-xl font-semibold tracking-tight">Create your workspace</h1>
           <p className="text-sm text-muted-foreground">
-            BDT 500/month flat plan. First payment verified by admin to activate.
+            {feeDisplay}/month flat plan. First payment verified by admin to activate.
           </p>
         </div>
 
