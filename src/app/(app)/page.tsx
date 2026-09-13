@@ -23,6 +23,7 @@ import {
   Package,
 } from "lucide-react";
 import { formatBDT } from "@/lib/format";
+import { useTranslation } from "@/lib/lang-store";
 
 const STATUS_TONE: Record<string, string> = {
   ACTIVE: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
@@ -42,6 +43,7 @@ const QUICK_LINKS = [
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
+  const { t } = useTranslation();
 
   const { data: stockData } = useQuery({
     queryKey: ["stock-summary-dashboard"],
@@ -74,12 +76,12 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Welcome, ${u.name}`}
-        description="Your workspace overview."
+        title={`${t("dashboard.welcome")}, ${u.name}`}
+        description={t("dashboard.overview")}
         action={
           <Button asChild variant="outline" size="sm">
             <Link href="/payment">
-              <CreditCard className="mr-2 h-4 w-4" /> Billing
+              <CreditCard className="mr-2 h-4 w-4" /> {t("dashboard.subscription")}
             </Link>
           </Button>
         }
@@ -90,7 +92,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1.5">
-              <Package className="h-3.5 w-3.5" /> Stock value
+              <Package className="h-3.5 w-3.5" /> {t("dashboard.stockValue")}
             </CardDescription>
             <CardTitle className="text-xl tabular-nums">{formatBDT(totals?.totalValue ?? 0)}</CardTitle>
           </CardHeader>
@@ -98,7 +100,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1.5">
-              <Boxes className="h-3.5 w-3.5" /> Units on hand
+              <Boxes className="h-3.5 w-3.5" /> {t("dashboard.unitsOnHand")}
             </CardDescription>
             <CardTitle className="text-xl tabular-nums">{totals?.totalUnits ?? 0}</CardTitle>
           </CardHeader>
@@ -106,7 +108,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1.5">
-              <AlertTriangle className="h-3.5 w-3.5" /> Low-stock items
+              <AlertTriangle className="h-3.5 w-3.5" /> {t("dashboard.lowStockItems")}
             </CardDescription>
             <CardTitle className={`text-xl tabular-nums ${(totals?.lowStockCount ?? 0) > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}>
               {totals?.lowStockCount ?? 0}
@@ -116,7 +118,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1.5">
-              <LayoutDashboard className="h-3.5 w-3.5" /> Subscription
+              <LayoutDashboard className="h-3.5 w-3.5" /> {t("dashboard.subscription")}
             </CardDescription>
             <CardTitle className="text-base flex items-center justify-between">
               <span className="flex items-center gap-1.5">
@@ -133,7 +135,7 @@ export default function DashboardPage() {
       {/* Quick actions */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Quick actions</CardTitle>
+          <CardTitle className="text-base">{t("dashboard.quickActions")}</CardTitle>
           <CardDescription>Jump into a module.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -159,16 +161,16 @@ export default function DashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base">Low stock</CardTitle>
+            <CardTitle className="text-base">{t("dashboard.lowStock")}</CardTitle>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/stock">View all <ArrowRight className="ml-1 h-3 w-3" /></Link>
+              <Link href="/stock">{t("dashboard.viewAll")} <ArrowRight className="ml-1 h-3 w-3" /></Link>
             </Button>
           </CardHeader>
           <CardContent>
             {lowStockItems.length === 0 ? (
               <EmptyState
                 icon={Boxes}
-                title="No low-stock alerts"
+                title={t("dashboard.noLowStock")}
                 description="All products are above their safety stock threshold."
               />
             ) : (
@@ -195,17 +197,17 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base">Upcoming reminders</CardTitle>
+            <CardTitle className="text-base">{t("dashboard.upcomingReminders")}</CardTitle>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/reminders">View all <ArrowRight className="ml-1 h-3 w-3" /></Link>
+              <Link href="/reminders">{t("dashboard.viewAll")} <ArrowRight className="ml-1 h-3 w-3" /></Link>
             </Button>
           </CardHeader>
           <CardContent>
             {(!dueReminders || dueReminders.count === 0) ? (
               <EmptyState
                 icon={Bell}
-                title="No reminders due today"
-                description="All caught up. Check reminders for upcoming dues."
+                title={t("dashboard.noReminders")}
+                description={t("dashboard.allCaughtUp")}
               />
             ) : (
               <ul className="space-y-2">

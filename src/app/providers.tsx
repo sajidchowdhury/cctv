@@ -2,12 +2,13 @@
 
 /**
  * Client providers: NextAuth SessionProvider + next-themes ThemeProvider
- * + TanStack Query (server-state cache for data fetching).
+ * + TanStack Query + LanguageProvider (i18n, S23).
  */
 import { useState } from "react";
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { LanguageProvider } from "@/lib/lang-store";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -32,7 +33,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <LanguageProvider>
+            {children}
+          </LanguageProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </SessionProvider>

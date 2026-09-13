@@ -5,9 +5,10 @@ import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { visibleNavItems } from "@/lib/nav";
-import { ShieldCheck, LogOut, Sun, Moon } from "lucide-react";
+import { ShieldCheck, LogOut, Sun, Moon, Languages } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/lib/lang-store";
 
 /**
  * Desktop sidebar — full module list + brand + user + theme toggle (doc §6).
@@ -17,6 +18,7 @@ export function DesktopSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
+  const { lang, toggle } = useLanguage();
   const role = session?.user?.role;
   const items = visibleNavItems(role as any);
 
@@ -55,7 +57,7 @@ export function DesktopSidebar() {
                   aria-current={active ? "page" : undefined}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  <span className="flex-1">{item.label}</span>
+                  <span className="flex-1">{lang === "bn" ? item.labelBn : item.label}</span>
                   {item.phase && (
                     <span className="text-[10px] text-muted-foreground">
                       {item.phase}
@@ -69,6 +71,15 @@ export function DesktopSidebar() {
       </nav>
 
       <div className="border-t p-3 space-y-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start min-h-[44px]"
+          onClick={() => toggle()}
+        >
+          <Languages className="mr-2 h-4 w-4" />
+          {lang === "en" ? "বাংলা" : "English"}
+        </Button>
         <Button
           variant="ghost"
           size="sm"
@@ -98,6 +109,7 @@ export function DesktopSidebar() {
 /** Mobile header brand bar (shown on <md where sidebar is hidden). */
 export function MobileTopBar() {
   const { theme, setTheme } = useTheme();
+  const { lang, toggle } = useLanguage();
   return (
     <header className="md:hidden sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-card px-4">
       <div className="flex items-center gap-2">
@@ -107,6 +119,15 @@ export function MobileTopBar() {
         <span className="font-semibold text-sm">CCTV Inventory</span>
       </div>
       <div className="flex items-center gap-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-9 px-2 text-xs font-medium"
+          onClick={() => toggle()}
+        >
+          <Languages className="mr-1 h-4 w-4" />
+          {lang === "en" ? "বাংলা" : "EN"}
+        </Button>
         <Button
           variant="ghost"
           size="icon"

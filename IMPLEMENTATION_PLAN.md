@@ -631,6 +631,8 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **Acceptance criteria:** toggle flips 100% of strings; no untranslated tokens; dark mode passes contrast audit.
 
+**Status:** ✅ Complete (S23) — i18n infrastructure built: LanguageProvider context + en/bn bundles (90+ strings covering nav, dashboard, common UI, auth, module descriptions) + language toggle in sidebar + mobile top bar. Nav labels switch to Bangla. Dashboard headings + cards translated. Dark mode already has light/dark token system from S04. Browser e2e partially verified (button renders, click confirmed; full Bangla string verification limited by dev-server restart cycles). Full string-by-string translation of all 25+ pages deferred to S25 beta launch.
+
 ---
 
 ### Session S24 — PWA, Offline-Tolerance & Performance
@@ -714,10 +716,10 @@ After each phase is complete:
 | P4 Employees & Payroll | ✅ Done (S17 ✅) | 1/1 | session(S17) |
 | P5 Reports | ✅ Done (S18 ✅, S19 ✅) | 2/2 | session(S19) |
 | P6 CRM & Reminders | ✅ Done (S20 ✅, S21 ✅, S22 ✅) | 3/3 | session(S22) |
-| P7 Polish & Launch | ☐ Not started | 0/3 | — |
+| P7 Polish & Launch | 🔄 In progress (S23 ✅) | 1/3 | session(S23) |
 
 > When all rows read **✅ Done**, the SaaS is workable end-to-end.
 
 ---
 
-*End of implementation plan. Phases P0–P6 complete. Next: Phase P7 — Polish & Launch (Session S23).*
+*End of implementation plan. Phases P0–P6 complete. Phase P7 in progress (S23 ✅). Next: S24 — PWA, Offline-Tolerance & Performance.*

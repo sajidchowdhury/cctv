@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { MOBILE_NAV_ITEMS } from "@/lib/nav";
+import { useLanguage } from "@/lib/lang-store";
 
 /**
  * Mobile bottom navigation (doc §6).
@@ -12,6 +13,7 @@ import { MOBILE_NAV_ITEMS } from "@/lib/nav";
  */
 export function MobileBottomNav() {
   const pathname = usePathname();
+  const { lang } = useLanguage();
   return (
     <nav
       aria-label="Primary"
@@ -37,7 +39,7 @@ export function MobileBottomNav() {
                 aria-current={active ? "page" : undefined}
               >
                 <Icon className="h-5 w-5" />
-                <span>{item.label}</span>
+                <span>{lang === "bn" ? item.labelBn : item.label}</span>
               </Link>
             </li>
           );
