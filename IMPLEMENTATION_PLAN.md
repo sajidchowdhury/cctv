@@ -104,9 +104,11 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 **UI screens:** none (only a placeholder `/` confirming the server runs).
 
 **Acceptance criteria:**
-- `bun run lint` passes with zero errors.
-- Dev server boots on port 3000; `/` renders a placeholder.
-- Folder contract exists and is documented in README.
+- ✅ `bun run lint` passes with zero errors.
+- ✅ Dev server boots on port 3000; `/` renders a placeholder.
+- ✅ Folder contract exists and is documented in README.
+
+**Status:** ✅ Complete (S01)
 
 ---
 
@@ -658,7 +660,7 @@ After each phase is complete:
 
 | Phase | Status | Sessions done | Pushed (commit) |
 |-------|--------|---------------|------------------|
-| P0 Foundation | ☐ Not started | 0/5 | — |
+| P0 Foundation | 🔄 In progress (S01 ✅) | 1/5 | session(S01) |
 | P1 Catalogue & Stock | ☐ Not started | 0/4 | — |
 | P2 Sales & Invoicing | ☐ Not started | 0/5 | — |
 | P3 Accounting | ☐ Not started | 0/2 | — |
@@ -671,4 +673,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Begin at Session S01.*
+*End of implementation plan. Sessions S01 complete — continue at Session S02.*
