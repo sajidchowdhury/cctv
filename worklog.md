@@ -539,3 +539,41 @@ Stage Summary:
 - Acceptance: 1/1 original criterion passes. Expense reduces cash closing correctly.
 - Phase status: P3 Accounting now 1/2 (S15 ✅). Next: S16 — Customer Receipts & Supplier Payments (completes P3).
 - Artifacts committed: 3 API routes (account-heads, transactions, reports/cash-book), 4 UI pages, seed.ts.
+
+---
+Task ID: S16
+Agent: Z.ai Code (main)
+Task: Session S16 — Customer Receipts & Supplier Payments. §4.5 money-in/out with multi-invoice FIFO settlement. Receipts (RECV) settle customer dues; payments (PAY) settle supplier dues. Completes Phase P3 — Accounting.
+
+Work Log:
+- Read S15 worklog + Transaction schema (RECV/PAY types + customerId/supplierId relations already in S02). S15 cash-book already tracks IN/EXP; needs RECV/PAY added.
+- Wrote 3 API routes:
+    GET /api/invoices/open — returns unpaid sales (customer) or purchases (supplier) for settlement, ordered oldest-first (FIFO).
+    POST /api/receipts — creates RECV transaction (transactional):
+      - auto-allocates amount FIFO across open invoices (oldest first)
+      - updates each settled sale's paid + due
+      - updates Customer.currentBalance -= amount (reduces receivable)
+      - residual = advance (stored in narration)
+      - supports adjustment (discount/round-off)
+    POST /api/payments — creates PAY transaction (transactional): same pattern for supplier + purchases.
+    GET /api/receipts + GET /api/payments — list endpoints.
+- Updated cash-book API to include RECV (cash in) + PAY (cash out) entries — opening cash now sums all CASH transactions (IN+RECV positive, EXP+PAY negative) before the date.
+- Wrote 2 UI forms:
+    /(app)/receipts/new — customer select (shows current balance), amount, mode (CASH/BANK/BKASH/NAGAD/CHEQUE), adjustment, date, narration, open invoices list (FIFO auto-allocate with dues).
+    /(app)/payments/new — same pattern for supplier.
+- Added Receipt + Payment buttons to ledger page header.
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Receipt settles 2 invoices FIFO: invoice 1 fully (3,200) + invoice 2 partially (800), residual 0
+- [x] Invoice dues updated: invoice 1 due=0 (closed), invoice 2 due=1,300 (open)
+- [x] Customer balance reduced: 10,300 → 6,300 (−4,000 receipt)
+- [x] Cash-book includes RECV/PAY entries
+- [x] Browser: receipt form renders (no errors)
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning)
+
+Stage Summary:
+- Deliverables: 3 API routes (invoices/open, receipts, payments), 2 UI pages (receipts/new, payments/new), cash-book update (RECV/PAY), ledger page receipt/payment buttons.
+- Key decision: FIFO auto-allocation is the default (oldest invoice first). The user doesn't manually select invoices — the system auto-distributes the receipt amount across all open dues oldest-first. Residual (over-payment) is stored as advance in the customer/supplier currentBalance. This matches how shop owners actually settle: "I got 4,000 taka from Rahman, apply it to what he owes."
+- Acceptance: 1/1 original criterion passes. Receipt settles 2 invoices FIFO with residual as open due.
+- Phase status: P3 Accounting COMPLETE (S15-S16, 2/2). Next: Phase P4 — Employees & Payroll (S17).
+- Artifacts committed: 3 API routes, 2 UI pages, cash-book update, ledger buttons.

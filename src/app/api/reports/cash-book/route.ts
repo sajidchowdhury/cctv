@@ -23,11 +23,11 @@ export const GET = withTenant(async (user, req: Request) => {
   const fromDate = new Date(from + "T00:00:00");
   const toDate = new Date(to + "T23:59:59");
 
-  // Fetch IN/EXP transactions in range.
+  // Fetch IN/EXP/RECV/PAY transactions in range (S15 + S16).
   const txns = await db.transaction.findMany({
     where: {
       deletedAt: null,
-      type: { in: ["IN", "EXP"] },
+      type: { in: ["IN", "EXP", "RECV", "PAY"] },
       date: { gte: fromDate, lte: toDate },
       mode: "CASH", // cash-book tracks cash only
     },
@@ -60,7 +60,7 @@ export const GET = withTenant(async (user, req: Request) => {
   const beforeTxns = await db.transaction.findMany({
     where: {
       deletedAt: null,
-      type: { in: ["IN", "EXP"] },
+      type: { in: ["IN", "EXP", "RECV", "PAY"] },
       mode: "CASH",
       date: { lt: fromDate },
     },
@@ -76,7 +76,10 @@ export const GET = withTenant(async (user, req: Request) => {
   });
 
   let openingCash = 0;
-  for (const t of beforeTxns) openingCash += t.type === "IN" ? t.amount : -t.amount;
+  for (const t of beforeTxns) {
+    if (t.type === "IN" || t.type === "RECV") openingCash += t.amount;
+    else openingCash -= t.amount; // EXP or PAY
+  }
   for (const s of beforeSales) openingCash += s.paid;
   for (const p of beforePurchases) openingCash -= p.paid;
 
@@ -94,6 +97,20 @@ export const GET = withTenant(async (user, req: Request) => {
   for (const t of txns.filter((t) => t.type === "EXP")) {
     entries.push({
       date: t.date, type: "EXPENSE", ref: t.accountHead?.name ?? "Expense",
+      amount: t.amount, direction: "out", narration: t.narration,
+    });
+  }
+  // Customer receipts (money-in, doc §4.5).
+  for (const t of txns.filter((t) => t.type === "RECV")) {
+    entries.push({
+      date: t.date, type: "RECEIPT", ref: "Customer receipt",
+      amount: t.amount, direction: "in", narration: t.narration,
+    });
+  }
+  // Supplier payments (money-out, doc §4.5).
+  for (const t of txns.filter((t) => t.type === "PAY")) {
+    entries.push({
+      date: t.date, type: "PAYMENT", ref: "Supplier payment",
       amount: t.amount, direction: "out", narration: t.narration,
     });
   }

@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/layout/data-table";
-import { BookOpen, Plus, Loader2, Settings, Wallet, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
+import { BookOpen, Plus, Loader2, Settings, Wallet, ArrowDownCircle, ArrowUpCircle, Receipt } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatBDT, formatDate } from "@/lib/format";
 
@@ -68,7 +68,13 @@ export default function LedgerPage() {
         title="Accounting"
         description="Income, expense, and cash book (doc §4.4)."
         action={
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Button asChild variant="outline" size="sm">
+              <Link href="/receipts/new"><Receipt className="mr-2 h-4 w-4" /> Receipt</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/payments/new"><Receipt className="mr-2 h-4 w-4" /> Payment</Link>
+            </Button>
             <Button asChild variant="outline" size="sm">
               <Link href="/accounting/heads"><Settings className="mr-2 h-4 w-4" /> Heads</Link>
             </Button>

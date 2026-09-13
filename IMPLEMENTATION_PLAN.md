@@ -476,6 +476,8 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **Acceptance criteria:** a receipt settles 2 invoices FIFO and leaves the residual as adjustment or open due.
 
+**Status:** ✅ Complete (S16) — verified via curl (receipt settles 2 invoices FIFO: invoice 1 fully 3,200 + invoice 2 partially 800, residual 0; invoice dues updated; customer balance reduced) + Agent Browser (receipt form renders). Cash-book updated to include RECV/PAY entries. Completes Phase P3.
+
 ---
 
 ## 7. Phase P4 — Employees & Payroll (Session S17)
@@ -696,7 +698,7 @@ After each phase is complete:
 | P0 Foundation | ✅ Done (S01 ✅, S02 ✅, S03 ✅, S04 ✅, S05 ✅) | 5/5 | session(S05) |
 | P1 Catalogue & Stock | ✅ Done (S06 ✅, S07 ✅, S08 ✅, S09 ✅) | 4/4 | session(S09) |
 | P2 Sales & Invoicing | ✅ Done (S10 ✅, S11 ✅, S12 ✅, S13 ✅, S14 ✅) | 5/5 | session(S14) |
-| P3 Accounting | 🔄 In progress (S15 ✅) | 1/2 | session(S15) |
+| P3 Accounting | ✅ Done (S15 ✅, S16 ✅) | 2/2 | session(S16) |
 | P4 Employees & Payroll | ☐ Not started | 0/1 | — |
 | P5 Reports | ☐ Not started | 0/2 | — |
 | P6 CRM & Reminders | ☐ Not started | 0/3 | — |
@@ -706,4 +708,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Phases P0–P2 complete. Phase P3 in progress (S15 ✅). Next: S16 — Customer Receipts & Supplier Payments (completes P3).*
+*End of implementation plan. Phases P0–P3 complete. Next: Phase P4 — Employees & Payroll (Session S17).*
