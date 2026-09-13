@@ -1068,3 +1068,54 @@ Stage Summary:
 Important environment note:
 - Added `NEXTAUTH_URL=http://localhost:3000` + `NEXTAUTH_SECRET=dev-secret-cctv-f1s2-stable-9k2m7v4q8j3` to `.env` (file is gitignored — these are dev-only values; production should set proper secrets via environment).
 - The `bun run db:push --accept-data-loss` command (run during schema migration) wiped the existing DB; re-ran `bun run src/scripts/seed.ts` to restore demo data (login: owner@cctv-demo.bd / password123).
+
+---
+Task ID: F5-S1
+Agent: Z.ai Code (main)
+Task: Session F5-S1 — Desktop UI Polish Part 1 (Layout & Components). Fix the desktop UI to feel premium: Select dropdown widths, content max-width, card padding consistency, table styling, sidebar width as CSS var, print CSS. First session of Phase F5 (UI/UX Desktop Polish).
+
+Work Log:
+- Read REVIEW_ISSUES.md F5-S1 spec (Issue 20) + comprehensive Explore agent audit of the entire UI (49 page files + Select + DataTable + Card + globals + Tailwind config).
+- Critical insights from audit:
+    - SelectTrigger used `flex w-fit` → width shrank to content, causing broken/inconsistent dropdown widths across ~28 callers.
+    - AppShell main content used `max-w-5xl` (1024px) — too narrow for desktop SaaS; after sidebar (256px) + px-4 (32px), inner content was ~640px with huge empty gutter on the right on 1440px+ displays.
+    - TableHeader had `bg-card` (same as body) → sticky header didn't visually separate; TableHead `px-2` + TableCell `p-2` were too tight (8px).
+    - DataTable default `max-h-[28rem]` (448px) too short.
+    - Sidebar width hardcoded `md:w-64` / `md:pl-64` in 3 places (desktop-sidebar, app-shell main, app-shell footer) — drift risk.
+    - No `@media print` rules anywhere (reports described as printable but had no print CSS).
+    - No Firefox scrollbar fallback (only `::-webkit-scrollbar`).
+    - customers/page.tsx used raw `<div className="rounded-lg border bg-card p-4">` for stat tiles instead of `<Card>`; dashboard loading skeleton used same raw div pattern.
+
+- Fix 1 (Select component): `src/components/ui/select.tsx` — changed `flex w-fit` → `flex w-full min-w-0` on SelectTrigger. Single-line fix, propagates to all ~28 callers. Existing `className="w-40"` overrides still work (cn() puts className last).
+- Fix 2 (AppShell max-width + responsive padding): `src/components/layout/app-shell.tsx` — `max-w-5xl px-4 py-6 md:py-8` → `max-w-7xl px-4 md:px-6 lg:px-8 py-6 md:py-8`. Mirrored in `<footer>` inner div.
+- Fix 3 (StickyActionBar max-width): `src/components/layout/sticky-action-bar.tsx` — `max-w-5xl` → `max-w-7xl`.
+- Fix 4 (sidebar CSS var): `src/app/globals.css` — added `--sidebar-width: 0px` to `:root` + `@media (min-width: 768px) { :root { --sidebar-width: 16rem; } }`. Used `md:w-[var(--sidebar-width)]` in desktop-sidebar.tsx and `md:pl-[var(--sidebar-width)]` in app-shell main + footer. Single source of truth.
+- Fix 5 (Table styling): `src/components/ui/table.tsx` — TableHeader added `bg-muted/40` (visual separation for sticky); TableHead `px-2 h-10` → `px-4 h-11 text-xs uppercase tracking-wide` (premium header); TableCell `p-2` → `px-4 py-3` (comfortable cell padding).
+- Fix 6 (DataTable polish): `src/components/layout/data-table.tsx` — default maxHeight `max-h-[28rem]` → `max-h-[40rem]`; TableHeader `sticky top-0 bg-card z-10` → `sticky top-0 z-10 shadow-sm` (bg comes from TableHeader component now).
+- Fix 7 (CartTable alignment): `src/components/layout/cart-table.tsx` — thead `bg-muted/50` → `bg-muted/40 sticky top-0`; th `px-3 py-2` → `px-4 py-2.5 text-xs uppercase tracking-wide`; tr added `hover:bg-muted/30 transition-colors`; td `px-3 py-2` → `px-4 py-3`. Now consistent with DataTable.
+- Fix 8 (Card consistency): `src/app/(app)/customers/page.tsx` — replaced 3 raw `<div className="rounded-lg border bg-card p-4">` stat tiles with `<Card><CardContent className="py-4">…</CardContent></Card>`. Added Card + CardContent imports. `src/app/(app)/page.tsx` (dashboard) — replaced raw `<div className="rounded-lg border p-4 space-y-2">` skeleton with `<Card><CardContent className="py-4 space-y-2">`.
+- Fix 9 (Print CSS): `src/app/globals.css` — added `@media print { … }` that hides nav/sidebar/footer/banners (`.md\:flex`, `.md\:hidden`, `aside`, `footer`, `nav[fixed/sticky]`, `[data-print-hidden]`), resets main content padding + max-width for full-page print, forces `print-color-adjust: exact` so backgrounds/accents print correctly, sets `@page { margin: 1.5cm; }`.
+- Fix 10 (Firefox scrollbar): `src/app/globals.css` — `.scroll-area-thin` now has `scrollbar-width: thin` + `scrollbar-color: oklch(0.85 0 0) transparent` for Firefox (in addition to existing `::-webkit-scrollbar` for Chromium/Safari). Added `.dark .scroll-area-thin` override for dark mode.
+- Updated REVIEW_ISSUES.md: marked F5-S1 ✅ Complete.
+
+Acceptance criteria (all pass — verified via curl HTML inspection + Agent Browser JS eval):
+- [x] Select dropdowns: trigger now `w-full min-w-0` → fills parent container. Verified via JS eval on purchase form: supplier trigger (flex-1 parent) = 211.5px, payment-mode trigger (full-width parent) = 255.5px — both fill their parents.
+- [x] Content max-width: AppShell main + footer use `max-w-7xl` (1280px). Verified via curl: dashboard HTML has `max-w-7xl` + `md:px-6` + `lg:px-8` + `md:pl-[var(--sidebar-width)]`.
+- [x] Responsive padding: `px-4 md:px-6 lg:px-8` (mobile 16px → tablet 24px → desktop 32px).
+- [x] Card padding: customers page raw divs replaced with `<Card><CardContent className="py-4">` (count of `rounded-lg border bg-card p-4` = 0 after fix); dashboard skeleton uses Card.
+- [x] Table styling: TableHeader `bg-muted/40` (verified via JS eval: theadClass = "[&_tr]:border-b bg-muted/40 sticky top-0 z-10 shadow-sm"); TableHead `px-4` (thPadding = "0px 16px"); TableCell `px-4 py-3` (tdPadding = "12px 16px").
+- [x] DataTable maxHeight bumped 28rem → 40rem.
+- [x] Sidebar width: `--sidebar-width: 16rem` CSS var (verified: asideWidth = 256px = 16rem; sidebarVar = "16rem"); used in desktop-sidebar + app-shell main + footer (single source of truth).
+- [x] Print CSS: `@media print` block hides nav/sidebar/footer, expands content, forces colors.
+- [x] Firefox scrollbar: `scrollbar-width: thin` + `scrollbar-color` added.
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning).
+
+Stage Summary:
+- Deliverables: 8 files updated — Select component (1-line w-full fix), AppShell (max-w-7xl + responsive px + sidebar var), StickyActionBar (max-w-7xl), globals.css (--sidebar-width var + @media md override + @media print + Firefox scrollbar), desktop-sidebar (md:w-[var(--sidebar-width)]), table.tsx (TableHeader bg + TableHead/TableCell padding), DataTable (maxHeight 40rem + shadow-sm), CartTable (align with DataTable), customers/page.tsx (Card instead of raw div), dashboard page.tsx (Card skeleton). REVIEW_ISSUES.md updated.
+- Key decision: sidebar width as CSS var (`--sidebar-width`) set to 0 on mobile + 16rem on md+ via media query. Referenced via Tailwind 4 arbitrary value syntax `md:w-[var(--sidebar-width)]` / `md:pl-[var(--sidebar-width)]`. Single source of truth — changing the var in globals.css updates sidebar + main padding + footer padding simultaneously.
+- Key decision: SelectTrigger `w-full min-w-0` instead of `w-fit` — fills parent container by default. Existing `className="w-40"` overrides (3 callers: admin verifications, quotation-register, accounting heads) still work via cn() merge order.
+- Key decision: TableHeader gets `bg-muted/40` (subtle background tint) instead of `bg-card` (same as body) so the sticky header visually separates from scrolling rows. DataTable adds `shadow-sm` on top for a premium floating effect.
+- Key decision: print CSS uses attribute selector `nav[class*="fixed"]` + `nav[class*="sticky"]` to catch both desktop sidebar (which uses `md:flex md:fixed`) and mobile bottom nav (`fixed bottom-0`). Plus `aside` + `footer` element selectors as belt-and-suspenders.
+- Acceptance: 6/6 original criteria pass (Select width, content max-width, card padding, table styling, sidebar width, premium feel).
+- Phase status: F5 UI/UX Desktop Polish now 1/2 (F5-S1 ✅). Next: F5-S2 (Forms + Supplier Edit + animations).
+- Artifacts committed: Select fix, AppShell max-width + sidebar var, globals.css (--sidebar-width + print + Firefox), desktop-sidebar var usage, table.tsx padding + bg, DataTable maxHeight + shadow, CartTable alignment, customers + dashboard Card consistency.

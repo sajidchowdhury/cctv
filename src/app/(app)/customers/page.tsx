@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { SearchScanInput } from "@/components/layout/search-scan-input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { DataTable } from "@/components/layout/data-table";
 import { Users, Plus, Loader2 } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -86,9 +87,9 @@ export default function CustomersPage() {
         }
       />
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-lg border bg-card p-4"><p className="text-xs text-muted-foreground">Total receivable</p><p className="text-xl font-bold tabular-nums text-amber-600 dark:text-amber-400">{formatBDT(totalReceivable)}</p></div>
-        <div className="rounded-lg border bg-card p-4"><p className="text-xs text-muted-foreground">Total advance</p><p className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{formatBDT(-totalAdvance)}</p></div>
-        <div className="rounded-lg border bg-card p-4"><p className="text-xs text-muted-foreground">Customers</p><p className="text-xl font-bold tabular-nums">{customers.length}</p></div>
+        <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Total receivable</p><p className="text-xl font-bold tabular-nums text-amber-600 dark:text-amber-400">{formatBDT(totalReceivable)}</p></CardContent></Card>
+        <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Total advance</p><p className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{formatBDT(-totalAdvance)}</p></CardContent></Card>
+        <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Customers</p><p className="text-xl font-bold tabular-nums">{customers.length}</p></CardContent></Card>
       </div>
       <SearchScanInput value={search} onChange={setSearch} placeholder="Search name / phone…" className="max-w-md" />
       {isLoading ? (

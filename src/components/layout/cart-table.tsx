@@ -49,20 +49,20 @@ export function CartTable({
           {/* Desktop table */}
           <div className="hidden sm:block overflow-auto rounded-lg border scroll-area-thin">
             <table className="w-full text-sm">
-              <thead className="bg-muted/50">
+              <thead className="bg-muted/40 sticky top-0">
                 <tr>
-                  <th className="text-left font-medium px-3 py-2">Item</th>
-                  <th className="text-right font-medium px-3 py-2 w-24">Qty</th>
-                  <th className="text-right font-medium px-3 py-2 w-32">Unit Price</th>
-                  <th className="text-right font-medium px-3 py-2 w-32">Total</th>
+                  <th className="text-left font-medium px-4 py-2.5 text-xs uppercase tracking-wide">Item</th>
+                  <th className="text-right font-medium px-4 py-2.5 w-24 text-xs uppercase tracking-wide">Qty</th>
+                  <th className="text-right font-medium px-4 py-2.5 w-32 text-xs uppercase tracking-wide">Unit Price</th>
+                  <th className="text-right font-medium px-4 py-2.5 w-32 text-xs uppercase tracking-wide">Total</th>
                   <th className="w-10"></th>
                 </tr>
               </thead>
               <tbody>
                 {lines.map((l) => (
-                  <tr key={l.id} className="border-t">
-                    <td className="px-3 py-2">{l.description}</td>
-                    <td className="px-3 py-2 text-right">
+                  <tr key={l.id} className="border-t hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-3">{l.description}</td>
+                    <td className="px-4 py-3 text-right">
                       <input
                         type="number"
                         step="0.01"
@@ -71,7 +71,7 @@ export function CartTable({
                         className="w-20 text-right bg-transparent border-0 focus:ring-1 focus:ring-ring rounded px-1 py-0.5"
                       />
                     </td>
-                    <td className="px-3 py-2 text-right">
+                    <td className="px-4 py-3 text-right">
                       <input
                         type="number"
                         step="0.01"
@@ -80,8 +80,8 @@ export function CartTable({
                         className="w-28 text-right bg-transparent border-0 focus:ring-1 focus:ring-ring rounded px-1 py-0.5"
                       />
                     </td>
-                    <td className="px-3 py-2 text-right font-medium">{l.lineTotal.toFixed(2)}</td>
-                    <td className="px-3 py-2 text-center">
+                    <td className="px-4 py-3 text-right font-medium">৳{l.lineTotal.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-center">
                       <button
                         type="button"
                         onClick={() => onRemove?.(l.id)}

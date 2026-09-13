@@ -21,7 +21,7 @@ export function StickyActionBar({
         className
       )}
     >
-      <div className="mx-auto max-w-5xl flex items-center gap-2">{children}</div>
+      <div className="mx-auto max-w-7xl flex items-center gap-2">{children}</div>
     </div>
   );
 }

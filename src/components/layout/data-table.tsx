@@ -39,7 +39,7 @@ export function DataTable<TData>({
   emptyTitle,
   emptyDescription,
   emptyAction,
-  maxHeight = "max-h-[28rem]",
+  maxHeight = "max-h-[40rem]",
 }: {
   columns: ColumnDef<TData, any>[];
   data: TData[];
@@ -74,7 +74,7 @@ export function DataTable<TData>({
   return (
     <div className={cn("rounded-lg border overflow-auto scroll-area-thin", maxHeight)}>
       <Table>
-        <TableHeader className="sticky top-0 bg-card z-10">
+        <TableHeader className="sticky top-0 z-10 shadow-sm">
           {table.getHeaderGroups().map((hg) => (
             <TableRow key={hg.id}>
               {hg.headers.map((header) => {

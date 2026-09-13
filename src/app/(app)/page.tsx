@@ -67,10 +67,10 @@ export default function DashboardPage() {
         <div className="h-8 w-64 rounded-lg bg-muted animate-pulse" />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="rounded-lg border p-4 space-y-2">
+            <Card key={i}><CardContent className="py-4 space-y-2">
               <div className="h-3 w-20 rounded bg-muted animate-pulse" />
               <div className="h-7 w-24 rounded bg-muted animate-pulse" />
-            </div>
+            </CardContent></Card>
           ))}
         </div>
       </div>

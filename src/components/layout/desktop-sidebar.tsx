@@ -23,7 +23,7 @@ export function DesktopSidebar() {
   const items = visibleNavItems(role as any);
 
   return (
-    <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 border-r bg-sidebar">
+    <aside className="hidden md:flex md:w-[var(--sidebar-width)] md:flex-col md:fixed md:inset-y-0 border-r bg-sidebar">
       <div className="flex items-center gap-2 h-16 px-6 border-b">
         <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
           <ShieldCheck className="h-5 w-5" />

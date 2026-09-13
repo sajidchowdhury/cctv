@@ -45,6 +45,10 @@
 
 :root {
   --radius: 0.625rem;
+  /* F5-S1: sidebar width as a single source of truth (referenced by AppShell +
+     DesktopSidebar via md:w-[var(--sidebar-width)] / md:pl-[var(--sidebar-width)]).
+     Set to 0 on mobile so the main content isn't padded; overridden on md+. */
+  --sidebar-width: 0px;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -121,6 +125,10 @@
     @apply bg-background text-foreground;
   }
   /* Custom scrollbar for long lists (UI rules) */
+  .scroll-area-thin {
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: oklch(0.85 0 0) transparent; /* Firefox */
+  }
   .scroll-area-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -135,8 +143,58 @@
   .dark .scroll-area-thin::-webkit-scrollbar-thumb {
     background: oklch(0.35 0 0);
   }
+  .dark .scroll-area-thin {
+    scrollbar-color: oklch(0.35 0 0) transparent;
+  }
   /* Safe-area padding for mobile bottom nav (iOS) */
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
+
+/* F5-S1: sidebar width — only applies on md+ (desktop sidebar visible). On mobile
+   the var stays at 0 so the main content has no left padding. */
+@media (min-width: 768px) {
+  :root {
+    --sidebar-width: 16rem;
+  }
+}
+
+/* F5-S1: print styles — hide nav/sidebar/footer/banners, expand content to full width,
+   force exact colors for backgrounds. Used by report print buttons. */
+@media print {
+  /* Hide everything that's not printable */
+  .md\:flex,
+  .md\:hidden,
+  .md\:pl-\[var\(--sidebar-width\)\],
+  nav[class*="fixed"],
+  nav[class*="sticky"],
+  aside,
+  footer,
+  [data-print-hidden] {
+    display: none !important;
+  }
+  /* Reset main content padding + max-width for full-page print */
+  main {
+    padding-left: 0 !important;
+    padding-bottom: 0 !important;
+  }
+  main > div {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  /* Force exact colors so backgrounds/accents print correctly */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body {
+    background: white !important;
+  }
+  /* Page margins for print */
+  @page {
+    margin: 1.5cm;
+  }
+}
+
