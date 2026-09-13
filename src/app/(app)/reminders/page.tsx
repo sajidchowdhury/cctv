@@ -7,14 +7,17 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Bell, Plus, Loader2, AlertTriangle, Clock, Check, Ban } from "lucide-react";
-import { formatBDT, formatDate } from "@/lib/format";
+import { Bell, Plus, Loader2, AlertTriangle, Clock, Check, Ban, Send } from "lucide-react";
+import { formatBDT, formatDate, formatDateTime } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 
 type Reminder = {
   id: string; type: string; title: string; amount: number | null;
   frequency: string; nextDue: string; channel: string; active: boolean;
   refType: string | null; refId: string | null; overdue: boolean; daysUntilDue: number;
+  lastDispatchedAt: string | null;
+  dispatchCount: number;
+  recentLogs: { channel: string; status: string; dispatchedAt: string }[];
 };
 
 const TYPE_TONE: Record<string, string> = {
@@ -129,6 +132,27 @@ export default function RemindersPage() {
                     )}
                   </div>
                 </div>
+
+                {/* Dispatch history (F3-S2) */}
+                {r.dispatchCount > 0 && (
+                  <div className="mt-2 pt-2 border-t space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Send className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">
+                        Dispatched {r.dispatchCount} time{r.dispatchCount !== 1 ? "s" : ""} · Last: {r.lastDispatchedAt ? formatDateTime(r.lastDispatchedAt) : "—"}
+                      </span>
+                    </div>
+                    {r.recentLogs.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {r.recentLogs.slice(0, 3).map((log, i) => (
+                          <Badge key={i} variant="outline" className="text-[10px]">
+                            {log.channel} · {log.status} · {formatDate(log.dispatchedAt)}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}

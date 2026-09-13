@@ -64,6 +64,7 @@ model Tenant {
   serviceTickets        ServiceTicket[]
   followUps             FollowUp[]
   reminders             Reminder[]
+  reminderLogs          ReminderLog[]
   salaryRecords         SalaryRecord[]
   quotations            Quotation[]
   rmaTickets            RmaTicket[]
@@ -235,6 +236,7 @@ model Product {
   purchaseItems PurchaseItem[]
   saleItems     SaleItem[]
   quotationItems QuotationItem[]
+  rmaTickets    RmaTicket[]
 
   @@unique([tenantId, sku])
   @@index([tenantId])
@@ -576,6 +578,7 @@ model Reminder {
   deletedAt  DateTime?
 
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  logs      ReminderLog[]
 
   @@index([tenantId, nextDue])
   @@index([tenantId, active])
@@ -691,6 +694,7 @@ model RmaTicket {
 
   tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   customer        Customer?      @relation(fields: [customerId], references: [id])
+  product         Product?       @relation(fields: [productId], references: [id])
   inventoryUnit   InventoryUnit? @relation(fields: [inventoryUnitId], references: [id])
   supplier        Supplier?      @relation(fields: [supplierId], references: [id])
   history         RmaHistory[]
@@ -714,4 +718,24 @@ model RmaHistory {
   actor       User?     @relation(fields: [actorUserId], references: [id])
 
   @@index([rmaTicketId, timestamp])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 15. Reminder Log (F3-S2) — tracks each reminder dispatch
+// ─────────────────────────────────────────────────────────────────────────
+
+model ReminderLog {
+  id          String   @id @default(cuid())
+  tenantId    String
+  reminderId  String
+  channel     String   // SMS | IN_APP
+  status      String   @default("SENT") // SENT | FAILED
+  message     String
+  dispatchedAt DateTime @default(now())
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  reminder    Reminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, dispatchedAt])
+  @@index([reminderId, dispatchedAt])
 }

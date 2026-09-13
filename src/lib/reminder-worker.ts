@@ -55,6 +55,17 @@ export async function tickReminders(now: Date = new Date()): Promise<{
       // In-app: logged via console in dev (S25 will add a persistent notification table).
       console.log(`[reminder] dispatched: ${reminder.title} (type=${reminder.type}, tenant=${reminder.tenant.name})`);
 
+      // Create a dispatch log entry (F3-S2: reminder visibility).
+      await adminDb.reminderLog.create({
+        data: {
+          tenantId: reminder.tenantId,
+          reminderId: reminder.id,
+          channel: reminder.channel.includes("SMS") ? "SMS" : "IN_APP",
+          status: "SENT",
+          message,
+        },
+      });
+
       dispatched++;
 
       // Advance nextDue by frequency.

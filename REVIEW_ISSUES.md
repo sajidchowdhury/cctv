@@ -554,7 +554,7 @@ Service Tickets:
 - "Not applicable" for units without warranty
 - "Not yet sold" for units in stock
 
-#### F3-S2: RMA List Fix + Reminder Visibility
+#### F3-S2: RMA List Fix + Reminder Visibility ✅ Complete
 - Debug RMA list API (check tenant filtering, deletedAt filter)
 - Fix RMA list page (verify fetch endpoint, check console errors)
 - Add ReminderLog model: records each reminder dispatch (timestamp, channel, status, message)

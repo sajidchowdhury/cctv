@@ -36,6 +36,13 @@ export const GET = withTenant(async (user, req: Request) => {
       ...(type ? { type } : {}),
       ...(activeOnly ? { active: true } : {}),
     },
+    include: {
+      logs: {
+        orderBy: { dispatchedAt: "desc" },
+        take: 3,
+        select: { id: true, channel: true, status: true, dispatchedAt: true, message: true },
+      },
+    },
     orderBy: { nextDue: "asc" },
   });
 
@@ -54,6 +61,13 @@ export const GET = withTenant(async (user, req: Request) => {
       refId: r.refId,
       overdue: r.active && r.nextDue <= now,
       daysUntilDue: Math.ceil((r.nextDue.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)),
+      lastDispatchedAt: r.logs[0]?.dispatchedAt.toISOString() ?? null,
+      dispatchCount: r.logs.length,
+      recentLogs: r.logs.map((l) => ({
+        channel: l.channel,
+        status: l.status,
+        dispatchedAt: l.dispatchedAt.toISOString(),
+      })),
     })),
   });
 });

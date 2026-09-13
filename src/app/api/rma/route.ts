@@ -93,6 +93,7 @@ export const POST = withTenant(async (user, req: Request) => {
 
   // Auto-warranty check (doc §5.7): if inventory unit provided, check warranty status.
   let inWarranty = false;
+  let autoProductId = productId || null;
   if (inventoryUnitId) {
     const unit = await adminDb.inventoryUnit.findUnique({
       where: { id: inventoryUnitId },
@@ -100,6 +101,10 @@ export const POST = withTenant(async (user, req: Request) => {
     });
     if (unit) {
       inWarranty = unit.warrantyEnd ? new Date(unit.warrantyEnd) > new Date() : false;
+      // Auto-derive productId from the inventory unit if not explicitly provided.
+      if (!autoProductId && unit.productId) {
+        autoProductId = unit.productId;
+      }
       // Mark unit as IN_RMA.
       await adminDb.inventoryUnit.update({
         where: { id: inventoryUnitId },
@@ -118,7 +123,7 @@ export const POST = withTenant(async (user, req: Request) => {
           rmaNo,
           customerId: customerId || null,
           inventoryUnitId: inventoryUnitId || null,
-          productId: productId || null,
+          productId: autoProductId,
           supplierId: supplierId || null,
           faultReason,
           stage: "RECEIVED_FROM_CUSTOMER",
