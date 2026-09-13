@@ -324,3 +324,41 @@ Stage Summary:
 - Acceptance: 1/1 original criterion passes. SMS fires (with notify=1); dashboard + /stock page show real data.
 - Phase status: P1 Catalogue & Stock COMPLETE (S06–S09 ✅, 4/4). Next: Phase P2 — Sales & Invoicing (S10).
 - Artifacts committed: stock-summary API, low-stock fix, /stock page, dashboard rewrite, nav.ts.
+
+---
+Task ID: S10
+Agent: Z.ai Code (main)
+Task: Session S10 — Quotation & Project Estimation Builder. Pre-sale quote builder (doc §5.6) with PRODUCT/LABOR/SERVICE lines, status workflow, convert-to-sale with stock check, duplicate clone. First session of Phase P2 — Sales & Invoicing.
+
+Work Log:
+- Read S09 worklog + Quotation/QuotationItem schema (already in S02). Quotation has status state machine (DRAFT→SENT→ACCEPTED→REJECTED→EXPIRED→CONVERTED) + convertedSaleId link to Sale.
+- Wrote quotations API (4 route files):
+    GET  /api/quotations (list with customer, project type, total, status, item count; status + search filters)
+    POST /api/quotations (create with PRODUCT/LABOR/SERVICE lines, auto quoteNo QT-YYMMDD-###, valid-until default 15d, subtotal/discount/VAT/total computation)
+    GET  /api/quotations/[id] (detail with items + product info)
+    PATCH /api/quotations/[id] (status update; reject requires lossReason per doc §5.6)
+    POST /api/quotations/[id]/convert (transactional: creates Sale + SaleItems from quote items, stock check flags out-of-stock products, marks quote CONVERTED, links convertedSaleId. Sale created with isHeld=true for salesman review in S11)
+    POST /api/quotations/[id]/duplicate (clones quote + items with new quoteNo, DRAFT status)
+- Wrote minimal customers API (GET list + POST create) — schema exists from S02, full customer UI in S14 but quotation form needs the dropdown now.
+- Wrote quotations UI (3 pages):
+    /(app)/quotations/page.tsx — list with stats cards (Total/Accepted/Converted/Rejected) + DataTable (Quote/Date/Customer/Type/Items/Total/Status with color-coded badges)
+    /(app)/quotations/new/page.tsx — the form: customer select (existing or walk-in name) + project type + product search picker + add Labor/Service text lines + line items cart (qty/unitPrice/discount%) + discount/VAT/valid-until/terms + live totals + StickyActionBar
+    /(app)/quotations/[id]/page.tsx — detail: 4 stat cards (Status/ValidUntil/Items/Total) + status action buttons (Send/Accept/Reject with reason dialog/Convert to Sale/Duplicate/Print) + line items table with subtotal/discount/total footer + terms display
+- Deferred: branded PDF (react-pdf) to S25; win/loss dashboard to S18 reports; auto follow-up reminder 3d after Sent to S22 reminder engine.
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Create quote with PRODUCT (4 cameras) + LABOR (install) + SERVICE (maintenance) → 201, total 20,300 (4*3200 + 5000 + 3000 - 500)
+- [x] Status workflow: DRAFT → SENT → ACCEPTED → CONVERTED (each PATCH 200)
+- [x] Convert to Sale → creates INV-260913-614, stock warning flagged (need 4, have 0)
+- [x] Quotation status = CONVERTED + convertedSaleId linked
+- [x] Duplicate → creates QT-260913-521 (201)
+- [x] Reject without reason → 422 "A loss reason is required"
+- [x] Browser: list with stats cards + DataTable renders; new quote form with Labor/Service buttons
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning)
+
+Stage Summary:
+- Deliverables: 5 API routes (quotations CRUD + convert + duplicate), minimal customers API, 3 quotations UI pages (list/new/detail with convert/duplicate/reject).
+- Key decision: convert-to-sale creates the Sale with isHeld=true so the salesman reviews + finalizes it in S11 (sets payment mode, paid, assigns inventory units). Stock check flags out-of-stock products but doesn't block conversion — the salesman sees warnings and can create a backorder Purchase. Reject requires a lossReason (doc §5.6 win/loss tracking).
+- Acceptance: 1/1 original criterion passes. Accepted quote converts to sale with items preserved + out-of-stock flagged.
+- Phase status: P2 Sales & Invoicing now 1/5 (S10 ✅). Next: S11 — Sales Cart, Invoice & Due Ledger.
+- Artifacts committed: 5 API routes, customers API, 3 UI pages.

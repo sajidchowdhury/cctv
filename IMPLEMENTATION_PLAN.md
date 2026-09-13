@@ -355,6 +355,8 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **Acceptance criteria:** accepted quote converts to a sale in one click with all line items/prices preserved; out-of-stock item flagged.
 
+**Status:** ✅ Complete (S10) — verified via curl API tests (create with PRODUCT/LABOR/SERVICE lines, status workflow, convert with stock warning, duplicate, reject-requires-reason) + Agent Browser (list with stats, new quote form with labor/service buttons). PDF generation deferred to S25 (react-pdf); win/loss dashboard deferred to S18 (reports). Auto follow-up reminder deferred to S22 (reminder engine).
+
 ---
 
 ### Session S11 — Sales Cart, Invoice & Due Ledger
@@ -683,7 +685,7 @@ After each phase is complete:
 |-------|--------|---------------|------------------|
 | P0 Foundation | ✅ Done (S01 ✅, S02 ✅, S03 ✅, S04 ✅, S05 ✅) | 5/5 | session(S05) |
 | P1 Catalogue & Stock | ✅ Done (S06 ✅, S07 ✅, S08 ✅, S09 ✅) | 4/4 | session(S09) |
-| P2 Sales & Invoicing | ☐ Not started | 0/5 | — |
+| P2 Sales & Invoicing | 🔄 In progress (S10 ✅) | 1/5 | session(S10) |
 | P3 Accounting | ☐ Not started | 0/2 | — |
 | P4 Employees & Payroll | ☐ Not started | 0/1 | — |
 | P5 Reports | ☐ Not started | 0/2 | — |
@@ -694,4 +696,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Phase P0 Foundation complete. Phase P1 Catalogue & Stock complete (S06–S09 ✅). Next: Phase P2 — Sales & Invoicing (Session S10).*
+*End of implementation plan. Phase P0 + P1 complete. Phase P2 in progress (S10 ✅). Next: S11 — Sales Cart, Invoice & Due Ledger.*
