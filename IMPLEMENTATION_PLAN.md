@@ -568,6 +568,8 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **Acceptance criteria:** after a sale, a 7-day follow-up reminder is auto-scheduled; call-list filter returns the right customers.
 
+**Status:** ✅ Complete (S20) — verified via curl (CRM customers with spent/count/daysSinceContact, follow-up CRUD, call-list filter, auto 7-day follow-up after sale with nextDueDate=sale+7d) + Agent Browser (CRM page renders customer cards).
+
 ---
 
 ### Session S21 — Vendor RMA Pipeline (5 Stages)
@@ -707,11 +709,11 @@ After each phase is complete:
 | P3 Accounting | ✅ Done (S15 ✅, S16 ✅) | 2/2 | session(S16) |
 | P4 Employees & Payroll | ✅ Done (S17 ✅) | 1/1 | session(S17) |
 | P5 Reports | ✅ Done (S18 ✅, S19 ✅) | 2/2 | session(S19) |
-| P6 CRM & Reminders | ☐ Not started | 0/3 | — |
+| P6 CRM & Reminders | 🔄 In progress (S20 ✅) | 1/3 | session(S20) |
 | P7 Polish & Launch | ☐ Not started | 0/3 | — |
 
 > When all rows read **✅ Done**, the SaaS is workable end-to-end.
 
 ---
 
-*End of implementation plan. Phases P0–P5 complete. Next: Phase P6 — CRM & Reminders (Session S20).*
+*End of implementation plan. Phases P0–P5 complete. Phase P6 in progress (S20 ✅). Next: S21 — Vendor RMA Pipeline.*

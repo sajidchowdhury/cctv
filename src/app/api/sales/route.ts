@@ -190,6 +190,20 @@ export const POST = withTenant(async (user, req: Request) => {
         });
       }
 
+      // Auto-task: 7-day follow-up call reminder after each sale (doc §5.4).
+      if (customerId && !isHeld) {
+        await tx.followUp.create({
+          data: {
+            tenantId,
+            customerId,
+            note: `Auto: 7-day follow-up call after sale ${finalInvoiceNo}`,
+            rating: "NEUTRAL",
+            nextDueDate: new Date(saleDate.getTime() + 7 * 24 * 60 * 60 * 1000),
+            createdBy: user.id,
+          },
+        });
+      }
+
       return sale;
     });
 

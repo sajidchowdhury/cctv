@@ -693,3 +693,36 @@ Stage Summary:
 - Acceptance: 1/1 original criterion passes. All 10 reports present + exportable.
 - Phase status: P5 Reports COMPLETE (S18-S19, 2/2). Next: Phase P6 — CRM & Reminders (S20).
 - Artifacts committed: 4 report APIs, 4 report UI pages.
+
+---
+Task ID: S20
+Agent: Z.ai Code (main)
+Task: Session S20 — Review & Customer Follow-up CRM. §5.4 CRM panel: customer cards with click-to-call, purchase timeline, follow-up notes with ratings (Happy/Neutral/Unhappy), call-list filter (not contacted in 30/60/90 days), auto 7-day follow-up reminder after each sale. First session of Phase P6 — CRM & Reminders.
+
+Work Log:
+- Read S19 worklog + FollowUp schema (already in S02: customerId, note, rating, nextDueDate, createdBy). S20 builds the CRM panel on top.
+- Wrote 4 API routes:
+    GET /api/crm/customers — customer cards with: name, phone, totalSpent, purchaseCount, lastPurchaseDate, lastFollowUpDate, lastRating, nextDueDate, daysSinceContact. Optional ?days=N filter for call-list (customers not contacted in N days). Optional ?q=search.
+    GET /api/crm/customers/[id]/timeline — unified timeline of sales + follow-ups sorted by date desc. Each sale shows items (product × qty). Each follow-up shows note, rating, author, nextDueDate.
+    GET /api/crm/call-list?days=N — shorthand for customers not contacted in N days, sorted by daysSince desc.
+    GET/POST /api/follow-ups — list + create follow-up notes with rating (HAPPY/NEUTRAL/UNHAPPY) + optional nextDueDate.
+- Added auto 7-day follow-up hook to sales POST handler (transactional): after creating a sale (non-held, with customerId), creates a FollowUp with note="Auto: 7-day follow-up call after sale {invoiceNo}", rating=NEUTRAL, nextDueDate = saleDate + 7 days. Doc §5.4: "after each sale, schedule a 7-day follow-up call reminder."
+- Wrote CRM UI (2 pages):
+    /(app)/crm/page.tsx — customer cards grid with: name (link to detail), phone (click-to-call tel: link), totalSpent, purchaseCount, lastPurchaseDate, daysSinceContact, rating badge, next follow-up due. Search + call-list filter (All/30d/60d/90d).
+    /(app)/crm/customers/[id]/page.tsx — customer detail: 4 stat cards (totalSpent/purchases/balance/phone) + add-follow-up form (note, rating, nextDueDate) + unified timeline (sales + follow-ups with icons, items, notes, author, dates).
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] CRM customers list with totalSpent, purchaseCount, daysSinceContact
+- [x] Call-list filter returns customers not contacted in N days
+- [x] Follow-up CRUD: created with HAPPY rating
+- [x] Customer timeline shows sales + follow-ups
+- [x] Auto 7-day follow-up after sale: created with nextDueDate = saleDate + 7 days (2026-09-20)
+- [x] Browser: CRM page renders customer cards (no errors)
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning)
+
+Stage Summary:
+- Deliverables: 4 API routes (crm/customers, crm/customers/[id]/timeline, crm/call-list, follow-ups), 2 UI pages (CRM cards, customer detail with timeline + follow-up form), auto 7-day follow-up hook in sales POST.
+- Key decision: the auto 7-day follow-up is created transactionally within the sale create (same DB transaction), so it always fires on a successful sale. The call-list filter compares the last contact date (most recent of: last follow-up OR last sale OR customer creation) against the cutoff. Click-to-call uses tel: links for direct phone dialing on mobile.
+- Acceptance: 1/1 original criterion passes. Auto 7-day follow-up scheduled + call-list returns right customers.
+- Phase status: P6 CRM & Reminders now 1/3 (S20 ✅). Next: S21 — Vendor RMA Pipeline.
+- Artifacts committed: 4 API routes, 2 UI pages, sales POST auto-follow-up hook.
