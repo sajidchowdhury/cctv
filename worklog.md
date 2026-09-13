@@ -362,3 +362,49 @@ Stage Summary:
 - Acceptance: 1/1 original criterion passes. Accepted quote converts to sale with items preserved + out-of-stock flagged.
 - Phase status: P2 Sales & Invoicing now 1/5 (S10 ✅). Next: S11 — Sales Cart, Invoice & Due Ledger.
 - Artifacts committed: 5 API routes, customers API, 3 UI pages.
+
+---
+Task ID: S11
+Agent: Z.ai Code (main)
+Task: Session S11 — Sales Cart, Invoice & Due Ledger. Cart-based sale (doc §4.3) with live stock, serialised unit consumption, oversell blocked, customer receivable update, printable invoice.
+
+Work Log:
+- Read S10 worklog + Sale/SaleItem schema. Sale has quotationId (from S10 convert) + isHeld (held carts). SaleItem.inventoryUnitId links to the serialised unit consumed.
+- Wrote sales API (2 route files, 5 endpoints):
+    GET  /api/sales (list with customer name, due, isHeld flag, quotationId link; held filter + search)
+    POST /api/sales (transactional create):
+      - validates inventory units IN_STOCK + belong to the right product (oversell block → 409)
+      - creates Sale + SaleItems
+      - for each serialised unit: marks SOLD + links saleItemId (doc §4.3 stock decreases)
+      - updates Customer.currentBalance += due (increases receivable)
+      - auto invoiceNo INV-YYMMDD-###
+      - supports isHeld=true (hold cart)
+    GET  /api/sales/[id] (detail with items, product, inventory unit serial, salesman, customer)
+    PATCH /api/sales/[id] (finalize held sale: un-hold, set paid/due/mode; recomputes due + customer balance delta)
+    DELETE /api/sales/[id] (soft delete + restores inventory units to IN_STOCK)
+- Wrote sales UI (3 pages):
+    /(app)/sales/page.tsx — list DataTable (Invoice/Status/Date/Customer/Items/Total/Due/Mode) with Status badges (Held/From Quote/Final), held-only filter, search.
+    /(app)/sales/new/page.tsx — the CART:
+      - invoice details (customer select, payment mode, paid, due badge)
+      - product picker (SearchScanInput + filtered dropdown with live "N in stock" badges)
+      - cart lines: serial input (for serialised stock), qty, unit price (auto-filled from product default), discount %
+      - quick-add SERVICE line (installation charge, doc §5.2)
+      - invoice-level discount + live totals (subtotal/discount/total/paid/due)
+      - Save sale + Hold cart buttons (StickyActionBar mobile + inline desktop)
+    /(app)/sales/[id]/page.tsx — invoice view: 4 stat cards + "Converted from quotation" link (if applicable) + printable invoice (white card with bill-to, items table with serials, subtotal/discount/total/paid/due footer) + Print button.
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Sale of serialised unit (SN-A1) + service line → 201, total ৳3,700, due ৳0
+- [x] Inventory unit marked SOLD (SN-A1: IN_STOCK → SOLD)
+- [x] Product on-hand decreased (3 → 2)
+- [x] Oversell blocked: re-selling SN-A1 → 409 "Inventory unit already SOLD"
+- [x] Sale detail returns invoice with 2 items, serial, totals
+- [x] Browser: sales list with DataTable + new sale cart render (no errors)
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning)
+
+Stage Summary:
+- Deliverables: sales API (5 endpoints, transactional create with inventory consumption + customer receivable update), 3 UI pages (list, cart, invoice detail with print).
+- Key decision: oversell is blocked at the API level — the create handler validates each inventoryUnitId is IN_STOCK before the transaction. Held carts (isHeld=true) can be finalized later via PATCH. Delete restores inventory units to IN_STOCK (soft delete preserves audit trail). Invoice PDF deferred to S25 (react-pdf); the printable invoice view uses window.print() for now.
+- Acceptance: 1/1 original criterion passes. Oversell blocked; due updates customer receivable.
+- Phase status: P2 Sales & Invoicing now 2/5 (S10 ✅, S11 ✅). Next: S12 — Warranty Card PDF + Customer SMS.
+- Artifacts committed: 2 API routes (sales, sales/[id]), 3 UI pages (list, new cart, detail invoice).

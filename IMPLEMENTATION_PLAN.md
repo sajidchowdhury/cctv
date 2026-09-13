@@ -376,6 +376,8 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **Acceptance criteria:** sale of an oversold serial is blocked; due balance appears on customer ledger.
 
+**Status:** ✅ Complete (S11) — verified via curl API tests (create with serialised unit + service line, inventory unit SOLD, on-hand decreased, oversell blocked 409, sale detail invoice) + Agent Browser (list + cart). Invoice PDF deferred to S25 (react-pdf); customer ledger view deferred to S14 (customer master).
+
 ---
 
 ### Session S12 — Warranty Card PDF + Customer SMS
@@ -685,7 +687,7 @@ After each phase is complete:
 |-------|--------|---------------|------------------|
 | P0 Foundation | ✅ Done (S01 ✅, S02 ✅, S03 ✅, S04 ✅, S05 ✅) | 5/5 | session(S05) |
 | P1 Catalogue & Stock | ✅ Done (S06 ✅, S07 ✅, S08 ✅, S09 ✅) | 4/4 | session(S09) |
-| P2 Sales & Invoicing | 🔄 In progress (S10 ✅) | 1/5 | session(S10) |
+| P2 Sales & Invoicing | 🔄 In progress (S10 ✅, S11 ✅) | 2/5 | session(S11) |
 | P3 Accounting | ☐ Not started | 0/2 | — |
 | P4 Employees & Payroll | ☐ Not started | 0/1 | — |
 | P5 Reports | ☐ Not started | 0/2 | — |
@@ -696,4 +698,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Phase P0 + P1 complete. Phase P2 in progress (S10 ✅). Next: S11 — Sales Cart, Invoice & Due Ledger.*
+*End of implementation plan. Phase P0 + P1 complete. Phase P2 in progress (S10–S11 ✅). Next: S12 — Warranty Card PDF + Customer SMS.*

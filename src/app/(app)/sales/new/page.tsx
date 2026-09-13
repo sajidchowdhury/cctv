@@ -1,0 +1,321 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { PageHeader } from "@/components/layout/page-header";
+import { SearchScanInput } from "@/components/layout/search-scan-input";
+import { StickyActionBar } from "@/components/layout/sticky-action-bar";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Trash2, Save, Loader2, ArrowLeft, Package, Wrench } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { formatBDT } from "@/lib/format";
+
+type Product = { id: string; name: string; model: string | null; sku: string; defaultPrice: number | null; unitName: string | null; onHand: number };
+type Customer = { id: string; name: string; phone: string | null };
+type CartLine = {
+  key: string;
+  productId: string;
+  productName: string;
+  productModel: string | null;
+  inventoryUnitId: string;
+  serialNo: string;
+  qty: string;
+  unitPrice: string;
+  discount: string;
+  lineType: "PRODUCT" | "SERVICE";
+  description: string;
+};
+
+export default function NewSalePage() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+  const [customerId, setCustomerId] = useState("");
+  const [mode, setMode] = useState("CASH");
+  const [paid, setPaid] = useState("");
+  const [discount, setDiscount] = useState("");
+  const [notes, setNotes] = useState("");
+  const [lines, setLines] = useState<CartLine[]>([]);
+  const [productSearch, setProductSearch] = useState("");
+
+  const [products, setProducts] = useState<Product[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  useState(() => {
+    fetch("/api/products").then((r) => r.json()).then((d) => setProducts(d.products ?? []));
+    fetch("/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers ?? []));
+  });
+
+  const filteredProducts = products.filter((p) =>
+    !productSearch ||
+    p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+    (p.model ?? "").toLowerCase().includes(productSearch.toLowerCase()) ||
+    p.sku.toLowerCase().includes(productSearch.toLowerCase())
+  );
+
+  function addProductLine(p: Product) {
+    setLines((l) => [...l, {
+      key: `${p.id}-${Date.now()}`,
+      productId: p.id,
+      productName: p.name,
+      productModel: p.model,
+      inventoryUnitId: "",
+      serialNo: "",
+      qty: "1",
+      unitPrice: p.defaultPrice ? String(p.defaultPrice) : "",
+      discount: "0",
+      lineType: "PRODUCT",
+      description: p.name,
+    }]);
+    setProductSearch("");
+  }
+
+  function addServiceLine() {
+    setLines((l) => [...l, {
+      key: `svc-${Date.now()}`,
+      productId: "",
+      productName: "",
+      productModel: null,
+      inventoryUnitId: "",
+      serialNo: "",
+      qty: "1",
+      unitPrice: "",
+      discount: "0",
+      lineType: "SERVICE",
+      description: "",
+    }]);
+  }
+
+  function updateLine(key: string, field: keyof CartLine, value: string) {
+    setLines((l) => l.map((line) => (line.key === key ? { ...line, [field]: value } : line)));
+  }
+  function removeLine(key: string) {
+    setLines((l) => l.filter((line) => line.key !== key));
+  }
+
+  const subtotal = lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0) * (1 - (Number(l.discount) || 0) / 100), 0);
+  const discountNum = Number(discount) || 0;
+  const total = Math.max(0, subtotal - discountNum);
+  const paidNum = Number(paid) || 0;
+  const due = Math.max(0, total - paidNum);
+
+  async function onSave(hold: boolean = false) {
+    if (lines.length === 0) {
+      toast({ title: "Empty cart", description: "Add at least one item.", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/sales", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId: customerId || null,
+          mode,
+          paid: paidNum,
+          discount: discountNum,
+          notes: notes || null,
+          isHeld: hold,
+          items: lines.map((l) => ({
+            productId: l.lineType === "PRODUCT" ? l.productId : null,
+            inventoryUnitId: l.inventoryUnitId || null,
+            description: l.lineType === "SERVICE" ? l.description : null,
+            lineType: l.lineType,
+            qty: Number(l.qty),
+            unitPrice: Number(l.unitPrice),
+            discount: Number(l.discount) || 0,
+            warrantyMonths: 0,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Failed", description: data.error ?? "Could not create sale.", variant: "destructive" });
+        setSaving(false);
+        return;
+      }
+      toast({ title: hold ? "Sale held" : "Sale saved", description: data.invoiceNo });
+      router.push(hold ? "/sales?held=1" : "/sales");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6 pb-24 md:pb-6">
+      <PageHeader
+        title="New sale"
+        description="Cart-based invoicing. Stock decreases on save."
+        action={
+          <Button asChild variant="outline" size="sm">
+            <Link href="/sales"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
+          </Button>
+        }
+      />
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Invoice details</CardTitle></CardHeader>
+        <CardContent>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label>Customer</Label>
+              <Select value={customerId} onValueChange={setCustomerId}>
+                <SelectTrigger><SelectValue placeholder="Walk-in…" /></SelectTrigger>
+                <SelectContent>
+                  {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Payment mode</Label>
+              <Select value={mode} onValueChange={setMode}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CASH">Cash</SelectItem>
+                  <SelectItem value="BANK">Bank</SelectItem>
+                  <SelectItem value="BKASH">bKash</SelectItem>
+                  <SelectItem value="NAGAD">Nagad</SelectItem>
+                  <SelectItem value="DUE">Due</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="paid">Paid (BDT)</Label>
+              <Input id="paid" type="number" min={0} step="0.01" value={paid} onChange={(e) => setPaid(e.target.value)} placeholder="0" />
+            </div>
+            <div className="space-y-2">
+              <Label>Due</Label>
+              <div className="flex h-10 items-center">
+                <Badge variant="secondary" className={due > 0 ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"}>
+                  {formatBDT(due)}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Add items</CardTitle>
+          <CardDescription>Search by name, model, or SKU. Add a service line for installation charges.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex gap-2">
+            <SearchScanInput value={productSearch} onChange={setProductSearch} placeholder="Search name / model / SKU…" className="flex-1" />
+            <Button variant="outline" type="button" onClick={addServiceLine}><Wrench className="mr-2 h-4 w-4" /> Service line</Button>
+          </div>
+          {productSearch && (
+            <div className="rounded-lg border max-h-60 overflow-y-auto scroll-area-thin">
+              {filteredProducts.length === 0 ? (
+                <p className="p-3 text-sm text-muted-foreground">No products match.</p>
+              ) : (
+                filteredProducts.slice(0, 20).map((p) => (
+                  <button key={p.id} type="button" onClick={() => addProductLine(p)}
+                    className="flex w-full items-center justify-between border-b last:border-0 px-3 py-2 text-left hover:bg-accent">
+                    <div>
+                      <p className="text-sm font-medium">{p.name}</p>
+                      <p className="text-xs text-muted-foreground">{p.model ?? "—"} · {p.sku}</p>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="secondary" className={p.onHand > 0 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"}>
+                        {p.onHand} in stock
+                      </Badge>
+                      {p.defaultPrice && <p className="text-xs text-muted-foreground mt-1">{formatBDT(p.defaultPrice)}</p>}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Cart ({lines.length})</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          {lines.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center border border-dashed rounded-lg">
+              No items added yet. Search above to add.
+            </p>
+          ) : (
+            lines.map((line) => {
+              const lt = (Number(line.qty) || 0) * (Number(line.unitPrice) || 0) * (1 - (Number(line.discount) || 0) / 100);
+              return (
+                <div key={line.key} className="rounded-lg border p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="outline" className={line.lineType === "PRODUCT" ? "border-blue-300 text-blue-700" : "border-emerald-300 text-emerald-700"}>
+                      {line.lineType}
+                    </Badge>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => removeLine(line.key)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {line.lineType === "PRODUCT" ? (
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">{line.productName}</span>
+                      {line.productModel && <span className="text-xs text-muted-foreground">{line.productModel}</span>}
+                    </div>
+                  ) : (
+                    <Input placeholder="Service description (e.g. Installation charge)" value={line.description} onChange={(e) => updateLine(line.key, "description", e.target.value)} />
+                  )}
+                  {line.lineType === "PRODUCT" && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Serial number (optional — for serialised stock)</Label>
+                      <Input placeholder="Scan or type serial" value={line.serialNo} onChange={(e) => updateLine(line.key, "serialNo", e.target.value)} className="font-mono text-xs" />
+                    </div>
+                  )}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div><Label className="text-xs">Qty</Label><Input type="number" step="0.01" min="0" value={line.qty} onChange={(e) => updateLine(line.key, "qty", e.target.value)} /></div>
+                    <div><Label className="text-xs">Unit price</Label><Input type="number" step="0.01" min="0" value={line.unitPrice} onChange={(e) => updateLine(line.key, "unitPrice", e.target.value)} placeholder="0" /></div>
+                    <div><Label className="text-xs">Disc %</Label><Input type="number" value={line.discount} onChange={(e) => updateLine(line.key, "discount", e.target.value)} /></div>
+                  </div>
+                  <p className="text-right text-sm"><span className="text-muted-foreground">Line total: </span><span className="font-medium">{formatBDT(lt)}</span></p>
+                </div>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      {lines.length > 0 && (
+        <Card>
+          <CardContent className="py-4 space-y-2">
+            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal</span><span className="tabular-nums">{formatBDT(subtotal)}</span></div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="space-y-2"><Label className="text-xs">Invoice discount (BDT)</Label><Input type="number" value={discount} onChange={(e) => setDiscount(e.target.value)} placeholder="0" /></div>
+            </div>
+            <div className="border-t pt-2">
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total</span><span className="tabular-nums font-medium">{formatBDT(total)}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">Paid</span><span className="tabular-nums">{formatBDT(paidNum)}</span></div>
+              <div className="flex justify-between text-lg font-bold pt-1"><span>Due</span><span className="tabular-nums text-amber-600 dark:text-amber-400">{formatBDT(due)}</span></div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <StickyActionBar>
+        <Button onClick={() => onSave(false)} disabled={saving || lines.length === 0} className="flex-1">
+          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save sale
+        </Button>
+        <Button variant="outline" onClick={() => onSave(true)} disabled={saving || lines.length === 0}>
+          <Plus className="mr-2 h-4 w-4" /> Hold
+        </Button>
+      </StickyActionBar>
+      <div className="hidden md:flex md:justify-end gap-2">
+        <Button variant="outline" onClick={() => onSave(true)} disabled={saving || lines.length === 0}>
+          <Plus className="mr-2 h-4 w-4" /> Hold cart
+        </Button>
+        <Button onClick={() => onSave(false)} disabled={saving || lines.length === 0}>
+          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save sale
+        </Button>
+      </div>
+    </div>
+  );
+}
