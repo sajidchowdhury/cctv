@@ -526,7 +526,7 @@ Service Tickets:
 - For non-serialised products: qty-based selling (no serial needed)
 - Auto-select first available serial on product click
 
-#### F2-S2: Sales Edit + Delete + Stock/Ledger Reversal
+#### F2-S2: Sales Edit + Delete + Stock/Ledger Reversal ✅ Complete
 - Sale edit: load items into cart, allow editing customer/items/prices/payment
 - Sale delete: soft delete + restore all inventory units to IN_STOCK + reverse customer balance
 - Transactional: stock + ledger stay consistent on edit/delete

@@ -55,6 +55,7 @@ function NewSalePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const resumeId = searchParams.get("resume");
+  const isEditMode = searchParams.get("edit") === "1";
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [customerId, setCustomerId] = useState("");
@@ -240,7 +241,31 @@ function NewSalePage() {
       };
 
       let res;
-      if (resumeId) {
+      if (resumeId && isEditMode) {
+        // Full edit: PATCH with editMode + all items + stock/ledger reversal.
+        res = await fetch(`/api/sales/${resumeId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            editMode: true,
+            customerId: customerId || null,
+            mode,
+            paid: paidNum,
+            discount: discountNum,
+            notes: notes || null,
+            items: lines.map((l) => ({
+              productId: l.lineType === "PRODUCT" ? l.productId : null,
+              inventoryUnitId: l.inventoryUnitId || null,
+              description: l.lineType === "SERVICE" ? l.description : null,
+              lineType: l.lineType,
+              qty: Number(l.qty),
+              unitPrice: Number(l.unitPrice),
+              discount: Number(l.discount) || 0,
+              warrantyMonths: 0,
+            })),
+          }),
+        });
+      } else if (resumeId) {
         // Finalize the held sale: PATCH to un-hold + update fields.
         res = await fetch(`/api/sales/${resumeId}`, {
           method: "PATCH",
@@ -263,7 +288,7 @@ function NewSalePage() {
       // Clear localStorage draft on successful save.
       localStorage.removeItem(DRAFT_KEY);
       const invoiceNo = data.invoiceNo ?? data.sale?.invoiceNo;
-      toast({ title: hold ? "Sale held" : "Sale saved", description: invoiceNo });
+      toast({ title: isEditMode ? "Sale updated" : hold ? "Sale held" : "Sale saved", description: isEditMode ? (data.message ?? invoiceNo) : invoiceNo });
       router.push(hold ? "/sales?held=1" : "/sales");
     } finally {
       setSaving(false);
@@ -273,8 +298,8 @@ function NewSalePage() {
   return (
     <div className="space-y-6 pb-24 md:pb-6">
       <PageHeader
-        title={resumeId ? "Resume held sale" : "New sale"}
-        description={resumeId ? "Review and finalize the held cart." : "Cart-based invoicing. Stock decreases on save. Draft auto-saves."}
+        title={isEditMode ? "Edit sale" : resumeId ? "Resume held sale" : "New sale"}
+        description={isEditMode ? "Edit items, prices, and payment. Stock + ledger are reversed and reapplied on save." : resumeId ? "Review and finalize the held cart." : "Cart-based invoicing. Stock decreases on save. Draft auto-saves."}
         action={
           <div className="flex gap-2">
             {!resumeId && lines.length > 0 && (
@@ -482,22 +507,22 @@ function NewSalePage() {
 
       <StickyActionBar>
         <Button onClick={() => onSave(false)} disabled={saving || lines.length === 0} className="flex-1">
-          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {resumeId ? "Finalize sale" : "Save sale"}
+          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {isEditMode ? "Update sale" : resumeId ? "Finalize sale" : "Save sale"}
         </Button>
-        {!resumeId && (
+        {!resumeId && !isEditMode && (
           <Button variant="outline" onClick={() => onSave(true)} disabled={saving || lines.length === 0}>
             <Plus className="mr-2 h-4 w-4" /> Hold
           </Button>
         )}
       </StickyActionBar>
       <div className="hidden md:flex md:justify-end gap-2">
-        {!resumeId && (
+        {!resumeId && !isEditMode && (
           <Button variant="outline" onClick={() => onSave(true)} disabled={saving || lines.length === 0}>
             <Plus className="mr-2 h-4 w-4" /> Hold cart
           </Button>
         )}
         <Button onClick={() => onSave(false)} disabled={saving || lines.length === 0}>
-          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {resumeId ? "Finalize sale" : "Save sale"}
+          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {isEditMode ? "Update sale" : resumeId ? "Finalize sale" : "Save sale"}
         </Button>
       </div>
     </div>

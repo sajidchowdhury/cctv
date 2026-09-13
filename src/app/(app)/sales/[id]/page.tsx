@@ -1,21 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useParams } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, Printer, Pause, Check, Link2, ShieldCheck, MessageSquare, RotateCcw } from "lucide-react";
+import { ArrowLeft, Loader2, Printer, Pause, Check, Link2, ShieldCheck, MessageSquare, RotateCcw, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/layout/confirm-dialog";
 import { formatBDT, formatDate, formatDateTime } from "@/lib/format";
 
 export default function SaleDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const { toast } = useToast();
+  const qc = useQueryClient();
   const [smsBusy, setSmsBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["sale", id],
     queryFn: async () => (await (await fetch(`/api/sales/${id}`)).json()).sale,
@@ -73,6 +77,41 @@ export default function SaleDetailPage() {
               {smsBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
               Warranty SMS
             </Button>
+            {!sale.isHeld && (
+              <Button asChild variant="outline" size="sm">
+                <Link href={`/sales/new?resume=${id}&edit=1`}>
+                  <Pencil className="mr-2 h-4 w-4" /> Edit
+                </Link>
+              </Button>
+            )}
+            <ConfirmDialog
+              trigger={
+                <Button variant="outline" size="sm" className="text-destructive" disabled={deleting}>
+                  {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                  Delete
+                </Button>
+              }
+              title="Delete this sale?"
+              description="This will restore all sold units to IN_STOCK and reverse the customer's balance. The sale is soft-deleted (data preserved). This action cannot be undone."
+              destructive
+              confirmLabel="Delete sale"
+              onConfirm={async () => {
+                setDeleting(true);
+                try {
+                  const res = await fetch(`/api/sales/${id}`, { method: "DELETE" });
+                  const data = await res.json();
+                  if (!res.ok) {
+                    toast({ title: "Failed", description: data.error ?? "Delete failed.", variant: "destructive" });
+                  } else {
+                    toast({ title: "Sale deleted", description: data.message });
+                    qc.invalidateQueries({ queryKey: ["sales"] });
+                    router.push("/sales");
+                  }
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+            />
           </div>
         }
       />
