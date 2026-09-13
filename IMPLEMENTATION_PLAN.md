@@ -166,9 +166,11 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 - `/login`, `/signup`, `/verify-email`, `/change-email`.
 
 **Acceptance criteria:**
-- Duplicate email signup is rejected with a clear message.
-- A locked tenant cannot reach any business route (redirects to `/payment`).
-- Role guard blocks a Salesman from accounting endpoints.
+- ✅ Duplicate email signup is rejected with a clear message (409 EMAIL_TAKEN).
+- ✅ A locked tenant cannot reach any business route (redirects to `/payment`).
+- ✅ Role guard blocks a Salesman from accounting endpoints (403 Forbidden).
+
+**Status:** ✅ Complete (S03) — verified via curl API tests + Agent Browser e2e (login → dashboard; locked → /payment).
 
 ---
 
@@ -662,7 +664,7 @@ After each phase is complete:
 
 | Phase | Status | Sessions done | Pushed (commit) |
 |-------|--------|---------------|------------------|
-| P0 Foundation | 🔄 In progress (S01 ✅, S02 ✅) | 2/5 | session(S02) |
+| P0 Foundation | 🔄 In progress (S01 ✅, S02 ✅, S03 ✅) | 3/5 | session(S03) |
 | P1 Catalogue & Stock | ☐ Not started | 0/4 | — |
 | P2 Sales & Invoicing | ☐ Not started | 0/5 | — |
 | P3 Accounting | ☐ Not started | 0/2 | — |
@@ -675,4 +677,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Sessions S01–S02 complete — continue at Session S03.*
+*End of implementation plan. Sessions S01–S03 complete — continue at Session S04.*

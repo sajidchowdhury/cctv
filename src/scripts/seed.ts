@@ -1,42 +1,49 @@
 /**
- * S02 Seed — creates a dev tenant + owner user + subscription.
+ * S03 Seed — creates a dev tenant + owner user + subscription (ACTIVE for dev).
  *
- * Run: `bun run src/scripts/seed.ts`
+ * Run: `bun run db:seed`
  *
  * Creates:
- *   - 1 Tenant  (ownerEmail: owner@cctv-demo.bd)
- *   - 1 User     (role OWNER, email owner@cctv-demo.bd)
- *   - 1 Subscription (status PENDING_ACTIVATION — first payment verifies it in S05)
+ *   - 1 Tenant  (ownerEmail: owner@cctv-demo.bd, status ACTIVE for dev testing)
+ *   - 1 User     (role OWNER, email owner@cctv-demo.bd, password "password123")
+ *   - 1 Subscription (status ACTIVE — S05 wires the real PENDING_ACTIVATION → verify flow)
  *   - Reference rows: 2 Categories, 1 Unit
+ *   - A 2nd user (salesman@cctv-demo.bd, role SALESMAN) for role-guard tests
  *
- * Also runs the tenant-isolation verification (see verify-tenant-isolation.ts).
+ * NOTE: real signups via /api/auth/signup start PENDING_ACTIVATION. The demo
+ * tenant is set ACTIVE here purely so S03/S04 auth flows are testable.
  */
 
+import bcrypt from "bcryptjs";
 import { adminDb } from "../lib/db";
 import { runWithTenant } from "../lib/tenant-context";
 
-async function main() {
-  console.log("🌱 Seeding S02 dev data...\n");
+const DEMO_PASSWORD = "password123";
 
-  // ── 1. Tenant ──────────────────────────────────────────────
+async function main() {
+  console.log("🌱 Seeding S03 dev data...\n");
+
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
+
+  // ── 1. Tenant (ACTIVE for dev; real signups start PENDING_ACTIVATION) ──
   const tenant = await adminDb.tenant.upsert({
     where: { ownerEmail: "owner@cctv-demo.bd" },
-    update: {},
+    update: { status: "ACTIVE" },
     create: {
       name: "Dhaka CCTV Center (Demo)",
       ownerEmail: "owner@cctv-demo.bd",
       phone: "+8801711111111",
       address: "Elephant Road, Dhaka",
-      status: "PENDING_ACTIVATION",
+      status: "ACTIVE",
     },
   });
-  console.log(`✓ Tenant: ${tenant.name} (${tenant.id})`);
+  console.log(`✓ Tenant: ${tenant.name} (${tenant.id}) — ACTIVE for dev`);
 
   // ── 2. Owner user (scoped to tenant) ──────────────────────
   await runWithTenant(tenant.id, async () => {
     const user = await adminDb.user.upsert({
       where: { email: "owner@cctv-demo.bd" },
-      update: {},
+      update: { passwordHash },
       create: {
         tenantId: tenant.id,
         email: "owner@cctv-demo.bd",
@@ -44,20 +51,37 @@ async function main() {
         phone: "+8801711111111",
         role: "OWNER",
         status: "ACTIVE",
+        passwordHash,
       },
     });
     console.log(`✓ User: ${user.email} [${user.role}]`);
 
-    // ── 3. Subscription (pending — no module access yet, doc §3.3) ──
+    // 2nd user: salesman for role-guard test (S03 acceptance)
+    const salesman = await adminDb.user.upsert({
+      where: { email: "salesman@cctv-demo.bd" },
+      update: { passwordHash },
+      create: {
+        tenantId: tenant.id,
+        email: "salesman@cctv-demo.bd",
+        name: "Demo Salesman",
+        phone: "+8801722222222",
+        role: "SALESMAN",
+        status: "ACTIVE",
+        passwordHash,
+      },
+    });
+    console.log(`✓ User: ${salesman.email} [${salesman.role}]`);
+
+    // ── 3. Subscription (ACTIVE for dev; S05 wires PENDING_ACTIVATION → verify) ──
     const sub = await adminDb.subscription.upsert({
       where: { tenantId: tenant.id },
-      update: {},
+      update: { status: "ACTIVE" },
       create: {
         tenantId: tenant.id,
         plan: "UNLIMITED",
         startedAt: new Date(),
         cycleEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        status: "PENDING_ACTIVATION",
+        status: "ACTIVE",
       },
     });
     console.log(`✓ Subscription: ${sub.plan} / ${sub.status}`);
@@ -83,8 +107,10 @@ async function main() {
     console.log(`✓ Unit: Pcs`);
 
     console.log(
-      `\n✅ Seed complete. Tenant id for testing: ${tenant.id}\n` +
-        `   email: owner@cctv-demo.bd (no password yet — S03 wires NextAuth)`
+      `\n✅ Seed complete.\n` +
+        `   Tenant: ${tenant.id}\n` +
+        `   Login: owner@cctv-demo.bd / ${DEMO_PASSWORD} (OWNER)\n` +
+        `   Login: salesman@cctv-demo.bd / ${DEMO_PASSWORD} (SALESMAN)`
     );
   });
 }
