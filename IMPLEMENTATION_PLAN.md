@@ -197,9 +197,13 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 - `/(app)/` — dashboard placeholder (widgets wired in later phases).
 
 **Acceptance criteria:**
-- On a 360px viewport, bottom nav is visible and thumb-reachable.
-- Footer sticks to bottom on short pages, pushes down on long pages.
-- Dark mode toggle persists across reloads.
+- ✅ On a 360px viewport, bottom nav is visible and thumb-reachable (5 slots, ≥56px targets).
+- ✅ Footer sticks to bottom on short pages (footerBottom === viewportH), pushes down on long pages.
+- ✅ Dark mode toggle persists across reloads (localStorage via next-themes).
+- ✅ Calm blue accent #1A73E8 applied to primary + sidebar tokens (light + dark).
+- ✅ Reusable components built: DataTable, CartTable, SearchScanInput, EmptyState, PageHeader, StickyActionBar, ConfirmDialog, ModuleComingSoon.
+
+**Status:** ✅ Complete (S04) — verified via Agent Browser (mobile bottom nav, desktop sidebar, nav clicks, dark mode toggle, sticky footer on short page).
 
 ---
 
@@ -664,7 +668,7 @@ After each phase is complete:
 
 | Phase | Status | Sessions done | Pushed (commit) |
 |-------|--------|---------------|------------------|
-| P0 Foundation | 🔄 In progress (S01 ✅, S02 ✅, S03 ✅) | 3/5 | session(S03) |
+| P0 Foundation | 🔄 In progress (S01 ✅, S02 ✅, S03 ✅, S04 ✅) | 4/5 | session(S04) |
 | P1 Catalogue & Stock | ☐ Not started | 0/4 | — |
 | P2 Sales & Invoicing | ☐ Not started | 0/5 | — |
 | P3 Accounting | ☐ Not started | 0/2 | — |
@@ -677,4 +681,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Sessions S01–S03 complete — continue at Session S04.*
+*End of implementation plan. Sessions S01–S04 complete — continue at Session S05.*

@@ -1,11 +1,24 @@
 "use client";
 
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ShieldCheck, LogOut, LayoutDashboard, CreditCard } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState } from "@/components/layout/empty-state";
+import {
+  Boxes,
+  ShoppingCart,
+  PackagePlus,
+  BookOpen,
+  LayoutDashboard,
+  CreditCard,
+  Bell,
+  Wrench,
+  ArrowRight,
+} from "lucide-react";
+import { formatBDT } from "@/lib/format";
 
 const STATUS_TONE: Record<string, string> = {
   ACTIVE: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
@@ -14,112 +27,147 @@ const STATUS_TONE: Record<string, string> = {
   PENDING_ACTIVATION: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
 };
 
+const QUICK_LINKS = [
+  { href: "/sales", label: "New Sale", icon: ShoppingCart, phase: "S11" },
+  { href: "/purchases", label: "New Purchase", icon: PackagePlus, phase: "S08" },
+  { href: "/products", label: "Products", icon: Boxes, phase: "S06" },
+  { href: "/ledger", label: "Ledger", icon: BookOpen, phase: "S15" },
+  { href: "/rma", label: "RMA", icon: Wrench, phase: "S21" },
+  { href: "/reminders", label: "Reminders", icon: Bell, phase: "S22" },
+];
+
 export default function DashboardPage() {
   const { data: session, status } = useSession();
 
   if (status === "loading") {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex items-center justify-center py-20">
         <p className="text-sm text-muted-foreground">Loading…</p>
-      </main>
+      </div>
     );
   }
-
   if (!session?.user) return null;
   const u = session.user;
 
   return (
-    <main className="min-h-screen flex flex-col bg-background">
-      <header className="border-b bg-card">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
-            <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <ShieldCheck className="h-4 w-4" />
-            </div>
-            <span className="font-semibold">CCTV Inventory</span>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: "/login" })}>
-            <LogOut className="mr-2 h-4 w-4" /> Log out
+    <div className="space-y-6">
+      <PageHeader
+        title={`Welcome, ${u.name}`}
+        description="Your workspace is ready. Modules fill in over the coming sessions."
+        action={
+          <Button asChild variant="outline" size="sm">
+            <Link href="/payment">
+              <CreditCard className="mr-2 h-4 w-4" /> Billing
+            </Link>
           </Button>
-        </div>
-      </header>
+        }
+      />
 
-      <section className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 space-y-6">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">
-            Welcome, {u.name}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Your workspace is ready. The module shell arrives in Session S04.
-          </p>
-        </div>
+      {/* Account + subscription snapshot */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Role</CardDescription>
+            <CardTitle className="text-base flex items-center gap-2">
+              <LayoutDashboard className="h-4 w-4" /> {u.role}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Subscription</CardDescription>
+            <CardTitle className="text-base flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4" /> Plan
+              </span>
+              <Badge className={STATUS_TONE[u.subscriptionStatus] ?? ""} variant="secondary">
+                {u.subscriptionStatus}
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Monthly fee</CardDescription>
+            <CardTitle className="text-base">{formatBDT(500)}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Email</CardDescription>
+            <CardTitle className="text-sm font-medium truncate" title={u.email}>
+              {u.email}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <LayoutDashboard className="h-4 w-4" /> Account
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <Row label="Email" value={u.email} />
-              <Row label="Role" value={u.role} />
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Subscription</span>
-                <Badge className={STATUS_TONE[u.subscriptionStatus] ?? ""} variant="secondary">
-                  {u.subscriptionStatus}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Quick actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Quick actions</CardTitle>
+          <CardDescription>Jump into a module (lands across S06–S22).</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {QUICK_LINKS.map((q) => {
+              const Icon = q.icon;
+              return (
+                <Link
+                  key={q.href}
+                  href={q.href}
+                  className="group flex flex-col items-center justify-center gap-2 rounded-lg border p-4 text-center transition-colors hover:bg-accent hover:text-accent-foreground min-h-[88px]"
+                >
+                  <Icon className="h-6 w-6 text-muted-foreground group-hover:text-foreground" />
+                  <span className="text-xs font-medium">{q.label}</span>
+                  <span className="text-[10px] text-muted-foreground">{q.phase}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <CreditCard className="h-4 w-4" /> Billing
-              </CardTitle>
-              <CardDescription>
-                BDT 500/month flat plan (doc §3.2).
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/payment">Manage subscription</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
+      {/* Empty placeholder widgets — wired in later sessions */}
+      <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Session S03 — Auth, RBAC</CardTitle>
-            <CardDescription>
-              Authenticated shell. Next sessions add the module navigation + data.
-            </CardDescription>
+            <CardTitle className="text-base">Low stock</CardTitle>
+            <CardDescription>Items at or below safety stock (S09).</CardDescription>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-1">
-            <p>• Credentials login + JWT session with subscription refresh</p>
-            <p>• 1-email-per-account enforced (DB UNIQUE + friendly message)</p>
-            <p>• Locked / pending tenants redirected to /payment</p>
-            <p>• Role guard demo: <code className="rounded bg-muted px-1">GET /api/test/accounting</code> (ACCOUNTANT/OWNER only)</p>
+          <CardContent>
+            <EmptyState
+              icon={Boxes}
+              title="No low-stock alerts"
+              description="Stock summary lands in Session S09. Add products in S06 to see alerts here."
+            />
           </CardContent>
         </Card>
-      </section>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Upcoming reminders</CardTitle>
+            <CardDescription>Due today + warranty expiries (S22).</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <EmptyState
+              icon={Bell}
+              title="No reminders yet"
+              description="The reminder engine lands in Session S22."
+              action={
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/reminders">
+                    Go to reminders <ArrowRight className="ml-2 h-3 w-3" />
+                  </Link>
+                </Button>
+              }
+            />
+          </CardContent>
+        </Card>
+      </div>
 
-      <footer className="mt-auto border-t bg-card">
-        <div className="mx-auto max-w-5xl px-4 py-4 text-center text-xs text-muted-foreground">
-          CCTV Inventory SaaS · Phase P0 · Session S03
-        </div>
-      </footer>
-    </main>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium truncate ml-2">{value}</span>
+      <p className="text-center text-xs text-muted-foreground pt-2">
+        Session S04 — base UI shell established. Next sessions add module data.
+      </p>
     </div>
   );
 }

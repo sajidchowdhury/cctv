@@ -69,3 +69,51 @@ Stage Summary:
 - Acceptance: 3/3 criteria pass + browser e2e verified. Login → dashboard; locked → /payment; duplicate email → 409; salesman → 403.
 - Phase status: P0 Foundation now 3/5 sessions (S01 ✅, S02 ✅, S03 ✅). Next: S04 — Base UI Shell, Navigation & Theme.
 - Artifacts committed: auth.ts, 4 API routes, session.ts, proxy.ts, providers.tsx, 5 auth UI pages, dashboard, test endpoint, seed.ts, worklog.md.
+
+---
+Task ID: S04
+Agent: Z.ai Code (main)
+Task: Session S04 — Base UI Shell, Navigation & Theme. Mobile-first AppShell (bottom nav on mobile, sidebar on desktop, sticky footer), dark mode with calm blue accent (#1A73E8), BDT currency util, reusable DataTable/CartTable/SearchScanInput/EmptyState/PageHeader components, subscription banner slot.
+
+Work Log:
+- Read S03 worklog + current (app)/layout.tsx (pass-through), (app)/page.tsx (standalone dashboard with embedded header/footer), globals.css (primary was pure black), format.ts (BDT util already present from S01).
+- Updated globals.css: primary + sidebar tokens to calm blue #1A73E8 (oklch approximations for light + dark), accent/ring/chart-1 matched, custom scrollbar (.scroll-area-thin), iOS safe-area (.pb-safe).
+- Wrote src/lib/nav.ts: NAV_ITEMS config (10 modules) + MOBILE_NAV_ITEMS (5 bottom-nav slots: Home/Sales/Purchase/Ledger/Products) + visibleNavItems(role) to hide accounting from SALESMAN. Each item has English + Bangla label (for S23 i18n) + phase tag.
+- Wrote src/components/layout/:
+    app-shell.tsx — root wrapper: min-h-screen flex flex-col, mobile top bar + desktop sidebar + main (md:pl-64) + sticky footer + mobile bottom nav. Footer uses mt-auto so it sticks on short pages, pushes down on long.
+    desktop-sidebar.tsx — fixed sidebar (md+): brand, role-filtered module list, theme toggle, logout. MobileTopBar: brand + theme toggle + billing link (md:hidden).
+    mobile-bottom-nav.tsx — fixed bottom nav (<md): 5 slots, ≥56px targets, pb-safe for iOS.
+    subscription-banner.tsx — shows for GRACE/PENDING_ACTIVATION (LOCKED redirected by proxy). GraceAlert widget variant.
+    page-header.tsx — title + description + action slot ("one primary action per screen").
+    empty-state.tsx — icon + title + description + single CTA.
+    search-scan-input.tsx — search + scan hint, keyboard-first, onEnter hook.
+    sticky-action-bar.tsx — sticky bottom action bar on mobile (above bottom nav).
+    data-table.tsx — TanStack Table wrapper: sortable headers, empty state passthrough, max-height scroll with custom scrollbar.
+    cart-table.tsx — multi-row cart (Purchase/Sale/Quotation): desktop table + mobile cards, qty/price inline edit, running total.
+    confirm-dialog.tsx — AlertDialog wrapper for destructive confirmations.
+    module-coming-soon.tsx — placeholder for module routes landing in later sessions.
+    index.ts — barrel export.
+- Rewrote (app)/layout.tsx to wrap children in <AppShell>.
+- Rewrote (app)/page.tsx dashboard: uses PageHeader, 4-card account snapshot (role/subscription/fee/email), quick-actions grid (6 module links with phase tags), 2 empty-state widgets (low stock, reminders). Removed embedded header/footer (now in shell).
+- Created 9 module placeholder pages (products, purchases, sales, customers, quotations, rma, reminders, reports, ledger) using ModuleComingSoon.
+
+Bug found + fixed:
+- Module pages passed a Lucide icon (React component with methods) as a prop from Server Components to the ModuleComingSoon client component → Next.js 16 error "Only plain objects can be passed to Client Components from Server Components". Fixed by marking all 9 module pages "use client".
+- Dev server kept dying between Bash tool calls (environment limitation). Worked around by running server + browser tests in a single Bash command.
+
+Acceptance criteria (all pass — verified via Agent Browser):
+- [x] On 375px viewport, bottom nav visible + thumb-reachable (5 slots, bottom:812 = viewport height)
+- [x] Footer sticks to bottom on short pages (products page: footerBottom=800 === viewportH=800, docScrollH=800 = no scroll, no floating gap)
+- [x] Footer pushes down on long pages (dashboard: docScrollH=1016 > viewportH=800)
+- [x] Dark mode toggle works (document.documentElement.className → "dark"), persists via next-themes localStorage
+- [x] Desktop sidebar renders full module list (10 items with phase tags) + theme toggle + logout
+- [x] Nav click: Products → /products renders "Products arrives in S06" (no error overlay)
+- [x] Calm blue accent #1A73E8 applied to primary buttons + sidebar active state
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table react-hooks/incompatible-library warning)
+
+Stage Summary:
+- Deliverables: globals.css (blue theme + scrollbar + safe-area), nav.ts (config), 12 layout components (app-shell, desktop-sidebar, mobile-bottom-nav, subscription-banner, page-header, empty-state, search-scan-input, sticky-action-bar, data-table, cart-table, confirm-dialog, module-coming-soon), (app)/layout.tsx (shell), (app)/page.tsx (dashboard rewrite), 9 module placeholder pages.
+- Key decision: AppShell uses min-h-screen flex flex-col + mt-auto footer (recommended Tailwind pattern) so the footer sticks on short pages and pushes down naturally on long pages. Mobile bottom nav is fixed with pb-safe for iOS safe-area. Nav is role-aware (SALESMAN doesn't see Ledger/Reports).
+- Acceptance: 3/3 original criteria + 2 bonus (blue accent, reusable components). All browser-verified.
+- Phase status: P0 Foundation now 4/5 sessions (S01 ✅, S02 ✅, S03 ✅, S04 ✅). Next: S05 — Subscription Lifecycle, Payment Verification & Admin Panel (completes P0).
+- Artifacts committed: globals.css, nav.ts, 12 layout components, (app) layout + dashboard, 9 module pages, IMPLEMENTATION_PLAN.md, worklog.md.

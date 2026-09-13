@@ -1,16 +1,18 @@
 /**
- * (app) route group — authenticated tenant app (doc §4 module screens).
+ * (app) route group layout — wires the AppShell (doc §6).
  *
- * S01: pass-through scaffold.
- * S04: becomes the mobile-first shell (bottom nav + sticky footer + sidebar).
- * S05: adds the subscription-status banner slot.
- *
- * Routes here are tenant-scoped + role-guarded.
+ * Authenticated, tenant-scoped, role-guarded (S03 proxy enforces login +
+ * locked-tenant gate). Every module page renders inside this shell:
+ *   - desktop sidebar + mobile bottom nav
+ *   - subscription banner slot
+ *   - sticky footer
  */
+import { AppShell } from "@/components/layout/app-shell";
+
 export default function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return <AppShell>{children}</AppShell>;
 }
