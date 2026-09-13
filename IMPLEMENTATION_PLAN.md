@@ -396,6 +396,8 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **Acceptance criteria:** within 5s of sale completion, warranty PDF exists and SMS dispatched (adapter logs it).
 
+**Status:** ✅ Complete (S12) — verified via curl API tests (PDF generates as valid %PDF binary, SMS dispatched via INotifier, warranty lookup by serial returns inWarranty status) + Agent Browser (warranty lookup page). 15/30-day pre-expiry reminder scheduling deferred to S22 (reminder engine). Dashboard upcoming-expiry widget deferred to S22.
+
 ---
 
 ### Session S13 — Held Invoices & Quick Service Lines
@@ -687,7 +689,7 @@ After each phase is complete:
 |-------|--------|---------------|------------------|
 | P0 Foundation | ✅ Done (S01 ✅, S02 ✅, S03 ✅, S04 ✅, S05 ✅) | 5/5 | session(S05) |
 | P1 Catalogue & Stock | ✅ Done (S06 ✅, S07 ✅, S08 ✅, S09 ✅) | 4/4 | session(S09) |
-| P2 Sales & Invoicing | 🔄 In progress (S10 ✅, S11 ✅) | 2/5 | session(S11) |
+| P2 Sales & Invoicing | 🔄 In progress (S10 ✅, S11 ✅, S12 ✅) | 3/5 | session(S12) |
 | P3 Accounting | ☐ Not started | 0/2 | — |
 | P4 Employees & Payroll | ☐ Not started | 0/1 | — |
 | P5 Reports | ☐ Not started | 0/2 | — |
@@ -698,4 +700,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Phase P0 + P1 complete. Phase P2 in progress (S10–S11 ✅). Next: S12 — Warranty Card PDF + Customer SMS.*
+*End of implementation plan. Phase P0 + P1 complete. Phase P2 in progress (S10–S12 ✅). Next: S13 — Held Invoices & Quick Service Lines.*

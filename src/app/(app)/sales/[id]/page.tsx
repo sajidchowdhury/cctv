@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -7,11 +8,14 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, Printer, Pause, Check, Link2 } from "lucide-react";
+import { ArrowLeft, Loader2, Printer, Pause, Check, Link2, ShieldCheck, MessageSquare } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { formatBDT, formatDate, formatDateTime } from "@/lib/format";
 
 export default function SaleDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { toast } = useToast();
+  const [smsBusy, setSmsBusy] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["sale", id],
     queryFn: async () => (await (await fetch(`/api/sales/${id}`)).json()).sale,
@@ -36,6 +40,33 @@ export default function SaleDetailPage() {
             </Button>
             <Button variant="outline" size="sm" onClick={() => window.print()}>
               <Printer className="mr-2 h-4 w-4" /> Print
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <a href={`/api/sales/${id}/warranty-card.pdf`} target="_blank" rel="noopener noreferrer">
+                <ShieldCheck className="mr-2 h-4 w-4" /> Warranty card
+              </a>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={smsBusy}
+              onClick={async () => {
+                setSmsBusy(true);
+                try {
+                  const res = await fetch(`/api/sales/${id}/send-warranty-sms`, { method: "POST" });
+                  const data = await res.json();
+                  if (!res.ok) {
+                    toast({ title: "Failed", description: data.error ?? "SMS not sent.", variant: "destructive" });
+                  } else {
+                    toast({ title: "SMS sent", description: data.message });
+                  }
+                } finally {
+                  setSmsBusy(false);
+                }
+              }}
+            >
+              {smsBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+              Warranty SMS
             </Button>
           </div>
         }

@@ -18,6 +18,7 @@ import {
   Users,
   Truck,
   FileText,
+  ShieldCheck,
   Wrench,
   Bell,
   ReceiptText,
@@ -103,6 +104,13 @@ export const NAV_ITEMS: NavItem[] = [
     labelBn: "কোটেশন",
     icon: FileText,
     phase: "S10",
+  },
+  {
+    href: "/warranty",
+    label: "Warranty",
+    labelBn: "ওয়ারেন্টি",
+    icon: ShieldCheck,
+    phase: "S12",
   },
   {
     href: "/rma",
