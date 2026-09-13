@@ -500,6 +500,8 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **Acceptance criteria:** disbursing salary creates a linked expense transaction visible in the cash book.
 
+**Status:** ✅ Complete (S17) — verified via curl (employee CRUD, salary record create with netPayable calculation, disburse auto-creates EXP transaction linked to Salary account head, cash-book shows the expense) + Agent Browser (employees list renders). Completes Phase P4.
+
 ---
 
 ## 8. Phase P5 — Reports (Sessions S18–S19)
@@ -699,7 +701,7 @@ After each phase is complete:
 | P1 Catalogue & Stock | ✅ Done (S06 ✅, S07 ✅, S08 ✅, S09 ✅) | 4/4 | session(S09) |
 | P2 Sales & Invoicing | ✅ Done (S10 ✅, S11 ✅, S12 ✅, S13 ✅, S14 ✅) | 5/5 | session(S14) |
 | P3 Accounting | ✅ Done (S15 ✅, S16 ✅) | 2/2 | session(S16) |
-| P4 Employees & Payroll | ☐ Not started | 0/1 | — |
+| P4 Employees & Payroll | ✅ Done (S17 ✅) | 1/1 | session(S17) |
 | P5 Reports | ☐ Not started | 0/2 | — |
 | P6 CRM & Reminders | ☐ Not started | 0/3 | — |
 | P7 Polish & Launch | ☐ Not started | 0/3 | — |
@@ -708,4 +710,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Phases P0–P3 complete. Next: Phase P4 — Employees & Payroll (Session S17).*
+*End of implementation plan. Phases P0–P4 complete. Next: Phase P5 — Reports (Session S18).*

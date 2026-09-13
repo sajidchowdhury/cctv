@@ -577,3 +577,40 @@ Stage Summary:
 - Acceptance: 1/1 original criterion passes. Receipt settles 2 invoices FIFO with residual as open due.
 - Phase status: P3 Accounting COMPLETE (S15-S16, 2/2). Next: Phase P4 — Employees & Payroll (S17).
 - Artifacts committed: 3 API routes, 2 UI pages, cash-book update, ledger buttons.
+
+---
+Task ID: S17
+Agent: Z.ai Code (main)
+Task: Session S17 — Employees & Payroll. Employee CRUD, monthly salary sheet (basic + allowance - advanceDeduction), disburse → auto-creates EXP transaction (Salary account head) linked to salary record. Completes Phase P4 — Employees & Payroll.
+
+Work Log:
+- Read S16 worklog + Employee/SalaryRecord schema (already in S02). Employee has name/phone/role/salary/joinDate/status. SalaryRecord has month/basic/allowance/advanceDeduction/netPayable/paidOn/transactionId (link to auto-created EXP).
+- Wrote employees API: GET (list with last salary record), POST (create), GET/[id] (detail with salary records), PATCH, DELETE (soft).
+- Wrote salary-records API: GET (list by month), POST (create with netPayable = basic + allowance - advanceDeduction; basic defaults to employee.salary; @@unique([tenantId, employeeId, month]) prevents duplicates).
+- Wrote POST /api/salary-records/[id]/disburse (transactional):
+    - finds or creates "Salary" account head (EXP, tenant-scoped)
+    - creates EXP transaction (type=EXP, partyType=EMPLOYEE, amount=netPayable, narration="Salary: {name} — {month}")
+    - marks salary record paidOn=now + links transactionId
+    - the expense automatically flows into the cash-book (S15 cash-book already includes EXP type)
+- Wrote employees UI (3 pages):
+    /(app)/employees — list DataTable (Name/Phone/Role/Salary/Joined/Last salary/Status) with last salary badge (paid/pending), links to Payroll + New.
+    /(app)/employees/new — create form (name, phone, role STAFF/SALESMAN/ACCOUNTANT/INSTALLER, salary, join date).
+    /(app)/employees/[id] — detail: edit form + salary history list (month, net payable, paid badge or Disburse button) + delete.
+- Wrote /(app)/payroll/new — monthly salary sheet: month picker → load active employees → editable table (basic auto-filled from employee.salary, allowance, advance deduction per row) → live net payable + totals row → save all.
+- Updated seed.ts: 3 demo employees (Karim SALESMAN 18000, Rahim INSTALLER 22000, Jamal STAFF 12000).
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Employee CRUD: 3 seeded, create/detail/update works
+- [x] Salary record: created with netPayable=13000 (12000+2000-1000)
+- [x] Disburse: auto-created EXP transaction (txn=cmtzlr6u1...), linked to salary record
+- [x] Cash-book shows the salary expense: "Salary: out ৳13,000.00 -> ৳-26,200.00"
+- [x] Salary account head auto-created if missing
+- [x] Browser: employees list renders (no errors)
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning)
+
+Stage Summary:
+- Deliverables: employees API (5 endpoints), salary-records API (3 endpoints including disburse), 4 UI pages (list, new, detail+salary history, payroll sheet), seed.ts (3 demo employees).
+- Key decision: disburse auto-creates an EXP transaction linked to a "Salary" account head (auto-created if missing). The salary record's transactionId links back to the expense. The cash-book (S15) automatically picks this up since it queries all EXP transactions. netPayable = basic + allowance - advanceDeduction; basic defaults to employee.salary but can be overridden per record.
+- Acceptance: 1/1 original criterion passes. Disburse creates linked expense in cash book.
+- Phase status: P4 Employees & Payroll COMPLETE (S17, 1/1). Next: Phase P5 — Reports (S18).
+- Artifacts committed: 4 API routes (employees, employees/[id], salary-records, salary-records/[id]/disburse), 4 UI pages, seed.ts.

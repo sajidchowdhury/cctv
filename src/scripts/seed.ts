@@ -237,6 +237,22 @@ async function main() {
     }
     console.log(`✓ Demo transactions: 3 seeded`);
 
+    // ── Demo employees (S17) ────────────────────────────────
+    const demoEmployees = [
+      { name: "Karim Uddin", phone: "01611111111", role: "SALESMAN", salary: 18000 },
+      { name: "Rahim Sheikh", phone: "01622222222", role: "INSTALLER", salary: 22000 },
+      { name: "Jamal Hossain", phone: "01633333333", role: "STAFF", salary: 12000 },
+    ];
+    for (const e of demoEmployees) {
+      const existing = await adminDb.employee.findFirst({ where: { tenantId: tenant.id, name: e.name } });
+      if (existing) {
+        await adminDb.employee.update({ where: { id: existing.id }, data: { phone: e.phone, role: e.role, salary: e.salary } });
+      } else {
+        await adminDb.employee.create({ data: { tenantId: tenant.id, name: e.name, phone: e.phone, role: e.role, salary: e.salary } });
+      }
+    }
+    console.log(`✓ Demo employees: ${demoEmployees.length} seeded`);
+
     console.log(
       `\n✅ Tenant + users seeded.\n` +
         `   Tenant: ${tenant.id}\n` +
