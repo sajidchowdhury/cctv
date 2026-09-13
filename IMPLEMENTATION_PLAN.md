@@ -612,6 +612,8 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **Acceptance criteria:** a reminder with `next_due = now` is dispatched within 60s and its `next_due` advances correctly.
 
+**Status:** ✅ Complete (S22) — verified via curl (reminders CRUD, due-today endpoint, worker started + ticking) + Agent Browser (reminders page renders). Worker confirmed running via dev log: '[reminder] worker started — ticking every 60s'. Dashboard 'Upcoming reminders' widget wired to real due-today data. Completes Phase P6.
+
 ---
 
 ## 10. Phase P7 — Polish & Launch (Sessions S23–S25)
@@ -711,11 +713,11 @@ After each phase is complete:
 | P3 Accounting | ✅ Done (S15 ✅, S16 ✅) | 2/2 | session(S16) |
 | P4 Employees & Payroll | ✅ Done (S17 ✅) | 1/1 | session(S17) |
 | P5 Reports | ✅ Done (S18 ✅, S19 ✅) | 2/2 | session(S19) |
-| P6 CRM & Reminders | 🔄 In progress (S20 ✅, S21 ✅) | 2/3 | session(S21) |
+| P6 CRM & Reminders | ✅ Done (S20 ✅, S21 ✅, S22 ✅) | 3/3 | session(S22) |
 | P7 Polish & Launch | ☐ Not started | 0/3 | — |
 
 > When all rows read **✅ Done**, the SaaS is workable end-to-end.
 
 ---
 
-*End of implementation plan. Phases P0–P5 complete. Phase P6 in progress (S20–S21 ✅). Next: S22 — Reminder Engine + SMS Gateway (completes P6).*
+*End of implementation plan. Phases P0–P6 complete. Next: Phase P7 — Polish & Launch (Session S23).*

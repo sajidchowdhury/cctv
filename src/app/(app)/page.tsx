@@ -52,6 +52,12 @@ export default function DashboardPage() {
     enabled: status === "authenticated" && session?.user?.role !== "SUPER_ADMIN",
   });
 
+  const { data: dueReminders } = useQuery({
+    queryKey: ["reminders-due-today"],
+    queryFn: async () => (await (await fetch("/api/reminders/due-today")).json()),
+    enabled: status === "authenticated" && session?.user?.role !== "SUPER_ADMIN",
+  });
+
   if (status === "loading") {
     return (
       <div className="flex items-center justify-center py-20">
@@ -188,23 +194,44 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-base">Upcoming reminders</CardTitle>
-            <CardDescription>Due today + warranty expiries (S22).</CardDescription>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/reminders">View all <ArrowRight className="ml-1 h-3 w-3" /></Link>
+            </Button>
           </CardHeader>
           <CardContent>
-            <EmptyState
-              icon={Bell}
-              title="No reminders yet"
-              description="The reminder engine lands in Session S22."
-              action={
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/reminders">
-                    Go to reminders <ArrowRight className="ml-2 h-3 w-3" />
-                  </Link>
-                </Button>
-              }
-            />
+            {(!dueReminders || dueReminders.count === 0) ? (
+              <EmptyState
+                icon={Bell}
+                title="No reminders due today"
+                description="All caught up. Check reminders for upcoming dues."
+              />
+            ) : (
+              <ul className="space-y-2">
+                {dueReminders.reminders.slice(0, 5).map((item: any) => (
+                  <li key={item.id} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2">
+                    <div className="min-w-0">
+                      <Link href="/reminders" className="text-sm font-medium hover:underline truncate block">
+                        {item.title}
+                      </Link>
+                      <p className="text-xs text-muted-foreground">{item.type.replace(/_/g, " ")}{item.amount ? ` · ৳${item.amount.toFixed(2)}` : ""}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      {item.overdue ? (
+                        <Badge variant="secondary" className="bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">
+                          {item.hoursLate > 24 ? `${Math.floor(item.hoursLate / 24)}d late` : `${item.hoursLate}h late`}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                          Due today
+                        </Badge>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -772,3 +772,46 @@ Stage Summary:
 - Acceptance: 1/1 original criterion passes. 5 stages with timestamped history + ETA overdue alerts.
 - Phase status: P6 CRM & Reminders now 2/3 (S20–S21 ✅). Next: S22 — Reminder Engine + SMS Gateway (completes P6).
 - Artifacts committed: 3 API routes, 3 UI pages.
+
+---
+Task ID: S22
+Agent: Z.ai Code (main)
+Task: Session S22 — Reminder Engine + SMS Gateway. Unified reminder system: Tradelicense, Rent, Electricity, Internet/Gas, Salary, Warranty Expiry, Low Stock, Customer Follow-up, Service Ticket, Subscription Bill. Hourly worker (60s tick) dispatches due reminders via INotifier + advances nextDue by frequency. Completes Phase P6 — CRM & Reminders.
+
+Work Log:
+- Read S21 worklog + Reminder schema (already in S02: type, title, amount, frequency, nextDue, channel, active, refType, refId). Lifecycle worker (S05) already ticks for subscription lifecycle.
+- Wrote reminder-worker.ts (src/lib/reminder-worker.ts):
+    - tickReminders(): queries all active reminders where nextDue <= now
+    - For each: dispatches SMS via INotifier (if channel includes SMS + tenant has phone)
+    - Advances nextDue by frequency (DAILY +1d, WEEKLY +7d, MONTHLY +30d, YEARLY +365d, ONCE → active=false)
+    - Returns {checked, dispatched, advanced} counts
+    - startReminderWorker(): singleton timer, first tick 10s after boot, interval 60s
+    - stopReminderWorker(): cleanup
+- Updated instrumentation.ts to start BOTH workers: lifecycle (S05) + reminder (S22).
+- Wrote reminders API (3 route files):
+    GET  /api/reminders — list with type/active filters, overdue flag, daysUntilDue
+    POST /api/reminders — create (10 types, 5 frequencies, 3 channels)
+    PATCH /api/reminders/[id] — update (snooze nextDue, toggle active)
+    DELETE /api/reminders/[id] — soft delete
+    GET  /api/reminders/due-today — reminders due now or today (for dashboard widget)
+- Wrote reminders UI (2 pages):
+    /(app)/reminders — list: summary cards (active/overdue/due today), type filter chips, reminder cards with type badges + overdue/due-today/days badges + amount + frequency + next due + snooze buttons (+1d/+7d) + toggle active.
+    /(app)/reminders/new — create form: type select (10 types), frequency, title, amount, nextDue date, channel (IN_APP_SMS/IN_APP/SMS).
+- Updated dashboard: replaced the "Upcoming reminders" empty-state widget with real due-today data (fetches /api/reminders/due-today, shows top 5 with overdue/due-today badges + "View all" link).
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Reminders API: CRUD works (create with MONTHLY + ONCE, list, due-today, PATCH, DELETE)
+- [x] Due-today endpoint: returns count + reminders with overdue flag + hoursLate
+- [x] Reminder worker started: "[reminder] worker started — ticking every 60s" (confirmed in dev log)
+- [x] Worker dispatches due reminders + advances nextDue by frequency (ONCE → deactivates)
+- [x] Both workers running: lifecycle (S05) + reminder (S22) via instrumentation.ts
+- [x] Dashboard "Upcoming reminders" widget shows real due-today data
+- [x] Browser: reminders page renders with type badges + snooze buttons (no errors)
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning)
+
+Stage Summary:
+- Deliverables: reminder-worker.ts, instrumentation.ts update (dual workers), 3 API routes (reminders, reminders/[id], reminders/due-today), 2 UI pages (list with snooze, new form), dashboard due-today widget.
+- Key decision: the worker ticks every 60s (more responsive than doc §5.5's "hourly" — the 60s interval ensures due reminders are dispatched within a 60-second window of trigger time per doc §5.5). Frequency advancement uses approximate day counts (30d for MONTHLY, 365d for YEARLY); S25 can switch to exact calendar months. ONCE reminders are deactivated after dispatch (not deleted — preserves audit trail).
+- Acceptance: 1/1 original criterion passes. Worker dispatches within 60s + advances nextDue correctly.
+- Phase status: P6 CRM & Reminders COMPLETE (S20-S22, 3/3). Next: Phase P7 — Polish & Launch (S23).
+- Artifacts committed: reminder-worker.ts, instrumentation.ts, 3 API routes, 2 UI pages, dashboard widget.
