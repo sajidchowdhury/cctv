@@ -9,7 +9,7 @@ import { SearchScanInput } from "@/components/layout/search-scan-input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/layout/data-table";
-import { ShoppingCart, Plus, Loader2, Pause } from "lucide-react";
+import { ShoppingCart, Plus, Loader2, Pause, RotateCcw } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatBDT, formatDate } from "@/lib/format";
 
@@ -76,6 +76,18 @@ export default function SalesPage() {
           ),
       },
       { header: "Mode", accessorKey: "mode" },
+      {
+        header: "",
+        id: "actions",
+        cell: ({ row }) =>
+          row.original.isHeld ? (
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/sales/new?resume=${row.original.id}`}>
+                <RotateCcw className="mr-1 h-3 w-3" /> Resume
+              </Link>
+            </Button>
+          ) : null,
+      },
     ],
     []
   );

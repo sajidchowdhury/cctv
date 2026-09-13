@@ -8,7 +8,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, Printer, Pause, Check, Link2, ShieldCheck, MessageSquare } from "lucide-react";
+import { ArrowLeft, Loader2, Printer, Pause, Check, Link2, ShieldCheck, MessageSquare, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT, formatDate, formatDateTime } from "@/lib/format";
 
@@ -33,8 +33,13 @@ export default function SaleDetailPage() {
         title={sale.invoiceNo}
         description={`${formatDate(sale.date)} · ${sale.customer?.name ?? "Walk-in"}`}
         action={
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {sale.isHeld && <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"><Pause className="h-3 w-3 mr-1" /> Held</Badge>}
+            {sale.isHeld && (
+              <Button asChild size="sm">
+                <Link href={`/sales/new?resume=${id}`}><RotateCcw className="mr-2 h-4 w-4" /> Resume</Link>
+              </Button>
+            )}
             <Button asChild variant="outline" size="sm">
               <Link href="/sales"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
             </Button>

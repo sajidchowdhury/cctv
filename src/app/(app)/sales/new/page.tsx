@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchScanInput } from "@/components/layout/search-scan-input";
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Save, Loader2, ArrowLeft, Package, Wrench } from "lucide-react";
+import { Plus, Trash2, Save, Loader2, ArrowLeft, Package, Wrench, RotateCcw, Eraser } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT } from "@/lib/format";
 
@@ -32,8 +32,20 @@ type CartLine = {
   description: string;
 };
 
-export default function NewSalePage() {
+const DRAFT_KEY = "cctv-sale-draft";
+
+export default function NewSalePageWrapper() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
+      <NewSalePage />
+    </Suspense>
+  );
+}
+
+function NewSalePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const resumeId = searchParams.get("resume");
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [customerId, setCustomerId] = useState("");
@@ -43,13 +55,76 @@ export default function NewSalePage() {
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<CartLine[]>([]);
   const [productSearch, setProductSearch] = useState("");
+  const [hydrated, setHydrated] = useState(false);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  useState(() => {
+
+  // Load products + customers once.
+  useEffect(() => {
     fetch("/api/products").then((r) => r.json()).then((d) => setProducts(d.products ?? []));
     fetch("/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers ?? []));
-  });
+  }, []);
+
+  // Resume: load a held sale's items into the cart.
+  useEffect(() => {
+    if (!resumeId) return;
+    fetch(`/api/sales/${resumeId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const sale = data.sale;
+        if (!sale) return;
+        setCustomerId(sale.customerId ?? "");
+        setMode(sale.mode);
+        setPaid(String(sale.paid));
+        setDiscount(String(sale.discount));
+        setNotes(sale.notes ?? "");
+        setLines(
+          sale.items.map((it: any) => ({
+            key: it.id,
+            productId: it.productId ?? "",
+            productName: it.product?.name ?? it.description ?? "",
+            productModel: it.product?.model ?? null,
+            inventoryUnitId: it.inventoryUnitId ?? "",
+            serialNo: it.inventoryUnit?.serialNo ?? "",
+            qty: String(it.qty),
+            unitPrice: String(it.unitPrice),
+            discount: String(it.discount),
+            lineType: it.lineType as "PRODUCT" | "SERVICE",
+            description: it.description ?? "",
+          }))
+        );
+        toast({ title: "Held sale loaded", description: `${sale.invoiceNo} — review and finalize.` });
+      });
+  }, [resumeId, toast]);
+
+  // localStorage persistence: auto-save cart on change (offline-tolerant, doc §6).
+  useEffect(() => {
+    if (resumeId) return; // don't override draft when resuming
+    if (!hydrated) {
+      // Restore from localStorage on first mount.
+      try {
+        const saved = localStorage.getItem(DRAFT_KEY);
+        if (saved) {
+          const draft = JSON.parse(saved);
+          setCustomerId(draft.customerId ?? "");
+          setMode(draft.mode ?? "CASH");
+          setPaid(draft.paid ?? "");
+          setDiscount(draft.discount ?? "");
+          setNotes(draft.notes ?? "");
+          setLines(draft.lines ?? []);
+        }
+      } catch {}
+      setHydrated(true);
+    }
+  }, [resumeId, hydrated]);
+
+  // Auto-save to localStorage whenever cart changes (after hydration).
+  useEffect(() => {
+    if (!hydrated || resumeId) return;
+    const draft = { customerId, mode, paid, discount, notes, lines };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  }, [customerId, mode, paid, discount, notes, lines, hydrated, resumeId]);
 
   const filteredProducts = products.filter((p) =>
     !productSearch ||
@@ -98,6 +173,16 @@ export default function NewSalePage() {
     setLines((l) => l.filter((line) => line.key !== key));
   }
 
+  function clearDraft() {
+    setCustomerId("");
+    setMode("CASH");
+    setPaid("");
+    setDiscount("");
+    setNotes("");
+    setLines([]);
+    localStorage.removeItem(DRAFT_KEY);
+  }
+
   const subtotal = lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0) * (1 - (Number(l.discount) || 0) / 100), 0);
   const discountNum = Number(discount) || 0;
   const total = Math.max(0, subtotal - discountNum);
@@ -111,35 +196,50 @@ export default function NewSalePage() {
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/sales", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerId: customerId || null,
-          mode,
-          paid: paidNum,
-          discount: discountNum,
-          notes: notes || null,
-          isHeld: hold,
-          items: lines.map((l) => ({
-            productId: l.lineType === "PRODUCT" ? l.productId : null,
-            inventoryUnitId: l.inventoryUnitId || null,
-            description: l.lineType === "SERVICE" ? l.description : null,
-            lineType: l.lineType,
-            qty: Number(l.qty),
-            unitPrice: Number(l.unitPrice),
-            discount: Number(l.discount) || 0,
-            warrantyMonths: 0,
-          })),
-        }),
-      });
+      const payload = {
+        customerId: customerId || null,
+        mode,
+        paid: paidNum,
+        discount: discountNum,
+        notes: notes || null,
+        isHeld: hold,
+        items: lines.map((l) => ({
+          productId: l.lineType === "PRODUCT" ? l.productId : null,
+          inventoryUnitId: l.inventoryUnitId || null,
+          description: l.lineType === "SERVICE" ? l.description : null,
+          lineType: l.lineType,
+          qty: Number(l.qty),
+          unitPrice: Number(l.unitPrice),
+          discount: Number(l.discount) || 0,
+          warrantyMonths: 0,
+        })),
+      };
+
+      let res;
+      if (resumeId) {
+        // Finalize the held sale: PATCH to un-hold + update fields.
+        res = await fetch(`/api/sales/${resumeId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isHeld: hold, paid: paidNum, mode, notes: notes || null }),
+        });
+      } else {
+        res = await fetch("/api/sales", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
       const data = await res.json();
       if (!res.ok) {
-        toast({ title: "Failed", description: data.error ?? "Could not create sale.", variant: "destructive" });
+        toast({ title: "Failed", description: data.error ?? "Could not save sale.", variant: "destructive" });
         setSaving(false);
         return;
       }
-      toast({ title: hold ? "Sale held" : "Sale saved", description: data.invoiceNo });
+      // Clear localStorage draft on successful save.
+      localStorage.removeItem(DRAFT_KEY);
+      const invoiceNo = data.invoiceNo ?? data.sale?.invoiceNo;
+      toast({ title: hold ? "Sale held" : "Sale saved", description: invoiceNo });
       router.push(hold ? "/sales?held=1" : "/sales");
     } finally {
       setSaving(false);
@@ -149,14 +249,35 @@ export default function NewSalePage() {
   return (
     <div className="space-y-6 pb-24 md:pb-6">
       <PageHeader
-        title="New sale"
-        description="Cart-based invoicing. Stock decreases on save."
+        title={resumeId ? "Resume held sale" : "New sale"}
+        description={resumeId ? "Review and finalize the held cart." : "Cart-based invoicing. Stock decreases on save. Draft auto-saves."}
         action={
-          <Button asChild variant="outline" size="sm">
-            <Link href="/sales"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
-          </Button>
+          <div className="flex gap-2">
+            {!resumeId && lines.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={clearDraft} className="text-muted-foreground">
+                <Eraser className="mr-2 h-4 w-4" /> Clear draft
+              </Button>
+            )}
+            <Button asChild variant="outline" size="sm">
+              <Link href="/sales"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
+            </Button>
+          </div>
         }
       />
+
+      {/* Resume banner */}
+      {resumeId && (
+        <div className="rounded-lg border border-violet-200 bg-violet-50 dark:bg-violet-950/50 dark:border-violet-900 px-4 py-3 text-sm text-violet-800 dark:text-violet-200 flex items-center gap-2">
+          <RotateCcw className="h-4 w-4" /> Resuming a held sale. Finalize to complete the transaction.
+        </div>
+      )}
+
+      {/* Draft restored indicator */}
+      {!resumeId && hydrated && lines.length > 0 && (
+        <div className="rounded-lg border border-sky-200 bg-sky-50 dark:bg-sky-950/50 dark:border-sky-900 px-4 py-2 text-xs text-sky-700 dark:text-sky-300">
+          Draft restored from your last session (auto-saved to this device).
+        </div>
+      )}
 
       <Card>
         <CardHeader><CardTitle className="text-base">Invoice details</CardTitle></CardHeader>
@@ -302,18 +423,22 @@ export default function NewSalePage() {
 
       <StickyActionBar>
         <Button onClick={() => onSave(false)} disabled={saving || lines.length === 0} className="flex-1">
-          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save sale
+          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {resumeId ? "Finalize sale" : "Save sale"}
         </Button>
-        <Button variant="outline" onClick={() => onSave(true)} disabled={saving || lines.length === 0}>
-          <Plus className="mr-2 h-4 w-4" /> Hold
-        </Button>
+        {!resumeId && (
+          <Button variant="outline" onClick={() => onSave(true)} disabled={saving || lines.length === 0}>
+            <Plus className="mr-2 h-4 w-4" /> Hold
+          </Button>
+        )}
       </StickyActionBar>
       <div className="hidden md:flex md:justify-end gap-2">
-        <Button variant="outline" onClick={() => onSave(true)} disabled={saving || lines.length === 0}>
-          <Plus className="mr-2 h-4 w-4" /> Hold cart
-        </Button>
+        {!resumeId && (
+          <Button variant="outline" onClick={() => onSave(true)} disabled={saving || lines.length === 0}>
+            <Plus className="mr-2 h-4 w-4" /> Hold cart
+          </Button>
+        )}
         <Button onClick={() => onSave(false)} disabled={saving || lines.length === 0}>
-          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save sale
+          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {resumeId ? "Finalize sale" : "Save sale"}
         </Button>
       </div>
     </div>

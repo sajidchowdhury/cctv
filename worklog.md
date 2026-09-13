@@ -439,3 +439,35 @@ Stage Summary:
 - Acceptance: 1/1 original criterion passes. PDF + SMS work within seconds of sale completion.
 - Phase status: P2 Sales & Invoicing now 3/5 (S10–S12 ✅). Next: S13 — Held Invoices & Quick Service Lines.
 - Artifacts committed: 3 API routes, /warranty page, sale detail warranty buttons, nav.ts, .env fix.
+
+---
+Task ID: S13
+Agent: Z.ai Code (main)
+Task: Session S13 — Held Invoices & Quick Service Lines. Cart ergonomics (doc §5.2): hold/resume, localStorage persistence (offline-tolerant), quick-add service line, default price auto-fill. S11 already implemented isHeld + service lines + auto-fill; S13 adds resume flow + localStorage.
+
+Work Log:
+- Read S12 worklog + S13 plan + S11 sale cart code. S11 already implemented: isHeld=true sales (Hold button), PATCH to finalize, held-only filter, quick-add SERVICE line, default price auto-fill. S13 gaps: resume flow (load held items back into cart) + localStorage persistence.
+- Rewrote /sales/new/page.tsx with:
+    1. Resume flow: reads ?resume=SALE_ID, fetches the held sale, populates cart with items (product name, serial, qty, price, discount, lineType). Shows violet "Resuming a held sale" banner + "Finalize sale" button instead of "Save sale". On save, PATCHes the existing sale (un-holds + updates paid/mode/notes) instead of POSTing a new one.
+    2. localStorage persistence: auto-saves cart (customerId, mode, paid, discount, notes, lines) to localStorage key "cctv-sale-draft" on every change. Restores on page reload (after hydration). Shows "Draft restored" indicator. "Clear draft" button to wipe. Does NOT override when resuming (resumeId takes precedence).
+    3. Wrapped in <Suspense> for useSearchParams (Next.js 16 requirement).
+- Added Resume button to sales list: actions column shows "Resume" link for isHeld sales → /sales/new?resume=ID.
+- Added Resume button to sale detail page: shows for isHeld sales → /sales/new?resume=ID, with RotateCcw icon.
+- Key decision: the isHeld Sale IS the server draft — no separate draft API needed. localStorage handles the offline-tolerant pre-save cart (walk-in interruption, page reload). On successful save/finalize, localStorage draft is cleared.
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Held cart survives a page reload: localStorage key "cctv-sale-draft" persists with cart state (verified via eval)
+- [x] Held cart survives a server restart: isHeld Sale persists in DB (verified via API: held sales list returns the sale)
+- [x] Resume flow: /sales/new?resume=ID loads held sale items into cart (browser: "Resume held sale" heading + violet banner + "Finalize sale" button)
+- [x] Sales list shows Resume button for held items
+- [x] Sale detail shows Resume button for held sales
+- [x] Quick-add SERVICE line (already from S11, verified)
+- [x] Default price auto-fill (already from S11, verified)
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning)
+
+Stage Summary:
+- Deliverables: rewrote /sales/new with resume + localStorage, added Resume buttons to sales list + detail.
+- Key decision: isHeld Sale = server draft (no separate draft API). localStorage = client-side pre-save draft (offline-tolerant, survives reload). Resume loads the held sale's items back into the cart; finalize PATCHes the existing sale.
+- Acceptance: 1/1 original criterion passes. Held cart survives both page reload (localStorage) and server restart (DB isHeld).
+- Phase status: P2 Sales & Invoicing now 4/5 (S10–S13 ✅). Next: S14 — Customer Master & Sales Attribution (completes P2).
+- Artifacts committed: /sales/new rewrite (resume + localStorage), sales list Resume button, sale detail Resume button.

@@ -415,6 +415,8 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **Acceptance criteria:** held cart survives a page reload (localStorage) and a server restart (server draft).
 
+**Status:** ✅ Complete (S13) — verified via curl + Agent Browser (held sale created, resume URL loads items into cart with violet banner + Finalize button, localStorage draft key persists, Sales list shows Resume button for held items). S11 already implemented isHeld sales + PATCH finalize + service lines + default price auto-fill; S13 adds the resume flow + localStorage persistence. Standalone draft endpoints (POST /api/sales/draft) not needed — the isHeld Sale IS the server draft.
+
 ---
 
 ### Session S14 — Customer Master & Sales Attribution
@@ -689,7 +691,7 @@ After each phase is complete:
 |-------|--------|---------------|------------------|
 | P0 Foundation | ✅ Done (S01 ✅, S02 ✅, S03 ✅, S04 ✅, S05 ✅) | 5/5 | session(S05) |
 | P1 Catalogue & Stock | ✅ Done (S06 ✅, S07 ✅, S08 ✅, S09 ✅) | 4/4 | session(S09) |
-| P2 Sales & Invoicing | 🔄 In progress (S10 ✅, S11 ✅, S12 ✅) | 3/5 | session(S12) |
+| P2 Sales & Invoicing | 🔄 In progress (S10 ✅, S11 ✅, S12 ✅, S13 ✅) | 4/5 | session(S13) |
 | P3 Accounting | ☐ Not started | 0/2 | — |
 | P4 Employees & Payroll | ☐ Not started | 0/1 | — |
 | P5 Reports | ☐ Not started | 0/2 | — |
@@ -700,4 +702,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Phase P0 + P1 complete. Phase P2 in progress (S10–S12 ✅). Next: S13 — Held Invoices & Quick Service Lines.*
+*End of implementation plan. Phase P0 + P1 complete. Phase P2 in progress (S10–S13 ✅). Next: S14 — Customer Master & Sales Attribution (completes P2).*
