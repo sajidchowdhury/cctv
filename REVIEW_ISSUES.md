@@ -598,7 +598,7 @@ Service Tickets:
 - Improve table styling: sticky headers, column widths, hover states
 - Fix sidebar width + spacing
 
-#### F5-S2: Desktop UI Polish — Part 2 (Forms + Supplier Edit)
+#### F5-S2: Desktop UI Polish — Part 2 (Forms + Supplier Edit) ✅ Complete
 - Audit all form layouts: consistent label/input alignment, grid spacing
 - Fix supplier edit form visibility + functionality
 - Add transitions/animations for premium feel

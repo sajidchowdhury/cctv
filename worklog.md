@@ -1432,3 +1432,61 @@ Stage Summary:
 - Acceptance: 5/5 original criteria pass (inline category, inline unit, popover/modal, customer creation, misc fixes).
 - Phase status: F7 Reminders & Misc COMPLETE (F7-S1, 1/1). ALL 14 FIX SESSIONS COMPLETE (F1-S1 through F7-S1).
 - Artifacts committed: InlineEntityCreator component, 3 page updates, 2 API bug fixes.
+
+---
+Task ID: F5-S2
+Agent: Z.ai Code (main)
+Task: Session F5-S2 — Desktop UI Polish Part 2 (Forms + Supplier Edit). Fix supplier edit form, add premium transitions/animations, typography polish, verify mobile bottom nav. Final fix session — completes Phase F5 + ALL 14 fix sessions.
+
+Work Log:
+- Read REVIEW_ISSUES.md F5-S2 spec (Issue 7 + Issue 20) + audited all form pages for label/input alignment + grid spacing + render-time setState anti-patterns.
+- Audit findings:
+    - All 9 form pages consistently use `max-w-lg` + `space-y-4` + `grid sm:grid-cols-2` — already consistent.
+    - Supplier detail page (`suppliers/[id]`) had a render-time `setState` anti-pattern: `if (detail && !form.name && Object.keys(form).length === 0) { setForm(...) }` — React 19 tolerates it but it causes extra renders + potential stale state bugs.
+    - Customer detail page (`customers/[id]`) had the same anti-pattern.
+    - Supplier detail page's ledger table used old pre-F5-S1 styling (px-3 py-2, bg-muted/50, no hover state).
+    - No card hover transitions in globals.css — cards are static.
+    - No page fade-in animation.
+    - No button active/press feedback.
+    - PageHeader title had no `text-balance` — long titles could wrap awkwardly.
+    - Mobile bottom nav already correctly uses `md:hidden` — no overlap on desktop.
+
+- Fixed supplier detail page (`suppliers/[id]`):
+    - Converted render-time `setForm` to `useEffect` with `formLoaded` guard — proper React pattern that prevents extra renders.
+    - Added `useQueryClient` + `qc.invalidateQueries({ queryKey: ["supplier", id] })` + `qc.invalidateQueries({ queryKey: ["suppliers"] })` on save — so the detail page + list page both refresh after an edit (previously the detail page didn't refresh its own data after save).
+    - Upgraded ledger table to F5-S1 premium styling: `bg-muted/40 sticky top-0` header, `px-4 py-2.5 text-xs uppercase tracking-wide` headers, `px-4 py-3` cells, `hover:bg-muted/30 transition-colors` rows, dark-mode badge colors.
+
+- Fixed customer detail page (`customers/[id]`):
+    - Same render-time `setForm` → `useEffect` with `formLoaded` guard conversion.
+
+- Added premium transitions to `globals.css`:
+    - Card hover: `[data-slot="card"]:hover { box-shadow: 0 4px 12px -2px oklch(0 0 0 / 0.08); }` — subtle shadow lift on all cards.
+    - Page fade-in: `main > div { animation: fade-in 0.2s ease-out; }` + `@keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }` — subtle entrance for main content on every page navigation.
+    - Button active press: `[data-slot="button"]:active:not(:disabled) { transform: scale(0.98); }` — tactile feedback on button click.
+
+- Typography polish:
+    - PageHeader title: added `text-balance` for better heading wrapping on narrow screens.
+    - PageHeader description: added `text-pretty` for balanced paragraph wrapping.
+
+- Verified mobile bottom nav: `md:hidden fixed bottom-0 inset-x-0 z-40` — correctly hidden on desktop (md+), only visible on mobile. AppShell's `<main className="pb-20 md:pb-0">` clears the nav height on mobile + removes padding on desktop. No overlap issue.
+
+- Updated REVIEW_ISSUES.md: marked F5-S2 ✅ Complete.
+
+Acceptance criteria (all pass — verified via grep + lint):
+- [x] All form layouts audited: 9 form pages consistently use `max-w-lg` + `space-y-4` + `grid sm:grid-cols-2`.
+- [x] Supplier edit form: render-time setState fixed → useEffect with formLoaded guard. QueryClient invalidation added so the detail + list pages refresh after save.
+- [x] Supplier ledger table: upgraded to premium F5-S1 styling (bg-muted/40, px-4 py-3, hover:bg-muted/30, uppercase tracking-wide headers, dark-mode badge colors).
+- [x] Customer edit form: same render-time setState fix.
+- [x] Transitions/animations: card hover shadow, page fade-in animation, button active scale — all in globals.css.
+- [x] Typography: PageHeader has text-balance + text-pretty.
+- [x] Mobile bottom nav: confirmed md:hidden (no desktop overlap).
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning).
+
+Stage Summary:
+- Deliverables: 2 detail pages fixed (supplier + customer render-time setState → useEffect), 1 ledger table upgraded (premium styling), globals.css premium transitions (card hover + page fade-in + button active), PageHeader typography polish (text-balance + text-pretty). REVIEW_ISSUES.md updated.
+- Key decision: card hover shadow applies globally via `[data-slot="card"]:hover` CSS selector — no need to add classes to every Card element. The shadcn Card component uses `data-slot="card"` which makes this a one-line global enhancement.
+- Key decision: page fade-in via `main > div` animation — fires on every page navigation (Next.js client-side routing replaces the content div). 0.2s ease-out is subtle enough to feel premium without being slow.
+- Key decision: `formLoaded` guard on the useEffect form-sync — prevents the effect from re-firing on every detail re-fetch (which would overwrite the user's in-progress edits).
+- Acceptance: 5/5 original criteria pass (form layouts, supplier edit, transitions, mobile nav, typography).
+- Phase status: F5 UI/UX Desktop Polish COMPLETE (F5-S1 + F5-S2, 2/2). ALL 14 FIX SESSIONS COMPLETE (F1-S1 through F7-S1).
+- Artifacts committed: 2 detail page fixes, globals.css transitions, PageHeader typography.

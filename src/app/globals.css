@@ -124,6 +124,23 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* F5-S2: premium card hover — subtle shadow lift on interactive cards.
+     Applies to all <Card> elements that have hover: classes or are links. */
+  [data-slot="card"]:hover {
+    box-shadow: 0 4px 12px -2px oklch(0 0 0 / 0.08);
+  }
+  /* F5-S2: page fade-in — subtle entrance for main content. */
+  main > div {
+    animation: fade-in 0.2s ease-out;
+  }
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  /* F5-S2: button active press — subtle scale for tactile feedback. */
+  [data-slot="button"]:active:not(:disabled) {
+    transform: scale(0.98);
+  }
   /* Custom scrollbar for long lists (UI rules) */
   .scroll-area-thin {
     scrollbar-width: thin; /* Firefox */

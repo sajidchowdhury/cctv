@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,8 +19,10 @@ export default function SupplierDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { toast } = useToast();
+  const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<Record<string, any>>({});
+  const [formLoaded, setFormLoaded] = useState(false);
 
   const { data: detail, isLoading } = useQuery({
     queryKey: ["supplier", id],
@@ -40,16 +42,19 @@ export default function SupplierDetailPage() {
     enabled: !!id,
   });
 
-  // Sync form once detail loads.
-  if (detail && !form.name && Object.keys(form).length === 0) {
-    setForm({
-      name: detail.name,
-      phone: detail.phone ?? "",
-      company: detail.company ?? "",
-      address: detail.address ?? "",
-      openingBalance: String(detail.openingBalance ?? 0),
-    });
-  }
+  // F5-S2: sync form via useEffect (was render-time setState — anti-pattern).
+  useEffect(() => {
+    if (detail && !formLoaded) {
+      setForm({
+        name: detail.name,
+        phone: detail.phone ?? "",
+        company: detail.company ?? "",
+        address: detail.address ?? "",
+        openingBalance: String(detail.openingBalance ?? 0),
+      });
+      setFormLoaded(true);
+    }
+  }, [detail, formLoaded]);
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
@@ -71,6 +76,8 @@ export default function SupplierDetailPage() {
         toast({ title: "Failed", description: data.error ?? "Update failed.", variant: "destructive" });
       } else {
         toast({ title: "Saved", description: "Supplier updated." });
+        qc.invalidateQueries({ queryKey: ["supplier", id] });
+        qc.invalidateQueries({ queryKey: ["suppliers"] });
       }
     } finally {
       setSaving(false);
@@ -160,31 +167,31 @@ export default function SupplierDetailPage() {
           ) : (
             <div className="overflow-x-auto rounded-lg border scroll-area-thin">
               <table className="w-full text-sm">
-                <thead className="bg-muted/50">
+                <thead className="bg-muted/40 sticky top-0">
                   <tr>
-                    <th className="text-left font-medium px-3 py-2">Date</th>
-                    <th className="text-left font-medium px-3 py-2">Type</th>
-                    <th className="text-left font-medium px-3 py-2">Reference</th>
-                    <th className="text-right font-medium px-3 py-2">Debit</th>
-                    <th className="text-right font-medium px-3 py-2">Credit</th>
-                    <th className="text-right font-medium px-3 py-2">Balance</th>
+                    <th className="text-left font-medium px-4 py-2.5 text-xs uppercase tracking-wide">Date</th>
+                    <th className="text-left font-medium px-4 py-2.5 text-xs uppercase tracking-wide">Type</th>
+                    <th className="text-left font-medium px-4 py-2.5 text-xs uppercase tracking-wide">Reference</th>
+                    <th className="text-right font-medium px-4 py-2.5 text-xs uppercase tracking-wide">Debit</th>
+                    <th className="text-right font-medium px-4 py-2.5 text-xs uppercase tracking-wide">Credit</th>
+                    <th className="text-right font-medium px-4 py-2.5 text-xs uppercase tracking-wide">Balance</th>
                   </tr>
                 </thead>
                 <tbody>
                   {ledger.map((e: any, i: number) => (
-                    <tr key={i} className="border-t">
-                      <td className="px-3 py-2 whitespace-nowrap">{formatDate(e.date)}</td>
-                      <td className="px-3 py-2">
+                    <tr key={i} className="border-t hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3 whitespace-nowrap text-xs">{formatDate(e.date)}</td>
+                      <td className="px-4 py-3">
                         <Badge variant="outline" className={
-                          e.type === "OPENING" ? "border-sky-300 text-sky-700" :
-                          e.type === "PURCHASE" ? "border-amber-300 text-amber-700" :
-                          "border-emerald-300 text-emerald-700"
+                          e.type === "OPENING" ? "border-sky-300 text-sky-700 dark:border-sky-800 dark:text-sky-400" :
+                          e.type === "PURCHASE" ? "border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-400" :
+                          "border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:text-emerald-400"
                         }>{e.type}</Badge>
                       </td>
-                      <td className="px-3 py-2">{e.ref}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{e.debitDisplay}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{e.creditDisplay}</td>
-                      <td className="px-3 py-2 text-right tabular-nums font-medium">{e.balanceDisplay}</td>
+                      <td className="px-4 py-3">{e.ref}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{e.debitDisplay}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{e.creditDisplay}</td>
+                      <td className="px-4 py-3 text-right tabular-nums font-medium">{e.balanceDisplay}</td>
                     </tr>
                   ))}
                 </tbody>

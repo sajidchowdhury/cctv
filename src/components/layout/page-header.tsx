@@ -23,9 +23,9 @@ export function PageHeader({
       )}
     >
       <div className="space-y-1">
-        <h1 className="text-xl md:text-2xl font-bold tracking-tight">{title}</h1>
+        <h1 className="text-xl md:text-2xl font-bold tracking-tight text-balance">{title}</h1>
         {description && (
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p className="text-sm text-muted-foreground text-pretty">{description}</p>
         )}
       </div>
       {action && <div className="flex items-center gap-2">{action}</div>}

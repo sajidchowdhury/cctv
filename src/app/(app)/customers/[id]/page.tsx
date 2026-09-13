@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -23,6 +23,7 @@ export default function CustomerDetailPage() {
   const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<Record<string, any>>({});
+  const [formLoaded, setFormLoaded] = useState(false);
 
   const { data: detail, isLoading } = useQuery({
     queryKey: ["customer", id],
@@ -36,15 +37,19 @@ export default function CustomerDetailPage() {
     enabled: !!id,
   });
 
-  if (detail && !form.name && Object.keys(form).length === 0) {
-    setForm({
-      name: detail.name,
-      phone: detail.phone ?? "",
-      address: detail.address ?? "",
-      type: detail.type ?? "RETAIL",
-      openingBalance: String(detail.openingBalance ?? 0),
-    });
-  }
+  // F5-S2: sync form via useEffect (was render-time setState — anti-pattern).
+  useEffect(() => {
+    if (detail && !formLoaded) {
+      setForm({
+        name: detail.name,
+        phone: detail.phone ?? "",
+        address: detail.address ?? "",
+        type: detail.type ?? "RETAIL",
+        openingBalance: String(detail.openingBalance ?? 0),
+      });
+      setFormLoaded(true);
+    }
+  }, [detail, formLoaded]);
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
