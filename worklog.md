@@ -246,3 +246,49 @@ Stage Summary:
 - Acceptance: 1/1 original criterion passes. Opening balance persists + shows in ledger.
 - Phase status: P1 Catalogue & Stock now 2/4 (S06 ✅, S07 ✅). Next: S08 — Purchase Cart + Serial Capture + Inventory Units.
 - Artifacts committed: 3 API routes (suppliers, [id], [id]/ledger), 3 UI pages, nav.ts, seed.ts.
+
+---
+Task ID: S08
+Agent: Z.ai Code (main)
+Task: Session S08 — Purchase Cart + Serial Capture + Inventory Units. Multi-row cart with bulk-paste/barcode-scan serials, warranty per line, fractional qty, supplier ledger update, inventory units auto-created on save.
+
+Work Log:
+- Read S07 worklog + Purchase/PurchaseItem/InventoryUnit schema (already in S02). serials field is JSON-encoded string[] (SQLite has no array).
+- Wrote purchases API:
+    GET  /api/purchases (list with supplier name, item count, due badge)
+    POST /api/purchases (transactional create):
+      - validates serials unique within tenant (409 on collision)
+      - validates serial count ≤ qty (422 if exceeded)
+      - auto-generates invoiceNo (PUR-YYMMDD-###) if not provided
+      - creates Purchase + PurchaseItems (serials as JSON string)
+      - for each serial: creates InventoryUnit (IN_STOCK, warrantyEnd = date + warrantyMonths*30d)
+      - updates Product.defaultPrice if salesPrice provided (doc §4.2 auto-fills)
+      - updates Supplier.currentBalance += due (increases payable)
+    GET  /api/purchases/[id] (detail with items, serials parsed, inventory units)
+- Wrote GET /api/inventory-units (list with productId/status/search filters, for sales screen live stock).
+- Wrote purchases UI (3 pages):
+    /(app)/purchases/page.tsx — list with DataTable (Invoice/Date/Supplier/Items/Total/Due/Mode), due badge.
+    /(app)/purchases/new/page.tsx — the CART:
+      - invoice details (supplier select, payment mode, paid, due badge)
+      - product picker (SearchScanInput + filtered dropdown, click to add to cart)
+      - cart lines: qty (fractional), unit price, sales price (auto-filled from product default), warranty months, serial bulk-paste textarea (one per line)
+      - live line totals + grand total + due
+      - StickyActionBar (mobile) + inline save (desktop)
+    /(app)/purchases/[id]/page.tsx — detail with 4 stat cards, items table (serials as badges), inventory units list.
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Purchase of 3 cameras (with 3 serials) + 1.5 rolls cable (fractional, no serials) → 201
+- [x] 3 inventory_units created (DH-SN-001/002/003, IN_STOCK, warrantyEnd +12mo)
+- [x] Product on-hand qty = 3 (counted from inventory units)
+- [x] Supplier currentBalance increased by 9750 (3*2500 + 1.5*1500; 15000 → 24750)
+- [x] Duplicate serial rejected (409 "Serial numbers already exist: DH-SN-001")
+- [x] Fractional qty works (1.5 rolls, no inventory units for non-serialised)
+- [x] Browser: purchases list + new cart render (no errors)
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning)
+
+Stage Summary:
+- Deliverables: 3 API routes (purchases, purchases/[id], inventory-units), 3 UI pages (list, new cart, detail), purchases API with transactional serial capture + supplier balance update.
+- Key decision: serials stored as JSON-encoded string in PurchaseItem.serials (SQLite has no array column). Inventory units created per-serial in the same transaction. Fractional qty (cable) creates no inventory units — stock tracked via the products API which counts both inventory_units.length (serialised) + PurchaseItem.qty (non-serialised). warrantyEnd = purchaseDate + warrantyMonths*30 days (approximate; S22 reminder engine will use exact).
+- Acceptance: 1/1 original criterion passes. 3 serialised units + fractional stock + supplier due all verified.
+- Phase status: P1 Catalogue & Stock now 3/4 (S06–S08 ✅). Next: S09 — Stock Summary & Low-Stock Alerts (completes P1).
+- Artifacts committed: 3 API routes, 3 UI pages.

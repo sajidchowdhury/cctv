@@ -311,6 +311,8 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **Acceptance criteria:** saving a purchase of 3 cameras + 1.5 rolls cable creates 3 serialised inventory_units + 1 fractional stock line + updates supplier due.
 
+**Status:** ✅ Complete (S08) — verified via curl API tests (create with serials + fractional, inventory units, supplier balance, duplicate-serial rejection) + Agent Browser (list + cart render).
+
 ---
 
 ### Session S09 — Stock Summary & Low-Stock Alerts
@@ -678,7 +680,7 @@ After each phase is complete:
 | Phase | Status | Sessions done | Pushed (commit) |
 |-------|--------|---------------|------------------|
 | P0 Foundation | ✅ Done (S01 ✅, S02 ✅, S03 ✅, S04 ✅, S05 ✅) | 5/5 | session(S05) |
-| P1 Catalogue & Stock | 🔄 In progress (S06 ✅, S07 ✅) | 2/4 | session(S07) |
+| P1 Catalogue & Stock | 🔄 In progress (S06 ✅, S07 ✅, S08 ✅) | 3/4 | session(S08) |
 | P2 Sales & Invoicing | ☐ Not started | 0/5 | — |
 | P3 Accounting | ☐ Not started | 0/2 | — |
 | P4 Employees & Payroll | ☐ Not started | 0/1 | — |
@@ -690,4 +692,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Phase P0 Foundation complete. Phase P1 in progress (S06–S07 ✅). Next: S08 — Purchase Cart + Serial Capture + Inventory Units.*
+*End of implementation plan. Phase P0 Foundation complete. Phase P1 in progress (S06–S08 ✅). Next: S09 — Stock Summary & Low-Stock Alerts (completes P1).*

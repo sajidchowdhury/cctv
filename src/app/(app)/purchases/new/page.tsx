@@ -1,0 +1,318 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { PageHeader } from "@/components/layout/page-header";
+import { SearchScanInput } from "@/components/layout/search-scan-input";
+import { StickyActionBar } from "@/components/layout/sticky-action-bar";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Trash2, Save, Loader2, ArrowLeft, ScanLine, Search } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { formatBDT } from "@/lib/format";
+
+type Product = { id: string; name: string; model: string | null; sku: string; defaultPrice: number | null; unitName: string | null };
+type Supplier = { id: string; name: string; company: string | null };
+type CartLine = {
+  key: string;
+  productId: string;
+  productName: string;
+  qty: string;
+  unitPrice: string;
+  salesPrice: string;
+  warrantyMonths: string;
+  serials: string; // bulk paste, one per line
+};
+
+export default function NewPurchasePage() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+  const [supplierId, setSupplierId] = useState("");
+  const [mode, setMode] = useState("CASH");
+  const [paid, setPaid] = useState("");
+  const [notes, setNotes] = useState("");
+  const [lines, setLines] = useState<CartLine[]>([]);
+  const [productSearch, setProductSearch] = useState("");
+  const [showProductPicker, setShowProductPicker] = useState(false);
+
+  // Fetch products + suppliers for the picker.
+  const [products, setProducts] = useState<Product[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+
+  useState(() => {
+    fetch("/api/products").then((r) => r.json()).then((d) => setProducts(d.products ?? []));
+    fetch("/api/suppliers").then((r) => r.json()).then((d) => setSuppliers(d.suppliers ?? []));
+  });
+
+  const filteredProducts = products.filter((p) =>
+    !productSearch ||
+    p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+    (p.model ?? "").toLowerCase().includes(productSearch.toLowerCase()) ||
+    p.sku.toLowerCase().includes(productSearch.toLowerCase())
+  );
+
+  function addProductToCart(p: Product) {
+    const key = `${p.id}-${Date.now()}`;
+    setLines((l) => [
+      ...l,
+      {
+        key,
+        productId: p.id,
+        productName: p.name,
+        qty: "1",
+        unitPrice: "",
+        salesPrice: p.defaultPrice ? String(p.defaultPrice) : "",
+        warrantyMonths: "0",
+        serials: "",
+      },
+    ]);
+    setProductSearch("");
+    setShowProductPicker(false);
+  }
+
+  function updateLine(key: string, field: keyof CartLine, value: string) {
+    setLines((l) => l.map((line) => (line.key === key ? { ...line, [field]: value } : line)));
+  }
+
+  function removeLine(key: string) {
+    setLines((l) => l.filter((line) => line.key !== key));
+  }
+
+  const total = lines.reduce((sum, l) => sum + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0);
+  const paidNum = Number(paid) || 0;
+  const due = Math.max(0, total - paidNum);
+  const totalSerials = lines.reduce((sum, l) => sum + (l.serials.trim() ? l.serials.trim().split(/\n/).filter(Boolean).length : 0), 0);
+
+  async function onSave() {
+    if (lines.length === 0) {
+      toast({ title: "Empty cart", description: "Add at least one product.", variant: "destructive" });
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        supplierId: supplierId || null,
+        mode,
+        paid: paidNum,
+        notes: notes || null,
+        items: lines.map((l) => ({
+          productId: l.productId,
+          qty: Number(l.qty),
+          unitPrice: Number(l.unitPrice),
+          salesPrice: l.salesPrice ? Number(l.salesPrice) : null,
+          warrantyMonths: Number(l.warrantyMonths) || 0,
+          serials: l.serials.trim() ? l.serials.trim().split(/\n/).filter(Boolean) : [],
+        })),
+      };
+      const res = await fetch("/api/purchases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Failed", description: data.error ?? "Could not create purchase.", variant: "destructive" });
+        setSaving(false);
+        return;
+      }
+      toast({ title: "Purchase saved", description: `${data.invoiceNo} — ${data.inventoryUnitsCreated} serialised units created.` });
+      router.push("/purchases");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6 pb-24 md:pb-6">
+      <PageHeader
+        title="New purchase"
+        description="Multi-row cart with serial capture. Stock increases on save."
+        action={
+          <Button asChild variant="outline" size="sm">
+            <Link href="/purchases"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
+          </Button>
+        }
+      />
+
+      {/* Header: supplier + payment */}
+      <Card>
+        <CardHeader><CardTitle className="text-base">Invoice details</CardTitle></CardHeader>
+        <CardContent>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="space-y-2">
+              <Label>Supplier</Label>
+              <Select value={supplierId} onValueChange={setSupplierId}>
+                <SelectTrigger><SelectValue placeholder="Walk-in / select…" /></SelectTrigger>
+                <SelectContent>
+                  {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Payment mode</Label>
+              <Select value={mode} onValueChange={setMode}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CASH">Cash</SelectItem>
+                  <SelectItem value="BANK">Bank</SelectItem>
+                  <SelectItem value="BKASH">bKash</SelectItem>
+                  <SelectItem value="DUE">Due</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="paid">Paid (BDT)</Label>
+              <Input id="paid" type="number" min={0} step="0.01" value={paid}
+                onChange={(e) => setPaid(e.target.value)} placeholder="0" />
+            </div>
+            <div className="space-y-2">
+              <Label>Due</Label>
+              <div className="flex h-10 items-center">
+                <Badge variant="secondary" className={due > 0 ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"}>
+                  {formatBDT(due)}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Product picker */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Add products</CardTitle>
+          <CardDescription>Search by name, model, or SKU. Scan a barcode to match instantly.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex gap-2">
+            <SearchScanInput value={productSearch} onChange={setProductSearch} placeholder="Search name / model / SKU…" className="flex-1" />
+            <Button variant="outline" onClick={() => setShowProductPicker((v) => !v)}>
+              <Search className="h-4 w-4" />
+            </Button>
+          </div>
+          {productSearch && (
+            <div className="rounded-lg border max-h-60 overflow-y-auto scroll-area-thin">
+              {filteredProducts.length === 0 ? (
+                <p className="p-3 text-sm text-muted-foreground">No products match. Add one in Products first.</p>
+              ) : (
+                filteredProducts.slice(0, 20).map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => addProductToCart(p)}
+                    className="flex w-full items-center justify-between border-b last:border-0 px-3 py-2 text-left hover:bg-accent"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{p.name}</p>
+                      <p className="text-xs text-muted-foreground">{p.model ?? "—"} · {p.sku}</p>
+                    </div>
+                    {p.defaultPrice && <span className="text-xs text-muted-foreground">{formatBDT(p.defaultPrice)}</span>}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Cart lines */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Cart ({lines.length})</CardTitle>
+          <CardDescription>Fractional qty allowed (e.g. 1.5 rolls). Serials: one per line, bulk-paste supported.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {lines.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center border border-dashed rounded-lg">
+              No products added yet. Search above to add.
+            </p>
+          ) : (
+            lines.map((line) => {
+              const serialCount = line.serials.trim() ? line.serials.trim().split(/\n/).filter(Boolean).length : 0;
+              const lineTotal = (Number(line.qty) || 0) * (Number(line.unitPrice) || 0);
+              return (
+                <div key={line.key} className="rounded-lg border p-3 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm">{line.productName}</p>
+                      <p className="text-xs text-muted-foreground">{serialCount > 0 && <Badge variant="outline" className="mr-2"><ScanLine className="h-3 w-3 mr-1" />{serialCount} serials</Badge>}</p>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => removeLine(line.key)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Qty</Label>
+                      <Input type="number" step="0.01" min="0" value={line.qty} onChange={(e) => updateLine(line.key, "qty", e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Unit price</Label>
+                      <Input type="number" step="0.01" min="0" value={line.unitPrice} onChange={(e) => updateLine(line.key, "unitPrice", e.target.value)} placeholder="0" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Sales price</Label>
+                      <Input type="number" step="0.01" min="0" value={line.salesPrice} onChange={(e) => updateLine(line.key, "salesPrice", e.target.value)} placeholder="optional" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Warranty (mo)</Label>
+                      <Input type="number" min="0" value={line.warrantyMonths} onChange={(e) => updateLine(line.key, "warrantyMonths", e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Serial numbers (one per line — bulk paste supported)</Label>
+                    <Textarea
+                      rows={2}
+                      value={line.serials}
+                      onChange={(e) => updateLine(line.key, "serials", e.target.value)}
+                      placeholder={"SN-001\nSN-002\n…"}
+                      className="text-xs font-mono"
+                    />
+                  </div>
+                  <div className="text-right text-sm">
+                    <span className="text-muted-foreground">Line total: </span>
+                    <span className="font-medium">{formatBDT(lineTotal)}</span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      {lines.length > 0 && (
+        <Card>
+          <CardContent className="py-4 space-y-2">
+            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Items</span><span className="tabular-nums">{lines.length}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Serialised units</span><span className="tabular-nums">{totalSerials}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Total</span><span className="font-bold tabular-nums">{formatBDT(total)}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Paid</span><span className="tabular-nums">{formatBDT(paidNum)}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Due</span><span className="font-bold tabular-nums text-amber-600 dark:text-amber-400">{formatBDT(due)}</span></div>
+            <Textarea placeholder="Notes (optional)" value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-2" />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Sticky action bar (mobile) + inline save (desktop) */}
+      <StickyActionBar>
+        <Button onClick={onSave} disabled={saving || lines.length === 0} className="flex-1">
+          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          Save purchase
+        </Button>
+      </StickyActionBar>
+      <div className="hidden md:flex md:justify-end">
+        <Button onClick={onSave} disabled={saving || lines.length === 0}>
+          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          Save purchase
+        </Button>
+      </div>
+    </div>
+  );
+}
