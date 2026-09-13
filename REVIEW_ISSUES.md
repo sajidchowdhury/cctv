@@ -538,7 +538,7 @@ Service Tickets:
 - Transactional: stock + ledger stay consistent on edit/delete
 - Confirmation dialog with clear warning about stock restoration
 
-#### F2-S3: Purchase Price Visibility + Margin Display
+#### F2-S3: Purchase Price Visibility + Margin Display ✅ Complete
 - PP field in cart lines: `***` by default, click to reveal (OWNER/MANAGER only)
 - Margin calculation: `Margin: ৳700 (22%)` when PP revealed
 - PP in search results: `PP: ***` with click-to-reveal

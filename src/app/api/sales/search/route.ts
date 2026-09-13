@@ -13,6 +13,7 @@
  *   [
  *     {
  *       productId, name, model, sku, defaultPrice, isSerialised,
+ *       purchasePrice: number | null,  // F2-S3 — last purchase cost for margin display (role-gated on UI)
  *       onHand, outOfStock: boolean,
  *       serials: [{ id, serialNo }]  // IN_STOCK serials (empty for non-serialised)
  *     }
@@ -40,7 +41,10 @@ export const GET = withTenant(async (user, req: Request) => {
     },
     include: {
       product: {
-        select: { id: true, name: true, model: true, sku: true, defaultPrice: true, isSerialised: true },
+        select: {
+          id: true, name: true, model: true, sku: true, defaultPrice: true, isSerialised: true,
+          purchaseItems: { orderBy: { createdAt: "desc" }, take: 1, select: { unitPrice: true } },
+        },
       },
     },
     take: 100,
@@ -56,7 +60,10 @@ export const GET = withTenant(async (user, req: Request) => {
         { sku: { contains: q } },
       ],
     },
-    select: { id: true, name: true, model: true, sku: true, defaultPrice: true, isSerialised: true },
+    select: {
+      id: true, name: true, model: true, sku: true, defaultPrice: true, isSerialised: true,
+      purchaseItems: { orderBy: { createdAt: "desc" }, take: 1, select: { unitPrice: true } },
+    },
   });
 
   // Merge: collect all product IDs from both sources.
@@ -66,6 +73,7 @@ export const GET = withTenant(async (user, req: Request) => {
     model: string | null;
     sku: string;
     defaultPrice: number | null;
+    purchasePrice: number | null;  // F2-S3
     isSerialised: boolean;
     serials: { id: string; serialNo: string }[];
   }>();
@@ -80,6 +88,7 @@ export const GET = withTenant(async (user, req: Request) => {
         model: p.model,
         sku: p.sku,
         defaultPrice: p.defaultPrice,
+        purchasePrice: p.purchaseItems[0]?.unitPrice ?? null,  // F2-S3
         isSerialised: p.isSerialised,
         serials: [],
       });
@@ -119,6 +128,7 @@ export const GET = withTenant(async (user, req: Request) => {
         model: p.model,
         sku: p.sku,
         defaultPrice: p.defaultPrice,
+        purchasePrice: p.purchaseItems[0]?.unitPrice ?? null,  // F2-S3
         isSerialised: p.isSerialised,
         serials: serialsByProduct.get(p.id) ?? [],
       });
@@ -133,6 +143,7 @@ export const GET = withTenant(async (user, req: Request) => {
       model: p.model,
       sku: p.sku,
       defaultPrice: p.defaultPrice,
+      purchasePrice: p.purchaseItems[0]?.unitPrice ?? null,  // F2-S3
       isSerialised: p.isSerialised,
       serials: [],
     });

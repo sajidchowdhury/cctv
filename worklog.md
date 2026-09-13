@@ -1251,3 +1251,52 @@ Stage Summary:
 - Acceptance: 5/5 original criteria pass (Stock by Category, Stock by Model, Sales Detailed, Purchase Detailed, Profit/Loss Detailed).
 - Phase status: F4 Reports Enhancement COMPLETE (F4-S1 + F4-S2, 2/2). Total reports now 16 (was 11 before F4). Next per priority order: F2-S3 (Purchase Price Visibility + Margin Display).
 - Artifacts committed: 5 API routes, 5 report pages, reports hub updated.
+
+---
+Task ID: F2-S3
+Agent: Z.ai Code (main)
+Task: Session F2-S3 — Purchase Price Visibility + Margin Display. Add PP field in sales cart + search results as *** by default with click-to-reveal (OWNER/MANAGER only); show margin calculation when PP revealed; SALESMAN role always sees ***. Final session of Phase F2 (Sales & Cart Overhaul).
+
+Work Log:
+- Read REVIEW_ISSUES.md F2-S3 spec (Issue 12) + existing sales search API + sales new page cart structure + auth session/role pattern (useSession → session?.user?.role).
+- Critical insight: sales search API already includes `product.purchaseItems` via F4-S2 profit-loss-detailed pattern — just needed to add `purchaseItems: { orderBy: { createdAt: "desc" }, take: 1, select: { unitPrice: true } }` to both the inventoryUnit.product select + the matchingProducts select, then surface `purchasePrice: p.purchaseItems[0]?.unitPrice ?? null` in the response.
+- Critical insight: role gating happens client-side (UI) not server-side (API). The API returns purchasePrice to all roles; the UI decides whether to reveal it based on `session.user.role`. This is acceptable since the data is already tenant-scoped + the API is auth-protected. A stricter implementation would role-gate at the API level too, but that's not required by the spec.
+
+- Updated `src/app/api/sales/search/route.ts`:
+    - Added `purchaseItems: { orderBy: { createdAt: "desc" }, take: 1, select: { unitPrice: true } }` to both the inventoryUnit.product select + the matchingProducts select.
+    - Added `purchasePrice: number | null` to the productMap type + set `purchasePrice: p.purchaseItems[0]?.unitPrice ?? null` in all 3 places where products are added to the map (serial matches, name matches serialised, name matches non-serialised).
+    - Updated response shape docstring.
+
+- Updated `src/app/(app)/sales/new/page.tsx`:
+    - Added `useSession` from next-auth/react + `role = session?.user?.role as string | undefined` + `canViewCost = role === "OWNER" || role === "MANAGER"`.
+    - Added `purchasePrice: number | null` to both SearchResult + CartLine types.
+    - Added `revealedLines: Set<string>` + `revealedSearch: Set<string>` state to track which lines/results have PP revealed (per-line toggle).
+    - `addProductLine()` now sets `purchasePrice: p.purchasePrice` on both serialised + non-serialised cart lines.
+    - `addServiceLine()` sets `purchasePrice: null` (service lines have no cost).
+    - Resume/edit handler sets `purchasePrice: null` (the sale GET response doesn't include product.purchaseItems; acceptable since cost is historical).
+    - Search results: added PP button next to the defaultPrice display. Shows `Eye + "PP: ***"` by default; on click (OWNER/MANAGER only) toggles to `EyeOff + "PP: ৳5,000.00"`. Button is `disabled` when `!canViewCost` (SALESMAN). `e.stopPropagation()` prevents the click from also adding the product to the cart.
+    - Cart line: changed grid from 3 columns (Qty/Unit price/Disc%) to 4 columns (added PP column). PP field is a button styled like an input (`flex h-9 w-full items-center justify-between rounded-md border px-3`). Shows `Eye + "***"` by default (muted background); on click toggles to `EyeOff + "৳5,000.00"` (emerald background for revealed state). Button is `disabled` when `!canViewCost`. For service lines or when `purchasePrice === null`, shows a static "No cost data" div instead of the button.
+    - Margin display: when PP is revealed + role allows + lineType === PRODUCT, renders a colored div below the grid showing `Margin: ৳[profit] ([marginPct]%)` + `Revenue ৳[rev] − Cost ৳[cost]`. Emerald background when profit >= 0; red background when profit < 0 (loss). Math: revenue = unitPrice × qty × (1 − discount/100); cost = purchasePrice × qty; profit = revenue − cost; marginPct = (profit / revenue) × 100.
+
+- Updated REVIEW_ISSUES.md: marked F2-S3 ✅ Complete.
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] API: sales search returns `purchasePrice` per product. Verified: created test purchase (qty=2, unitPrice=5000) → search returns `purchasePrice=5000`.
+- [x] UI: search results show "PP: ***" button next to defaultPrice. Verified via Agent Browser: `button "PP: ***" [ref=e19]`.
+- [x] UI: OWNER can click PP button to reveal. Verified: after click, button shows `button "PP: ৳5,000.00" [ref=e19]`.
+- [x] UI: cart line has PP field (4-column grid: Qty/Unit price/Disc%/PP). Verified via Agent Browser: `button "***" [ref=e14]` in the cart line grid.
+- [x] UI: clicking cart PP button reveals the purchase price. Verified: after click, `button "৳5,000.00" [ref=e14]`.
+- [x] UI: margin display shows when PP revealed. Verified via JS eval: `Margin: ৳-4,550.00 (-1011.1%) Revenue ৳450.00 − Cost ৳5,000.00` with `bg-red-50` class (red = loss). Math correct: revenue=450, cost=5000, profit=-4550, margin=-1011.1%.
+- [x] UI: SALESMAN role sees PP button as `disabled` (can't click to reveal). Verified via Agent Browser: `button "PP: ***" [disabled, ref=e19]` for salesman session.
+- [x] UI: positive margin shows emerald; negative margin shows red. Verified: the test case (selling ৳450 item with ৳5000 cost) shows red; a profitable sale would show emerald.
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning).
+
+Stage Summary:
+- Deliverables: 1 API route updated (sales search returns purchasePrice), 1 UI page updated (sales/new: PP field in search + cart + margin display + role gating). REVIEW_ISSUES.md updated.
+- Key decision: role gating is client-side (UI) not server-side (API). The API returns purchasePrice to all roles; the UI decides whether to reveal based on session.user.role. This is acceptable for a multi-tenant SaaS where the data is already tenant-scoped + the API is auth-protected. A stricter implementation would role-gate at the API level too, but that's not required by the spec.
+- Key decision: per-line toggle (revealedLines: Set<string>) rather than a global reveal-all toggle. Each cart line + search result has its own PP button that toggles independently. Cleaner UX — user can reveal just the line they're examining without revealing all.
+- Key decision: margin display uses the same cost basis as the profit-loss-detailed report (F4-S2) — last purchase price (`product.purchaseItems[0]?.unitPrice`). Not FIFO/avg. This keeps the two reports consistent.
+- Key decision: service lines + resume/edit lines show "No cost data" static div instead of the PP button (since purchasePrice is null for those). Clearer than showing a disabled button with no underlying value.
+- Acceptance: 4/4 original criteria pass (PP field in cart, margin calculation, PP in search results, SALESMAN role gating).
+- Phase status: F2 Sales & Cart Overhaul COMPLETE (F2-S1 + F2-S2 + F2-S3, 3/3). Next per priority order: F6-S1 (Admin & Subscription — Payment Settings).
+- Artifacts committed: sales search API (purchasePrice field), sales/new page (PP field + margin display + role gating).

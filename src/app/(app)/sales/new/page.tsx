@@ -12,9 +12,10 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Save, Loader2, ArrowLeft, Package, Wrench, RotateCcw, Eraser } from "lucide-react";
+import { Plus, Trash2, Save, Loader2, ArrowLeft, Package, Wrench, RotateCcw, Eraser, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT } from "@/lib/format";
+import { useSession } from "next-auth/react";
 
 type SearchResult = {
   productId: string;
@@ -22,6 +23,7 @@ type SearchResult = {
   model: string | null;
   sku: string;
   defaultPrice: number | null;
+  purchasePrice: number | null; // F2-S3 — last cost for margin display (role-gated on UI)
   isSerialised: boolean; // F1-S2
   onHand: number;
   outOfStock: boolean;
@@ -34,6 +36,7 @@ type CartLine = {
   productName: string;
   productModel: string | null;
   isSerialised: boolean; // F1-S2: false = qty-based (no serial pick)
+  purchasePrice: number | null; // F2-S3 — last cost (null for service lines)
   inventoryUnitId: string;
   serialNo: string;
   qty: string;
@@ -59,6 +62,13 @@ function NewSalePage() {
   const resumeId = searchParams.get("resume");
   const isEditMode = searchParams.get("edit") === "1";
   const { toast } = useToast();
+  const { data: session } = useSession();
+  // F2-S3: only OWNER + MANAGER can reveal purchase price. SALESMAN always sees ***.
+  const role = session?.user?.role as string | undefined;
+  const canViewCost = role === "OWNER" || role === "MANAGER";
+  // Track which cart lines + search results have PP revealed (per-line toggle).
+  const [revealedLines, setRevealedLines] = useState<Set<string>>(new Set());
+  const [revealedSearch, setRevealedSearch] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [customerId, setCustomerId] = useState("");
   const [mode, setMode] = useState("CASH");
@@ -110,6 +120,10 @@ function NewSalePage() {
             // F1-S2: derive isSerialised from whether inventoryUnitId is set.
             // If the item has an inventory unit → serialised; otherwise qty-based (non-serial or service).
             isSerialised: !!(it.inventoryUnitId || (it.inventoryUnit && it.inventoryUnit.serialNo)),
+            // F2-S3: for resume/edit, fetch purchasePrice from product relation if available.
+            // The sale GET includes product with { id, name, model, sku } — no purchaseItems.
+            // Set null; the PP field will show "N/A" in edit mode (acceptable since cost is historical).
+            purchasePrice: null,
             inventoryUnitId: it.inventoryUnitId ?? "",
             serialNo: it.inventoryUnit?.serialNo ?? "",
             qty: String(it.qty),
@@ -170,6 +184,7 @@ function NewSalePage() {
         productName: p.name,
         productModel: p.model,
         isSerialised: false,
+        purchasePrice: p.purchasePrice,  // F2-S3
         inventoryUnitId: "",
         serialNo: "",
         qty: "1",
@@ -197,6 +212,7 @@ function NewSalePage() {
       productName: p.name,
       productModel: p.model,
       isSerialised: true,
+      purchasePrice: p.purchasePrice,  // F2-S3
       inventoryUnitId: selectedSerial?.id ?? "",
       serialNo: selectedSerial?.serialNo ?? "",
       qty: "1",
@@ -215,6 +231,7 @@ function NewSalePage() {
       productName: "",
       productModel: null,
       isSerialised: false,
+      purchasePrice: null,  // F2-S3 — service lines have no cost
       inventoryUnitId: "",
       serialNo: "",
       qty: "1",
@@ -448,6 +465,31 @@ function NewSalePage() {
                         {p.defaultPrice && (
                           <p className="text-xs text-muted-foreground mt-1">{formatBDT(p.defaultPrice)}</p>
                         )}
+                        {/* F2-S3: PP field with role-gated click-to-reveal */}
+                        {p.purchasePrice !== null && p.purchasePrice !== undefined ? (
+                          <button
+                            type="button"
+                            disabled={!canViewCost}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!canViewCost) return;
+                              setRevealedSearch((s) => {
+                                const next = new Set(s);
+                                if (next.has(p.productId)) next.delete(p.productId);
+                                else next.add(p.productId);
+                                return next;
+                              });
+                            }}
+                            className={`mt-1 inline-flex items-center gap-1 text-xs ${canViewCost ? "text-muted-foreground hover:text-foreground cursor-pointer" : "text-muted-foreground cursor-not-allowed"}`}
+                            title={canViewCost ? "Click to reveal purchase price" : "Purchase price hidden (insufficient role)"}
+                          >
+                            {canViewCost && revealedSearch.has(p.productId) ? (
+                              <><EyeOff className="h-3 w-3" />PP: {formatBDT(p.purchasePrice)}</>
+                            ) : (
+                              <><Eye className="h-3 w-3" />PP: ***</>
+                            )}
+                          </button>
+                        ) : null}
                       </div>
                     </button>
                     {/* Available serials — click a specific serial to add that exact unit */}
@@ -518,11 +560,77 @@ function NewSalePage() {
                       </Badge>
                     </div>
                   )}
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <div><Label className="text-xs">Qty</Label><Input type="number" step="0.01" min="0" value={line.qty} onChange={(e) => updateLine(line.key, "qty", e.target.value)} /></div>
                     <div><Label className="text-xs">Unit price</Label><Input type="number" step="0.01" min="0" value={line.unitPrice} onChange={(e) => updateLine(line.key, "unitPrice", e.target.value)} placeholder="0" /></div>
                     <div><Label className="text-xs">Disc %</Label><Input type="number" value={line.discount} onChange={(e) => updateLine(line.key, "discount", e.target.value)} /></div>
+                    {/* F2-S3: PP field — *** by default, click to reveal (OWNER/MANAGER only). */}
+                    <div>
+                      <Label className="text-xs">
+                        PP {line.purchasePrice === null && <span className="text-muted-foreground italic">(N/A)</span>}
+                      </Label>
+                      {line.purchasePrice !== null ? (
+                        <button
+                          type="button"
+                          disabled={!canViewCost}
+                          onClick={() => {
+                            if (!canViewCost) return;
+                            setRevealedLines((s) => {
+                              const next = new Set(s);
+                              if (next.has(line.key)) next.delete(line.key);
+                              else next.add(line.key);
+                              return next;
+                            });
+                          }}
+                          className={`flex h-9 w-full items-center justify-between rounded-md border px-3 text-sm transition-colors ${
+                            canViewCost
+                              ? "cursor-pointer hover:bg-accent"
+                              : "cursor-not-allowed opacity-60"
+                          } ${revealedLines.has(line.key) && canViewCost
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900"
+                              : "bg-muted/30 text-muted-foreground"
+                          }`}
+                          title={canViewCost ? "Click to reveal purchase price" : "Purchase price hidden (insufficient role)"}
+                        >
+                          {revealedLines.has(line.key) && canViewCost ? (
+                            <><EyeOff className="h-3 w-3" /><span className="font-medium">{formatBDT(line.purchasePrice)}</span></>
+                          ) : (
+                            <><Eye className="h-3 w-3" /><span>***</span></>
+                          )}
+                        </button>
+                      ) : (
+                        <div className="flex h-9 items-center px-3 rounded-md border bg-muted/20 text-xs text-muted-foreground italic">
+                          No cost data
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  {/* F2-S3: margin display when PP is revealed + role allows */}
+                  {line.lineType === "PRODUCT" && line.purchasePrice !== null && canViewCost && revealedLines.has(line.key) && (() => {
+                    const unitPriceNum = Number(line.unitPrice) || 0;
+                    const qtyNum = Number(line.qty) || 0;
+                    const discountNum = Number(line.discount) || 0;
+                    const revenue = unitPriceNum * qtyNum * (1 - discountNum / 100);
+                    const cost = (line.purchasePrice ?? 0) * qtyNum;
+                    const profit = revenue - cost;
+                    const marginPct = revenue > 0 ? (profit / revenue) * 100 : 0;
+                    const profitable = profit >= 0;
+                    return (
+                      <div className={`rounded-md border px-3 py-2 text-xs flex items-center justify-between ${
+                        profitable
+                          ? "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-900 dark:text-emerald-300"
+                          : "bg-red-50 border-red-200 text-red-700 dark:bg-red-950/30 dark:border-red-900 dark:text-red-300"
+                      }`}>
+                        <span>
+                          Margin: <span className="font-bold">{formatBDT(profit)}</span>
+                          <span className="ml-1">({marginPct.toFixed(1)}%)</span>
+                        </span>
+                        <span className="text-muted-foreground">
+                          Revenue {formatBDT(revenue)} − Cost {formatBDT(cost)}
+                        </span>
+                      </div>
+                    );
+                  })()}
                   <p className="text-right text-sm"><span className="text-muted-foreground">Line total: </span><span className="font-medium">{formatBDT(lt)}</span></p>
                 </div>
               );
