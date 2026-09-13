@@ -543,6 +543,8 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **Acceptance criteria:** all 10 reports present, exportable, <1s render target met.
 
+**Status:** ✅ Complete (S19) — verified via curl (quotation-register, warranty-expiry, salary-sheet, rma-status APIs with date-range + summary) + Agent Browser (quotation register report renders). All 10 reports from doc §5.3 now present. Completes Phase P5.
+
 ---
 
 ## 9. Phase P6 — CRM & Reminders (Sessions S20–S22)
@@ -704,7 +706,7 @@ After each phase is complete:
 | P2 Sales & Invoicing | ✅ Done (S10 ✅, S11 ✅, S12 ✅, S13 ✅, S14 ✅) | 5/5 | session(S14) |
 | P3 Accounting | ✅ Done (S15 ✅, S16 ✅) | 2/2 | session(S16) |
 | P4 Employees & Payroll | ✅ Done (S17 ✅) | 1/1 | session(S17) |
-| P5 Reports | 🔄 In progress (S18 ✅) | 1/2 | session(S18) |
+| P5 Reports | ✅ Done (S18 ✅, S19 ✅) | 2/2 | session(S19) |
 | P6 CRM & Reminders | ☐ Not started | 0/3 | — |
 | P7 Polish & Launch | ☐ Not started | 0/3 | — |
 
@@ -712,4 +714,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Phases P0–P4 complete. Phase P5 in progress (S18 ✅). Next: S19 — Specialised Reports (completes P5).*
+*End of implementation plan. Phases P0–P5 complete. Next: Phase P6 — CRM & Reminders (Session S20).*

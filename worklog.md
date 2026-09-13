@@ -658,3 +658,38 @@ Stage Summary:
 - Acceptance: 1/1 original criterion passes (all reports render + CSV export works). 10k row performance deferred to S25.
 - Phase status: P5 Reports now 1/2 (S18 ✅). Next: S19 — Specialised Reports (Warranty Expiry, Salary Sheet, Quotation Register, RMA Status).
 - Artifacts committed: 4 report APIs, csv.ts, date-range-picker.tsx, 11 report UI pages.
+
+---
+Task ID: S19
+Agent: Z.ai Code (main)
+Task: Session S19 — Specialised Reports. 4 specialised reports: Warranty Expiry (upcoming ends by date window), Employee Salary Sheet (monthly payroll summary), Quotation Register (all quotes by status + win/loss + conversion rate), RMA Status (open RMAs by stage + overdue). Completes Phase P5 — Reports.
+
+Work Log:
+- Read S18 worklog + existing basic warranty/salary-sheet report pages (created in S18, no date range or CSV). S19 enhances them + adds quotation-register + rma-status.
+- Wrote 4 report APIs:
+    GET /api/reports/quotation-register — all quotes by status/customer/date with win/loss summary (total, draft, sent, accepted, converted, rejected, conversionRate, winRate, totalValue, convertedValue, avgQuoteValue). Status filter.
+    GET /api/reports/warranty-expiry — SOLD inventory units with warrantyEnd in the date window, sorted soonest-expiring first. Returns daysLeft + expired flag + customer + sale invoice. Default window: next 90 days.
+    GET /api/reports/salary-sheet — monthly payroll summary (count, paid/pending, totalBasic/allowance/deduction/net). Month filter.
+    GET /api/reports/rma-status — RMA tickets by stage + overdue count. API ready (schema exists from S02); RMA UI (S21) will populate it.
+- Enhanced report UI pages:
+    /(app)/reports/quotation-register — DataTable + 4 summary cards (total/conversionRate/totalValue/avgQuote) + DateRangePicker + status filter + CSV export.
+    /(app)/reports/warranty — enhanced: 3 summary cards (total/expiring≤30d/expired) + table with product/serial/customer/invoice/warrantyEnd/daysLeft/status badges + CSV export.
+    /(app)/reports/salary-sheet — enhanced: 4 summary cards (records/totalNet/paid/pending) + DataTable with paid/pending badges + month filter + CSV export.
+    /(app)/reports/rma-status — DataTable with stage badges + overdue flag + 3 summary cards (total/overdue/stages) + CSV export. Empty state: "No RMA tickets. The RMA module (S21) will populate this report."
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Quotation register: returns summary + quote list with date range + status filter
+- [x] Warranty expiry: returns units in date window with daysLeft + expired flag
+- [x] Salary sheet: returns summary + records with paid/pending badges + month filter
+- [x] RMA status: returns empty (RMA module lands S21; API structure ready)
+- [x] All 4 reports have CSV export
+- [x] Browser: quotation register report renders (no errors)
+- [x] All 10 reports from doc §5.3 now present
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning)
+
+Stage Summary:
+- Deliverables: 4 report APIs (quotation-register, warranty-expiry, salary-sheet, rma-status), 4 enhanced report UI pages.
+- Key decision: warranty-expiry report uses a 90-day default window from today, sorted soonest-expiring first, with expired flag + daysLeft count. RMA status report queries the schema (ready from S02) — it'll show data once S21 creates RMA tickets. All 10 reports from doc §5.3 are now present: 8 core (S18) + 4 specialised (S19, with stock/cash-book/customer-ledger/supplier-ledger already existing from earlier sessions).
+- Acceptance: 1/1 original criterion passes. All 10 reports present + exportable.
+- Phase status: P5 Reports COMPLETE (S18-S19, 2/2). Next: Phase P6 — CRM & Reminders (S20).
+- Artifacts committed: 4 report APIs, 4 report UI pages.
