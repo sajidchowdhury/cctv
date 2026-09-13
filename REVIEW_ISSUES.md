@@ -542,7 +542,7 @@ Service Tickets:
 
 ### Phase F3: Warranty & RMA Fixes (2 sessions)
 
-#### F3-S1: Warranty Lookup Fix + Product History
+#### F3-S1: Warranty Lookup Fix + Product History ✅ Complete
 - Fix serial search (case-insensitive, verify API returns results)
 - Add product name search (not just serial)
 - Show full product history timeline per unit:
