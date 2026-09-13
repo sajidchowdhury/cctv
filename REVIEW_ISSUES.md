@@ -490,7 +490,7 @@ Service Tickets:
 
 ### Phase F1: Purchase & Stock Fixes (3 sessions)
 
-#### F1-S1: Purchase Serial & Qty Fixes
+#### F1-S1: Purchase Serial & Qty Fixes ✅ Complete
 - Serial qty validation (count must match qty, hard block if exceeds)
 - Auto-comma after serial scan (detect Enter/Tab, add delimiter)
 - Serial chips/tags UI (removable, visual)

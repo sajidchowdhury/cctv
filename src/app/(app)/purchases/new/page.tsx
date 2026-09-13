@@ -11,9 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, Save, Loader2, ArrowLeft, ScanLine, Search } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Trash2, Save, Loader2, ArrowLeft, ScanLine, Search, X, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT } from "@/lib/format";
 
@@ -27,7 +27,8 @@ type CartLine = {
   unitPrice: string;
   salesPrice: string;
   warrantyMonths: string;
-  serials: string; // bulk paste, one per line
+  serialInput: string; // current text in the serial input field
+  serials: string[]; // parsed serial chips
 };
 
 export default function NewPurchasePage() {
@@ -42,10 +43,8 @@ export default function NewPurchasePage() {
   const [productSearch, setProductSearch] = useState("");
   const [showProductPicker, setShowProductPicker] = useState(false);
 
-  // Fetch products + suppliers for the picker.
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-
   useState(() => {
     fetch("/api/products").then((r) => r.json()).then((d) => setProducts(d.products ?? []));
     fetch("/api/suppliers").then((r) => r.json()).then((d) => setSuppliers(d.suppliers ?? []));
@@ -70,14 +69,15 @@ export default function NewPurchasePage() {
         unitPrice: "",
         salesPrice: p.defaultPrice ? String(p.defaultPrice) : "",
         warrantyMonths: "0",
-        serials: "",
+        serialInput: "",
+        serials: [],
       },
     ]);
     setProductSearch("");
     setShowProductPicker(false);
   }
 
-  function updateLine(key: string, field: keyof CartLine, value: string) {
+  function updateLine(key: string, field: keyof CartLine, value: any) {
     setLines((l) => l.map((line) => (line.key === key ? { ...line, [field]: value } : line)));
   }
 
@@ -85,15 +85,109 @@ export default function NewPurchasePage() {
     setLines((l) => l.filter((line) => line.key !== key));
   }
 
+  // ─── Serial chip management ───────────────────────────────
+  function addSerial(key: string, serial: string) {
+    const trimmed = serial.trim();
+    if (!trimmed) return;
+    setLines((l) => l.map((line) => {
+      if (line.key !== key) return line;
+      // Check duplicate within same line
+      if (line.serials.includes(trimmed)) {
+        toast({ title: "Duplicate serial", description: `${trimmed} already added.`, variant: "destructive" });
+        return line;
+      }
+      const newSerials = [...line.serials, trimmed];
+      // Auto-set qty to match serial count (if qty < serial count)
+      const currentQty = Number(line.qty) || 0;
+      const newQty = currentQty < newSerials.length ? String(newSerials.length) : line.qty;
+      return { ...line, serials: newSerials, serialInput: "", qty: newQty };
+    }));
+  }
+
+  function removeSerial(key: string, index: number) {
+    setLines((l) => l.map((line) => {
+      if (line.key !== key) return line;
+      const newSerials = line.serials.filter((_, i) => i !== index);
+      // Auto-reduce qty if it was auto-set from serial count
+      const currentQty = Number(line.qty) || 0;
+      const newQty = currentQty > newSerials.length ? String(newSerials.length || 1) : line.qty;
+      return { ...line, serials: newSerials, qty: newQty };
+    }));
+  }
+
+  function handleSerialInputKeyDown(key: string, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
+      e.preventDefault();
+      const value = (e.target as HTMLInputElement).value.trim();
+      if (value) {
+        // Handle paste with multiple serials (comma/newline separated)
+        const parts = value.split(/[\n,;]/).map(s => s.trim()).filter(Boolean);
+        for (const part of parts) {
+          addSerial(key, part);
+        }
+      }
+    }
+    if (e.key === "Backspace" && !(e.target as HTMLInputElement).value) {
+      // Remove last serial on backspace in empty input
+      setLines((l) => l.map((line) => {
+        if (line.key !== key || line.serials.length === 0) return line;
+        const newSerials = line.serials.slice(0, -1);
+        const currentQty = Number(line.qty) || 0;
+        const newQty = currentQty > newSerials.length ? String(newSerials.length || 1) : line.qty;
+        return { ...line, serials: newSerials, qty: newQty };
+      }));
+    }
+  }
+
+  function handleSerialInputBlur(key: string, value: string) {
+    if (value.trim()) {
+      const parts = value.split(/[\n,;]/).map(s => s.trim()).filter(Boolean);
+      for (const part of parts) {
+        addSerial(key, part);
+      }
+    }
+  }
+
+  // ─── Validation helpers ──────────────────────────────────
+  function getSerialErrors(line: CartLine): { excess: boolean; deficit: boolean; duplicateInDb: boolean } {
+    const qty = Number(line.qty) || 0;
+    const serialCount = line.serials.length;
+    return {
+      excess: serialCount > qty,
+      deficit: serialCount > 0 && serialCount < qty,
+      duplicateInDb: false, // TODO: debounced DB check (API already validates on save)
+    };
+  }
+
+  // Check for duplicate serials across all lines (same serial in different products)
+  function isDuplicateAcrossLines(serial: string, currentKey: string): boolean {
+    return lines.some((l) => l.key !== currentKey && l.serials.includes(serial));
+  }
+
+  function hasSaveErrors(): boolean {
+    return lines.some((line) => {
+      const errors = getSerialErrors(line);
+      return errors.excess;
+    });
+  }
+
   const total = lines.reduce((sum, l) => sum + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0);
   const paidNum = Number(paid) || 0;
   const due = Math.max(0, total - paidNum);
-  const totalSerials = lines.reduce((sum, l) => sum + (l.serials.trim() ? l.serials.trim().split(/\n/).filter(Boolean).length : 0), 0);
+  const totalSerials = lines.reduce((sum, l) => sum + l.serials.length, 0);
 
   async function onSave() {
     if (lines.length === 0) {
       toast({ title: "Empty cart", description: "Add at least one product.", variant: "destructive" });
       return;
+    }
+    // Hard block: serial count > qty
+    for (const line of lines) {
+      const qty = Number(line.qty) || 0;
+      if (line.serials.length > qty) {
+        toast({ title: "Serial count exceeds qty", description: `${line.productName}: ${line.serials.length} serials but qty is ${qty}.`, variant: "destructive" });
+        return;
+      }
     }
     setSaving(true);
     try {
@@ -108,7 +202,7 @@ export default function NewPurchasePage() {
           unitPrice: Number(l.unitPrice),
           salesPrice: l.salesPrice ? Number(l.salesPrice) : null,
           warrantyMonths: Number(l.warrantyMonths) || 0,
-          serials: l.serials.trim() ? l.serials.trim().split(/\n/).filter(Boolean) : [],
+          serials: l.serials,
         })),
       };
       const res = await fetch("/api/purchases", {
@@ -133,7 +227,7 @@ export default function NewPurchasePage() {
     <div className="space-y-6 pb-24 md:pb-6">
       <PageHeader
         title="New purchase"
-        description="Multi-row cart with serial capture. Stock increases on save."
+        description="Multi-row cart with serial capture. Scan or type serials — they appear as removable chips."
         action={
           <Button asChild variant="outline" size="sm">
             <Link href="/purchases"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
@@ -226,7 +320,7 @@ export default function NewPurchasePage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Cart ({lines.length})</CardTitle>
-          <CardDescription>Fractional qty allowed (e.g. 1.5 rolls). Serials: one per line, bulk-paste supported.</CardDescription>
+          <CardDescription>Type or scan serials — press Enter or comma to add. Qty auto-updates with serial count.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {lines.length === 0 ? (
@@ -235,47 +329,101 @@ export default function NewPurchasePage() {
             </p>
           ) : (
             lines.map((line) => {
-              const serialCount = line.serials.trim() ? line.serials.trim().split(/\n/).filter(Boolean).length : 0;
-              const lineTotal = (Number(line.qty) || 0) * (Number(line.unitPrice) || 0);
+              const serialCount = line.serials.length;
+              const qty = Number(line.qty) || 0;
+              const errors = getSerialErrors(line);
+              const lineTotal = qty * (Number(line.unitPrice) || 0);
               return (
                 <div key={line.key} className="rounded-lg border p-3 space-y-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="font-medium text-sm">{line.productName}</p>
-                      <p className="text-xs text-muted-foreground">{serialCount > 0 && <Badge variant="outline" className="mr-2"><ScanLine className="h-3 w-3 mr-1" />{serialCount} serials</Badge>}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {serialCount > 0 && (
+                          <Badge variant="outline" className="text-xs">
+                            <ScanLine className="h-3 w-3 mr-1" />{serialCount} serials
+                          </Badge>
+                        )}
+                        {errors.excess && (
+                          <Badge variant="secondary" className="bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 text-xs">
+                            <AlertTriangle className="h-3 w-3 mr-1" />{serialCount}/{qty} — remove {serialCount - qty}
+                          </Badge>
+                        )}
+                        {errors.deficit && !errors.excess && serialCount > 0 && (
+                          <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 text-xs">
+                            {serialCount}/{qty} — add {qty - serialCount} more
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => removeLine(line.key)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
+
+                  {/* Qty + prices grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <div className="space-y-1">
-                      <Label className="text-xs">Qty</Label>
-                      <Input type="number" step="0.01" min="0" value={line.qty} onChange={(e) => updateLine(line.key, "qty", e.target.value)} />
+                      <Label className="text-xs">Qty {serialCount > 0 && `(${serialCount} serials)`}</Label>
+                      <Input type="number" step="0.01" min="0" value={line.qty}
+                        onChange={(e) => updateLine(line.key, "qty", e.target.value)} />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Unit price</Label>
-                      <Input type="number" step="0.01" min="0" value={line.unitPrice} onChange={(e) => updateLine(line.key, "unitPrice", e.target.value)} placeholder="0" />
+                      <Input type="number" step="0.01" min="0" value={line.unitPrice}
+                        onChange={(e) => updateLine(line.key, "unitPrice", e.target.value)} placeholder="0" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Sales price</Label>
-                      <Input type="number" step="0.01" min="0" value={line.salesPrice} onChange={(e) => updateLine(line.key, "salesPrice", e.target.value)} placeholder="optional" />
+                      <Input type="number" step="0.01" min="0" value={line.salesPrice}
+                        onChange={(e) => updateLine(line.key, "salesPrice", e.target.value)} placeholder="optional" />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Warranty (mo)</Label>
-                      <Input type="number" min="0" value={line.warrantyMonths} onChange={(e) => updateLine(line.key, "warrantyMonths", e.target.value)} />
+                      <Input type="number" min="0" value={line.warrantyMonths}
+                        onChange={(e) => updateLine(line.key, "warrantyMonths", e.target.value)} />
                     </div>
                   </div>
+
+                  {/* Serial chips input */}
                   <div className="space-y-1">
-                    <Label className="text-xs">Serial numbers (one per line — bulk paste supported)</Label>
-                    <Textarea
-                      rows={2}
-                      value={line.serials}
-                      onChange={(e) => updateLine(line.key, "serials", e.target.value)}
-                      placeholder={"SN-001\nSN-002\n…"}
-                      className="text-xs font-mono"
-                    />
+                    <Label className="text-xs">Serial numbers (scan or type + Enter)</Label>
+                    <div className="flex flex-wrap items-center gap-1 rounded-lg border p-2 min-h-[42px] focus-within:ring-2 focus-within:ring-ring">
+                      {line.serials.map((serial, i) => (
+                        <span
+                          key={i}
+                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-mono ${
+                            isDuplicateAcrossLines(serial, line.key)
+                              ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300 border border-red-300"
+                              : "bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300 border border-blue-200 dark:border-blue-900"
+                          }`}
+                        >
+                          {serial}
+                          <button
+                            type="button"
+                            onClick={() => removeSerial(line.key, i)}
+                            className="hover:text-destructive"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                      <input
+                        type="text"
+                        aria-label="Serial input"
+                        value={line.serialInput}
+                        onChange={(e) => updateLine(line.key, "serialInput", e.target.value)}
+                        onKeyDown={(e) => handleSerialInputKeyDown(line.key, e)}
+                        onBlur={(e) => handleSerialInputBlur(line.key, e.target.value)}
+                        placeholder={line.serials.length === 0 ? "Scan or type serial + Enter…" : ""}
+                        className="flex-1 min-w-[120px] bg-transparent text-xs font-mono outline-none"
+                      />
+                    </div>
+                    {isDuplicateAcrossLines("", line.key) && line.serials.some(s => isDuplicateAcrossLines(s, line.key)) && (
+                      <p className="text-xs text-red-600">Duplicate serial detected across products — will be rejected on save.</p>
+                    )}
                   </div>
+
                   <div className="text-right text-sm">
                     <span className="text-muted-foreground">Line total: </span>
                     <span className="font-medium">{formatBDT(lineTotal)}</span>
@@ -300,15 +448,14 @@ export default function NewPurchasePage() {
         </Card>
       )}
 
-      {/* Sticky action bar (mobile) + inline save (desktop) */}
       <StickyActionBar>
-        <Button onClick={onSave} disabled={saving || lines.length === 0} className="flex-1">
+        <Button onClick={onSave} disabled={saving || lines.length === 0 || hasSaveErrors()} className="flex-1">
           {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
           Save purchase
         </Button>
       </StickyActionBar>
       <div className="hidden md:flex md:justify-end">
-        <Button onClick={onSave} disabled={saving || lines.length === 0}>
+        <Button onClick={onSave} disabled={saving || lines.length === 0 || hasSaveErrors()}>
           {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
           Save purchase
         </Button>
