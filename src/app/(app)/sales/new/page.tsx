@@ -460,12 +460,15 @@ function NewSalePage() {
               ) : (
                 filteredProducts.map((p) => (
                   <div key={p.productId} className={`p-3 ${p.outOfStock ? "opacity-50" : "hover:bg-accent/50"} transition-opacity`}>
-                    {/* Product header row — click adds to cart with auto-selected first serial */}
-                    <button
-                      type="button"
-                      disabled={p.outOfStock}
-                      onClick={() => addProductLine(p)}
-                      className="flex w-full items-start justify-between gap-2 text-left disabled:cursor-not-allowed"
+                    {/* Product header row — click adds to cart with auto-selected first serial.
+                        F5-S2 fix: outer element is a div (not button) so the inner PP reveal
+                        button doesn't cause a nested-button hydration error. */}
+                    <div
+                      role="button"
+                      tabIndex={p.outOfStock ? -1 : 0}
+                      onClick={() => { if (!p.outOfStock) addProductLine(p); }}
+                      onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !p.outOfStock) { e.preventDefault(); addProductLine(p); } }}
+                      className={`flex w-full items-start justify-between gap-2 text-left ${p.outOfStock ? "cursor-not-allowed" : "cursor-pointer"}`}
                     >
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium">{p.name}</p>
@@ -513,7 +516,7 @@ function NewSalePage() {
                           </button>
                         ) : null}
                       </div>
-                    </button>
+                    </div>
                     {/* Available serials — click a specific serial to add that exact unit */}
                     {p.serials.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1 pl-1">
