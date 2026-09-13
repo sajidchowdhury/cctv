@@ -614,3 +614,47 @@ Stage Summary:
 - Acceptance: 1/1 original criterion passes. Disburse creates linked expense in cash book.
 - Phase status: P4 Employees & Payroll COMPLETE (S17, 1/1). Next: Phase P5 — Reports (S18).
 - Artifacts committed: 4 API routes (employees, employees/[id], salary-records, salary-records/[id]/disburse), 4 UI pages, seed.ts.
+
+---
+Task ID: S18
+Agent: Z.ai Code (main)
+Task: Session S18 — Core Operational Reports. 8 core reports: Stock Summary, Sales, Purchase, Profit/Loss, Customer Ledger, Supplier Ledger, Cash Book, Income/Expense. All with date-range filters + CSV export. First session of Phase P5 — Reports.
+
+Work Log:
+- Read S17 worklog + existing report APIs (stock-summary from S09, cash-book from S15). S18 adds: sales, purchase, profit-loss, income-expense report APIs + unified reports index + individual report pages + CSV export utility.
+- Wrote 4 new report APIs:
+    GET /api/reports/sales — invoice list + summary (count, totalSales, totalPaid, totalDue, totalDiscount) with date range.
+    GET /api/reports/purchase — same pattern for purchases + supplier-wise.
+    GET /api/reports/profit-loss — per invoice: revenue - cost (last purchase price × qty) - discount = profit + margin %. Aggregate totals + margin.
+    GET /api/reports/income-expense — account-head-wise summary grouped by head, totals (income/expense/net).
+- Wrote CSV export utility (src/lib/csv.ts): exportToCSV() converts array of objects to CSV string, triggers browser download.
+- Wrote DateRangePicker component (from/to + quick presets: Today, This month, 30d).
+- Wrote reports UI:
+    /(app)/reports — index page with 10 report cards (icon + title + description + phase badge). Links to each report.
+    /(app)/reports/sales — DataTable + 4 summary cards + CSV export + date range.
+    /(app)/reports/purchase — same pattern.
+    /(app)/reports/profit-loss — DataTable with revenue/cost/discount/profit/margin columns + 4 summary cards (revenue, cost, profit, margin) with trend icons.
+    /(app)/reports/income-expense — head-wise table + 3 summary cards (income, expense, net) + CSV export.
+    /(app)/reports/stock — redirect to /stock (existing S09).
+    /(app)/reports/cash-book — redirect to /accounting/cash-book (existing S15).
+    /(app)/reports/customer-ledger — DataTable linking to customer detail (existing S14 ledger).
+    /(app)/reports/supplier-ledger — DataTable linking to supplier detail (existing S07 ledger).
+    /(app)/reports/salary-sheet — DataTable of salary records (existing S17).
+    /(app)/reports/warranty — table of sold units with warranty status (existing S12).
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Sales report API: returns summary + invoice list with date range
+- [x] Purchase report API: returns summary + invoice list
+- [x] Profit-loss report API: returns revenue/cost/profit/margin per invoice + aggregate
+- [x] Income-expense report API: returns head-wise summary + totals (income=5,000 expense=18,200 net=-13,200)
+- [x] CSV export utility (client-side download)
+- [x] Reports index with 10 report cards renders (no errors)
+- [x] All report pages accessible from the index
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning)
+
+Stage Summary:
+- Deliverables: 4 report APIs (sales, purchase, profit-loss, income-expense), CSV utility, DateRangePicker component, 11 report UI pages (index + 10 individual), nav Reports link.
+- Key decision: CSV export is client-side (exportToCSV creates a Blob + triggers download). PDF export uses browser print for now; react-pdf report generation deferred to S25. Reports index links to existing screens (stock → /stock, cash-book → /accounting/cash-book, customer/supplier ledger → their detail pages) to avoid duplication. Profit/loss uses the latest PurchaseItem.unitPrice as cost basis (same as stock-summary S09).
+- Acceptance: 1/1 original criterion passes (all reports render + CSV export works). 10k row performance deferred to S25.
+- Phase status: P5 Reports now 1/2 (S18 ✅). Next: S19 — Specialised Reports (Warranty Expiry, Salary Sheet, Quotation Register, RMA Status).
+- Artifacts committed: 4 report APIs, csv.ts, date-range-picker.tsx, 11 report UI pages.

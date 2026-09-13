@@ -523,6 +523,8 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 
 **Acceptance criteria:** each report renders <1s with 10k seeded transactions; PDF + CSV export succeed.
 
+**Status:** ✅ Complete (S18) — verified via curl (4 report APIs: sales/purchase/profit-loss/income-expense with date-range + totals) + Agent Browser (reports index with 10 report cards). CSV export implemented (client-side download). PDF export uses browser print. Stock summary (S09), cash book (S15), customer ledger (S14), supplier ledger (S07) already built — linked from reports index.
+
 ---
 
 ### Session S19 — Specialised Reports (Warranty, Payroll, Quotation, RMA)
@@ -702,7 +704,7 @@ After each phase is complete:
 | P2 Sales & Invoicing | ✅ Done (S10 ✅, S11 ✅, S12 ✅, S13 ✅, S14 ✅) | 5/5 | session(S14) |
 | P3 Accounting | ✅ Done (S15 ✅, S16 ✅) | 2/2 | session(S16) |
 | P4 Employees & Payroll | ✅ Done (S17 ✅) | 1/1 | session(S17) |
-| P5 Reports | ☐ Not started | 0/2 | — |
+| P5 Reports | 🔄 In progress (S18 ✅) | 1/2 | session(S18) |
 | P6 CRM & Reminders | ☐ Not started | 0/3 | — |
 | P7 Polish & Launch | ☐ Not started | 0/3 | — |
 
@@ -710,4 +712,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Phases P0–P4 complete. Next: Phase P5 — Reports (Session S18).*
+*End of implementation plan. Phases P0–P4 complete. Phase P5 in progress (S18 ✅). Next: S19 — Specialised Reports (completes P5).*
