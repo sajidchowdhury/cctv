@@ -72,6 +72,19 @@ model Tenant {
   @@index([status])
 }
 
+/// Super-admin (platform operator) — verifies payments, manages tenants (doc §3.3.1).
+/// Separate from tenant Users so admin access is cross-tenant and never
+/// mixed into the tenant RBAC (OWNER/MANAGER/SALESMAN/ACCOUNTANT).
+model SuperAdmin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  status       String   @default("ACTIVE") // ACTIVE | DISABLED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 /// A user belonging to a tenant. Email is globally unique (doc §3.3).
 model User {
   id           String   @id @default(cuid())

@@ -1,5 +1,6 @@
 /**
- * S03 Seed — creates a dev tenant + owner user + subscription (ACTIVE for dev).
+ * S05 Seed — creates a dev tenant + owner user + subscription (ACTIVE for dev)
+ * + a super-admin for the admin control plane (S05).
  *
  * Run: `bun run db:seed`
  *
@@ -9,6 +10,7 @@
  *   - 1 Subscription (status ACTIVE — S05 wires the real PENDING_ACTIVATION → verify flow)
  *   - Reference rows: 2 Categories, 1 Unit
  *   - A 2nd user (salesman@cctv-demo.bd, role SALESMAN) for role-guard tests
+ *   - 1 SuperAdmin (admin@cctv-saas.bd, password "admin123") for the admin queue
  *
  * NOTE: real signups via /api/auth/signup start PENDING_ACTIVATION. The demo
  * tenant is set ACTIVE here purely so S03/S04 auth flows are testable.
@@ -107,12 +109,27 @@ async function main() {
     console.log(`✓ Unit: Pcs`);
 
     console.log(
-      `\n✅ Seed complete.\n` +
+      `\n✅ Tenant + users seeded.\n` +
         `   Tenant: ${tenant.id}\n` +
         `   Login: owner@cctv-demo.bd / ${DEMO_PASSWORD} (OWNER)\n` +
         `   Login: salesman@cctv-demo.bd / ${DEMO_PASSWORD} (SALESMAN)`
     );
   });
+
+  // ── 5. Super-admin (for the S05 admin control plane) ─────────────
+  const adminPasswordHash = await bcrypt.hash("admin123", 10);
+  const superAdmin = await adminDb.superAdmin.upsert({
+    where: { email: "admin@cctv-saas.bd" },
+    update: { passwordHash: adminPasswordHash },
+    create: {
+      email: "admin@cctv-saas.bd",
+      name: "Platform Admin",
+      passwordHash: adminPasswordHash,
+      status: "ACTIVE",
+    },
+  });
+  console.log(`✓ SuperAdmin: ${superAdmin.email} (password: admin123)`);
+  console.log(`\n✅ Seed complete.`);
 }
 
 main()

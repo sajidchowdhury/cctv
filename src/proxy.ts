@@ -1,12 +1,14 @@
 /**
  * Middleware — locked-tenant gate + auth redirect (doc §3.3).
  *
- * Page-level protection. API routes enforce auth via withTenant/withRole.
+ * Page-level protection. API routes enforce auth via withTenant/withRole/withAdmin.
  *
  * Logic:
  *   - Public paths (login, signup, verify-email, change-email, payment,
- *     api/auth/*, api/health, static assets) → pass through.
+ *     admin/*, api/*, static assets) → pass through. Admin pages self-gate
+ *     on session.user.role === "SUPER_ADMIN".
  *   - No token → redirect to /login (NextAuth withAuth default).
+ *   - SUPER_ADMIN tokens → allowed everywhere (admin control plane).
  *   - Token with LOCKED or PENDING_ACTIVATION status → redirect to /payment
  *     (unless already there).
  *   - Otherwise → allow.
@@ -20,6 +22,7 @@ import { NextResponse } from "next/server";
 
 export default withAuth(
   (req) => {
+    const role = req.nextauth.token?.role as string | undefined;
     const status = req.nextauth.token?.subscriptionStatus as
       | "ACTIVE"
       | "GRACE"
@@ -29,6 +32,9 @@ export default withAuth(
 
     const path = req.nextUrl.pathname;
 
+    // Super-admins go wherever they want (admin control plane).
+    if (role === "SUPER_ADMIN") return NextResponse.next();
+
     // Locked / pending activation → must visit /payment (only reachable screen).
     if (
       (status === "LOCKED" || status === "PENDING_ACTIVATION") &&
@@ -36,22 +42,19 @@ export default withAuth(
     ) {
       return NextResponse.redirect(new URL("/payment", req.url));
     }
-    // An active/grace user sitting on /payment is allowed (they may be viewing
-    // their renewal status); no forced redirect away.
   },
   {
     callbacks: {
       // A token means "authenticated" → authorised to proceed past the gate.
-      // The main function above then handles the locked redirect.
       authorized: ({ token }) => !!token,
     },
   }
 );
 
 export const config = {
-  // Match page routes only. API routes handle auth via withTenant/withRole.
-  // Excluded: auth pages, api/*, static assets, uploads.
+  // Match page routes only. API routes handle auth via withTenant/withRole/withAdmin.
+  // Excluded: api, auth pages, admin (self-gates on role), static assets, uploads.
   matcher: [
-    "/((?!api|login|signup|verify-email|change-email|payment|_next/static|_next/image|favicon.ico|logo.svg|robots.txt|uploads).*)",
+    "/((?!api|login|signup|verify-email|change-email|payment|admin|_next/static|_next/image|favicon.ico|logo.svg|robots.txt|uploads).*)",
   ],
 };

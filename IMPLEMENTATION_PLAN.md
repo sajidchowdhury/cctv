@@ -243,10 +243,15 @@ The technical document specifies a production stack (PostgreSQL 16, Redis 7 + Bu
 - `/admin/verifications` — admin verification queue.
 
 **Acceptance criteria:**
-- A brand-new signup cannot reach any business module (only `/payment`).
-- Admin verify extends `cycle_end` by exactly 30 days and lifts lock within 60s.
-- Day-41 lock hides every module; data preserved, not deleted.
-- Reject requires a reason; user receives retry SMS (adapter logs the SMS).
+- ✅ A brand-new signup cannot reach any business module (only `/payment`).
+- ✅ Admin verify extends `cycle_end` by exactly 30 days and lifts lock within 60s.
+- ✅ Day-41 lock hides every module; data preserved, not deleted.
+- ✅ Reject requires a reason; user receives retry SMS (adapter logs the SMS).
+- ✅ Pending user can still submit a payment (withTenantAny guard).
+- ✅ Admin login (shared auth, admin-credentials provider) → SUPER_ADMIN session.
+- ✅ Lifecycle worker auto-advances ACTIVE→GRACE→LOCKED based on time.
+
+**Status:** ✅ Complete (S05) — verified via curl API tests (full lifecycle) + Agent Browser (admin queue + tenant payment page on mobile).
 
 ---
 
@@ -668,7 +673,7 @@ After each phase is complete:
 
 | Phase | Status | Sessions done | Pushed (commit) |
 |-------|--------|---------------|------------------|
-| P0 Foundation | 🔄 In progress (S01 ✅, S02 ✅, S03 ✅, S04 ✅) | 4/5 | session(S04) |
+| P0 Foundation | ✅ Done (S01 ✅, S02 ✅, S03 ✅, S04 ✅, S05 ✅) | 5/5 | session(S05) |
 | P1 Catalogue & Stock | ☐ Not started | 0/4 | — |
 | P2 Sales & Invoicing | ☐ Not started | 0/5 | — |
 | P3 Accounting | ☐ Not started | 0/2 | — |
@@ -681,4 +686,4 @@ After each phase is complete:
 
 ---
 
-*End of implementation plan. Sessions S01–S04 complete — continue at Session S05.*
+*End of implementation plan. Phase P0 Foundation complete (S01–S05). Next: Phase P1 — Catalogue & Stock (Session S06).*

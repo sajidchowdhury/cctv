@@ -1,22 +1,27 @@
 /**
- * NextAuth.js v4 configuration — Session S03.
+ * NextAuth.js v4 configuration — Session S03 + S05.
  *
  * Doc §3.3: 1-email-per-account, no free trial, manual payment verification.
  *
- * Session shape carries: tenantId, role, subscriptionStatus — used by the
- * middleware (locked-tenant gate) and the withTenant/withRole API guards.
+ * Two credential providers share one NextAuth instance:
+ *   1. "credentials" — tenant users (OWNER/MANAGER/SALESMAN/ACCOUNTANT)
+ *   2. "admin-credentials" — super-admins (platform operator, doc §3.3.1)
  *
- * JWT refresh: the subscription status is re-read from the DB on each token
- * access if older than 60s, so an admin verify/lock takes effect quickly
- * without a re-login. (Bounded DB hit: 1 query / min / user.)
+ * Sharing one instance avoids dual-CSRF-cookie routing issues; the role
+ * field on the JWT distinguishes tenant vs admin sessions. The proxy + UI
+ * gate admin pages on role === "SUPER_ADMIN".
+ *
+ * Session shape carries: tenantId (null for admin), role, subscriptionStatus.
+ * JWT refresh: subscription status re-read from DB every 60s so admin
+ * verify/lock takes effect without re-login (doc §3.3 "within 60 seconds").
  */
 import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { adminDb } from "@/lib/db";
 
-/** Role enum (doc §3, §4). */
-export type Role = "OWNER" | "MANAGER" | "SALESMAN" | "ACCOUNTANT";
+/** Role enum — tenant roles + platform super-admin (doc §3, §3.3.1). */
+export type Role = "OWNER" | "MANAGER" | "SALESMAN" | "ACCOUNTANT" | "SUPER_ADMIN";
 
 /** Subscription lifecycle status (doc §3.3). */
 export type SubscriptionStatus =
@@ -33,8 +38,8 @@ declare module "next-auth" {
       email: string;
       name?: string | null;
       role: Role;
-      tenantId: string;
-      subscriptionStatus: SubscriptionStatus;
+      tenantId: string | null; // null for SUPER_ADMIN
+      subscriptionStatus: SubscriptionStatus | null; // null for SUPER_ADMIN
     };
   }
 }
@@ -42,9 +47,9 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     userId?: string;
-    tenantId?: string;
+    tenantId?: string | null;
     role?: Role;
-    subscriptionStatus?: SubscriptionStatus;
+    subscriptionStatus?: SubscriptionStatus | null;
     refreshedAt?: number;
   }
 }
@@ -53,10 +58,10 @@ declare module "next-auth/jwt" {
 const REFRESH_INTERVAL_MS = 60_000;
 
 export const authOptions: NextAuthOptions = {
-  // Credentials provider: email + password (doc §3.3).
-  // Email verification happens in a separate step before first login.
   providers: [
+    // ── 1. Tenant user credentials ───────────────────────────────
     CredentialsProvider({
+      id: "credentials",
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
@@ -66,14 +71,9 @@ export const authOptions: NextAuthOptions = {
         if (!credentials?.email || !credentials?.password) return null;
         const email = credentials.email.trim().toLowerCase();
 
-        // adminDb: user lookup is cross-tenant-neutral (email is global unique).
         const user = await adminDb.user.findUnique({
           where: { email },
-          include: {
-            tenant: {
-              include: { subscription: true },
-            },
-          },
+          include: { tenant: { include: { subscription: true } } },
         });
         if (!user || !user.passwordHash) return null;
         if (user.status !== "ACTIVE") return null;
@@ -89,6 +89,36 @@ export const authOptions: NextAuthOptions = {
           role: user.role as Role,
           tenantId: user.tenantId,
           subscriptionStatus: (sub?.status ?? "PENDING_ACTIVATION") as SubscriptionStatus,
+        } as any;
+      },
+    }),
+
+    // ── 2. Super-admin credentials (doc §3.3.1) ──────────────────
+    CredentialsProvider({
+      id: "admin-credentials",
+      name: "Admin Credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null;
+        const email = credentials.email.trim().toLowerCase();
+
+        const admin = await adminDb.superAdmin.findUnique({ where: { email } });
+        if (!admin || !admin.passwordHash) return null;
+        if (admin.status !== "ACTIVE") return null;
+
+        const ok = await bcrypt.compare(credentials.password, admin.passwordHash);
+        if (!ok) return null;
+
+        return {
+          id: admin.id,
+          email: admin.email,
+          name: admin.name,
+          role: "SUPER_ADMIN" as Role,
+          tenantId: null,
+          subscriptionStatus: null,
         } as any;
       },
     }),
@@ -113,11 +143,11 @@ export const authOptions: NextAuthOptions = {
         token.refreshedAt = Date.now();
         return token;
       }
-      // Periodic refresh of subscription status from DB (doc §3.3 lifecycle).
+      // Periodic refresh of subscription status from DB (tenant users only).
       const stale =
         !token.refreshedAt ||
         Date.now() - token.refreshedAt > REFRESH_INTERVAL_MS;
-      if (stale && token.tenantId) {
+      if (stale && token.tenantId && token.role !== "SUPER_ADMIN") {
         try {
           const sub = await adminDb.subscription.findUnique({
             where: { tenantId: token.tenantId },
@@ -137,9 +167,9 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.userId!;
-        session.user.tenantId = token.tenantId!;
+        session.user.tenantId = token.tenantId ?? null;
         session.user.role = token.role!;
-        session.user.subscriptionStatus = token.subscriptionStatus!;
+        session.user.subscriptionStatus = token.subscriptionStatus ?? null;
       }
       return session;
     },

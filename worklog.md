@@ -117,3 +117,50 @@ Stage Summary:
 - Acceptance: 3/3 original criteria + 2 bonus (blue accent, reusable components). All browser-verified.
 - Phase status: P0 Foundation now 4/5 sessions (S01 ✅, S02 ✅, S03 ✅, S04 ✅). Next: S05 — Subscription Lifecycle, Payment Verification & Admin Panel (completes P0).
 - Artifacts committed: globals.css, nav.ts, 12 layout components, (app) layout + dashboard, 9 module pages, IMPLEMENTATION_PLAN.md, worklog.md.
+
+---
+Task ID: S05
+Agent: Z.ai Code (main)
+Task: Session S05 — Subscription Lifecycle, Payment Verification & Admin Panel. Flat BDT 500/month plan, manual txn-ID verification by admin, day-25 reminder / day-30 grace / day-41 lock lifecycle, super-admin verification queue. Completes Phase P0 Foundation.
+
+Work Log:
+- Read S04 worklog + schema (Subscription/PaymentVerification/Tenant already in S02), auth.ts (S03), proxy.ts, payment page (placeholder).
+- Added SuperAdmin model to schema.prisma (separate from tenant Users; platform operator for payment verification). db:push applied.
+- Wrote src/lib/subscription.ts — lifecycle state machine: computeStatus() (pure), advanceSubscription() (persists status changes + sends day-25/grace/lock SMS via INotifier), verifyPayment() (extends cycleEnd +30d, lifts lock, SMS "renewed until DD-MM-YYYY"), rejectPayment() (requires reason, SMS "retry"). In-process reminder dedup (one per tenant per day).
+- Wrote src/lib/lifecycle-worker.ts — ticks every 60s, advances all subscriptions based on time. Started via src/instrumentation.ts (Next.js convention, runs once on server boot).
+- Wrote tenant billing API: POST /api/billing/submit-payment (Zod validation, creates PENDING PaymentVerification), GET /api/billing/history (returns history + subscription status). Both use withTenantAny (allows PENDING/LOCKED users — they must reach billing while locked).
+- Wrote admin verification API: GET /api/admin/verifications (queue with tenant name, txn ID, amount, age; filter by status), POST /api/admin/verifications/[id]/verify (+30d, ACTIVE), POST .../reject (reason required, SMS user), POST /api/admin/tenants/[id]/unlock (7-day grace extension).
+- Auth refactor: initially tried a separate NextAuth instance for admin (admin-auth.ts with custom cookies) — failed with "POST not supported" CSRF error. Refactored to a SINGLE shared NextAuth instance (auth.ts) with two credential providers: "credentials" (tenant) + "admin-credentials" (super-admin). The role field on the JWT distinguishes sessions. Removed admin-auth.ts + the separate /api/admin/auth route.
+- Updated session.ts: added withTenantAny (allows PENDING/LOCKED for billing routes), updated withTenant signature to pass (req, ctx) through to handlers, reject SUPER_ADMIN from tenant routes. Updated admin-session.ts (withAdmin passes req+ctx).
+- Updated proxy.ts: SUPER_ADMIN tokens bypass the locked-tenant gate; admin routes excluded from matcher (self-gate on role).
+- Fixed Next.js 16 async params: all [id] routes now `await ctx.params` instead of `ctx.params.id`.
+- Rewrote /payment page: full submit form (method select, amount, txn ID, paid date, sender number) + status banner (PENDING/ACTIVE/GRACE/LOCKED with tone) + payment history list (status badges, reject reason, verified date). Mobile-first.
+- Wrote /admin/login (signIn("admin-credentials")) + /admin/verifications queue UI (filter by status, verify/reject buttons, reject reason dialog, manual unlock, age badge for >24h submissions).
+- Updated seed.ts: creates SuperAdmin (admin@cctv-saas.bd / admin123).
+- Updated auth.ts: Role type now includes "SUPER_ADMIN"; tenantId/subscriptionStatus nullable for admin sessions.
+
+Bugs found + fixed:
+- Separate NextAuth instance for admin → CSRF "POST not supported" error. Fixed by sharing one instance with two providers.
+- withTenant blocked PENDING/LOCKED users from /api/billing/submit-payment → they couldn't submit their first payment! Added withTenantAny for billing routes.
+- withTenant/withRole handler signature didn't pass req → "Invalid JSON body". Fixed to pass (user, req, ctx).
+- ctx.params.id undefined in Next.js 16 (params is now a Promise). Fixed with `await ctx.params`.
+- Dev server kept dying between Bash tool calls (env limitation). Worked around by running server + tests in a single Bash command.
+
+Acceptance criteria (all pass — verified via curl + Agent Browser):
+- [x] Brand-new signup → PENDING_ACTIVATION, GET / → 307 redirect to /payment
+- [x] Pending user can submit payment (withTenantAny allows billing routes)
+- [x] Admin login (admin-credentials provider) → SUPER_ADMIN session, tenantId=null
+- [x] Admin verifies → cycleEnd +30 days, status ACTIVE, PV marked VERIFIED (curl: cycleEnd 2026-11-12)
+- [x] Admin rejects → 200 "Payment rejected. User notified to retry." (SMS logged via INotifier)
+- [x] Day-41 lock: advanceSubscription transitions ACTIVE→LOCKED when cycleEnd 41+ days past, sets lockedAt, SMS "account is locked"
+- [x] Locked user → GET / → 307 redirect to /payment (JWT refresh picked up LOCKED)
+- [x] Browser: admin login → /admin/verifications queue renders (no errors)
+- [x] Browser: pending user → /payment renders full submit form + status banner on mobile (375px)
+- [x] bun run lint clean (0 errors; 1 expected TanStack Table warning)
+
+Stage Summary:
+- Deliverables: SuperAdmin model, subscription.ts (lifecycle state machine + verify/reject), lifecycle-worker.ts + instrumentation.ts, 7 API routes (submit-payment, history, verifications list/verify/reject, tenant unlock, [shared] NextAuth), auth.ts refactor (two providers, SUPER_ADMIN role), session.ts (withTenantAny), admin-session.ts (withAdmin), proxy.ts (SUPER_ADMIN bypass), /payment page rewrite, /admin/login + /admin/verifications UI, seed.ts (super-admin).
+- Key decision: single shared NextAuth instance with two credential providers (tenant + admin) instead of separate instances — avoids dual-CSRF-cookie routing issues. The role field on the JWT (OWNER/MANAGER/SALESMAN/ACCOUNTANT/SUPER_ADMIN) distinguishes session types. withTenantAny allows PENDING/LOCKED users to reach billing routes (they must submit payments while locked).
+- Acceptance: 4/4 original criteria + 3 bonus. Full lifecycle verified end-to-end: signup→pending→submit→admin verify→+30d active; reject→SMS; day-41 lock→/payment.
+- Phase status: P0 Foundation COMPLETE (S01–S05 ✅, 5/5). Next: Phase P1 — Catalogue & Stock (S06).
+- Artifacts committed: schema.prisma (SuperAdmin), subscription.ts, lifecycle-worker.ts, instrumentation.ts, 7 API routes, auth.ts refactor, session.ts, admin-session.ts, proxy.ts, /payment page, /admin login + verifications UI, seed.ts.
