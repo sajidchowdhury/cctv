@@ -32,6 +32,7 @@ export const GET = withTenant(async (user, req: Request) => {
     select: {
       id: true, name: true, phone: true, company: true,
       openingBalance: true, currentBalance: true, createdAt: true,
+      deletedAt: true,
     },
   });
   if (!supplier || supplier.deletedAt) {

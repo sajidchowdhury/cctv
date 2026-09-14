@@ -12,7 +12,7 @@ export const GET = withTenantAny(async (user) => {
     db.product.count({ where: { deletedAt: null } }),
     db.supplier.count({ where: { deletedAt: null } }),
     db.sale.count({ where: { deletedAt: null, isHeld: false } }),
-    db.tenant.findUnique({ where: { id: user.tenantId }, select: { name: true, phone: true, address: true } }),
+    db.tenant.findUnique({ where: { id: user.tenantId! }, select: { name: true, phone: true, address: true } }),
   ]);
 
   const steps = {

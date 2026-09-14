@@ -11,7 +11,7 @@ import { withTenantAny } from "@/lib/session";
 export const GET = withTenantAny(async (user) => {
   const [history, subscription] = await Promise.all([
     adminDb.paymentVerification.findMany({
-      where: { tenantId: user.tenantId },
+      where: { tenantId: user.tenantId! },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -27,7 +27,7 @@ export const GET = withTenantAny(async (user) => {
       },
     }),
     adminDb.subscription.findUnique({
-      where: { tenantId: user.tenantId },
+      where: { tenantId: user.tenantId! },
       select: { status: true, cycleEnd: true, startedAt: true, plan: true },
     }),
   ]);

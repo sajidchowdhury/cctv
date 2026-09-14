@@ -227,18 +227,31 @@ function buildTenantExtension() {
 }
 
 /**
+ * Build the singleton Prisma client WITH the tenant-isolation extension.
+ *
+ * Extracted into a factory so the extended client type can be named via
+ * `ReturnType<typeof createDb>` — the type returned by `PrismaClient.$extends(...)`
+ * (`DynamicClientExtensionThis<...>`) is NOT assignable to `PrismaClient`
+ * (extensions drop lifecycle methods like `$on`), so the dev-mode global cache
+ * must be typed with the actual extended client type, not `PrismaClient`.
+ */
+function createDb() {
+  return new PrismaClient({
+    log: ["warn", "error"],
+  }).$extends(buildTenantExtension());
+}
+
+type DbClient = ReturnType<typeof createDb>;
+
+/**
  * Singleton Prisma client WITH the tenant-isolation extension.
  * Use everywhere in tenant-scoped app code.
  */
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+  prisma: DbClient | undefined;
 };
 
-export const db =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: ["warn", "error"],
-  }).$extends(buildTenantExtension());
+export const db = globalForPrisma.prisma ?? createDb();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
 

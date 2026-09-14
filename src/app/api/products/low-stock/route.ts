@@ -55,7 +55,7 @@ export const GET = withTenant(async (user, req: Request) => {
   // Fire digest SMS only when explicitly requested (e.g. after a sale in S11).
   if (notify && lowStock.length > 0) {
     const tenant = await adminDb.tenant.findUnique({
-      where: { id: user.tenantId },
+      where: { id: user.tenantId! },
       select: { phone: true, name: true },
     });
     if (tenant?.phone) {

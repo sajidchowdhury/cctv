@@ -32,6 +32,7 @@ export const GET = withTenant(async (user, _req: Request, ctx: any) => {
       imageUrl: true,
       createdAt: true,
       updatedAt: true,
+      deletedAt: true,
       category: { select: { id: true, name: true } },
       unit: { select: { id: true, name: true } },
     },

@@ -36,7 +36,7 @@ export const POST = withTenant(async (user, req: Request) => {
   }
   try {
     const head = await db.accountHead.create({
-      data: parsed.data,
+      data: { ...parsed.data, tenantId: user.tenantId! },
       select: { id: true, name: true, kind: true },
     });
     return NextResponse.json({ accountHead: head }, { status: 201 });

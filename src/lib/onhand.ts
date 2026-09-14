@@ -11,9 +11,30 @@
  * (products list, product detail, low-stock, sales search, stock-summary report)
  * stay in sync.
  */
-import type { Prisma, PrismaClient } from "@prisma/client";
+import { db } from "./db";
 
-type Tx = PrismaClient | Prisma.TransactionClient;
+/**
+ * Client parameter type for on-hand stock computation.
+ *
+ * All callers in the codebase pass the tenant-scoped singleton `db` (the
+ * Prisma client extended with the tenant-isolation extension). All
+ * `$transaction` usages in the codebase go through `adminDb` (the raw
+ * client) and never pass their `tx` into these helpers, so there is no need
+ * to also accept `Prisma.TransactionClient`.
+ *
+ * Using `typeof db` (rather than `PrismaClient | Prisma.TransactionClient`)
+ * is required because `db`'s type is `DynamicClientExtensionThis<...>` from
+ * `PrismaClient.$extends(...)` — the extended client is NOT assignable to
+ * `PrismaClient` (extensions drop lifecycle methods like `$on`). It also
+ * avoids a TypeScript union-of-callables issue where `groupBy`'s generic
+ * signatures don't unify across the two union members.
+ *
+ * If a future caller needs to invoke these helpers inside a `db.$transaction`
+ * callback (with the EXTENDED `db`, not `adminDb`), revisit this type — the
+ * transaction `tx` is also extended and may or may not be assignable to
+ * `typeof db` depending on Prisma's inference.
+ */
+type Tx = typeof db;
 
 /**
  * Compute onHand for a single product.

@@ -23,7 +23,7 @@ export const GET = withTenant(async (user, req: Request) => {
   const month = url.searchParams.get("month") ?? "";
   const records = await db.salaryRecord.findMany({
     where: {
-      tenantId: user.tenantId,
+      tenantId: user.tenantId!,
       ...(month ? { month } : {}),
     },
     include: { employee: { select: { id: true, name: true, role: true } } },

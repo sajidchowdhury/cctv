@@ -40,6 +40,7 @@ export const GET = withTenant(async (user, req: Request) => {
     select: {
       id: true, name: true, phone: true,
       openingBalance: true, currentBalance: true, createdAt: true,
+      deletedAt: true,
     },
   });
   if (!customer || customer.deletedAt) {

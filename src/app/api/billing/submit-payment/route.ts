@@ -36,7 +36,7 @@ export const POST = withTenantAny(async (user, req: Request) => {
 
   const pv = await adminDb.paymentVerification.create({
     data: {
-      tenantId: user.tenantId,
+      tenantId: user.tenantId!,
       method,
       txnId: txnId.trim(),
       amount,
