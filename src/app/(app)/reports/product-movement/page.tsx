@@ -33,7 +33,7 @@ export default function ProductMovementReportPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["report-product-movement", appliedProductId, appliedFrom, appliedTo],
     queryFn: async () => {
-      const url = `/api/reports/product-movement?from=${appliedFrom}&to=${appliedTo}${appliedProductId ? `&productId=${appliedProductId}` : ""}`;
+      const url = `/cctv/api/reports/product-movement?from=${appliedFrom}&to=${appliedTo}${appliedProductId ? `&productId=${appliedProductId}` : ""}`;
       return await (await fetch(url)).json();
     },
   });

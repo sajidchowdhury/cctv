@@ -36,7 +36,7 @@ export default function ProductsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["products", search, lowOnly],
     queryFn: async () => {
-      const url = `/api/products?q=${encodeURIComponent(search)}${lowOnly ? "&lowStock=1" : ""}`;
+      const url = `/cctv/api/products?q=${encodeURIComponent(search)}${lowOnly ? "&lowStock=1" : ""}`;
       const r = await fetch(url);
       return (await r.json()).products as Product[];
     },

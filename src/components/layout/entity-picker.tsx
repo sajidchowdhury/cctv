@@ -85,8 +85,7 @@ export function EntityPicker({
     setCreateOpen(true);
   }
 
-  async function onCreate(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleCreate() {
     const name = newName.trim();
     if (!name) {
       toast({ title: "Name required", description: `${label} name cannot be empty.`, variant: "destructive" });
@@ -209,7 +208,9 @@ export function EntityPicker({
               Create a {label.toLowerCase()} without leaving this form. It&apos;s auto-selected when saved.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={onCreate} className="space-y-3 py-2">
+          {/* Use a div (not form) to prevent any form submission from
+              bubbling up to a parent form and causing a page refresh. */}
+          <div className="space-y-3 py-2">
             <div className="space-y-1">
               <Label htmlFor={`ep-name-${label}`}>Name *</Label>
               <Input
@@ -218,6 +219,12 @@ export function EntityPicker({
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder={namePlaceholder}
                 autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !creating && !duplicate && newName.trim()) {
+                    e.preventDefault();
+                    handleCreate();
+                  }
+                }}
               />
               {duplicate && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 mt-1">
@@ -228,12 +235,16 @@ export function EntityPicker({
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={creating || !newName.trim() || duplicate}>
+              <Button
+                type="button"
+                disabled={creating || !newName.trim() || duplicate}
+                onClick={handleCreate}
+              >
                 {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
                 Create {label.toLowerCase()}
               </Button>
             </DialogFooter>
-          </form>
+          </div>
         </DialogContent>
       </Dialog>
     </>

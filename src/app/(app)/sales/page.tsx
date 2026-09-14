@@ -33,7 +33,7 @@ export default function SalesPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["sales", search, heldOnly],
     queryFn: async () => {
-      const url = `/api/sales?q=${encodeURIComponent(search)}${heldOnly ? "&held=1" : ""}`;
+      const url = `/cctv/api/sales?q=${encodeURIComponent(search)}${heldOnly ? "&held=1" : ""}`;
       return (await (await fetch(url)).json()).sales as Sale[];
     },
   });
