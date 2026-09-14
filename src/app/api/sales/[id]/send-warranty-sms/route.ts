@@ -55,7 +55,7 @@ export const POST = withTenant(async (user, _req: Request, ctx: any) => {
 
   // One SMS per sale (digest): list serials + warranty end.
   const serialsList = warrantied
-    .map((it) => `${it.product.name}: ${it.inventoryUnit!.serialNo}`)
+    .map((it) => `${it.product?.name ?? "—"}: ${it.inventoryUnit!.serialNo}`)
     .join(", ");
   const firstEnd = warrantied[0].inventoryUnit!.warrantyEnd!;
   const endStr = firstEnd.toLocaleDateString("en-GB", {

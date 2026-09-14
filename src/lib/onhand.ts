@@ -197,7 +197,10 @@ export async function computeOnHandBatch(
     }
     const soldMap = new Map<string, number>();
     for (const row of soldAgg) {
-      soldMap.set(row.productId, row._sum.qty ?? 0);
+      // row.productId is typed `string | null` by Prisma's groupBy (the relation
+      // filter `sale: { deletedAt: null }` widens the inferred type). The schema
+      // guarantees productId is non-null (required FK), so guard + skip nulls.
+      if (row.productId) soldMap.set(row.productId, row._sum.qty ?? 0);
     }
     for (const id of nonSerialisedIds) {
       const purchased = purchasedMap.get(id) ?? 0;
