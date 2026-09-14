@@ -16,7 +16,7 @@ const STEPS = [
 export function OnboardingBanner() {
   const { data } = useQuery({
     queryKey: ["onboarding-status"],
-    queryFn: async () => (await (await fetch("/api/onboarding/status")).json()),
+    queryFn: async () => (await (await fetch("/cctv/api/onboarding/status")).json()),
   });
 
   if (!data || data.completed) return null;

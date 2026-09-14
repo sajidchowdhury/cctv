@@ -10,7 +10,7 @@
  * Usage:
  *   <InlineEntityCreator
  *     label="Category"
- *     endpoint="/api/categories"
+ *     endpoint="/cctv/api/categories"
  *     bodyBuilder={(name) => ({ name })}
  *     onCreated={(entity) => { ... select it in the dropdown ... }}
  *     trigger={<Button variant="outline" size="icon"><Plus className="h-4 w-4" /></Button>}

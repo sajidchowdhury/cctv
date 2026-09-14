@@ -26,7 +26,7 @@ export default function PayrollSheetPage() {
 
   async function loadEmployees() {
     setLoading(true);
-    const res = await fetch("/api/employees?status=ACTIVE");
+    const res = await fetch("/cctv/api/employees?status=ACTIVE");
     const data = await res.json();
     setEmployees(data.employees ?? []);
     // Initialize records with employee basic salary.
@@ -59,7 +59,7 @@ export default function PayrollSheetPage() {
     for (const e of employees) {
       const r = records[e.id];
       if (!r) continue;
-      const res = await fetch("/api/salary-records", {
+      const res = await fetch("/cctv/api/salary-records", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

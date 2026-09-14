@@ -32,12 +32,12 @@ export default function NewReceiptPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
 
   useEffect(() => {
-    fetch("/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers ?? []));
+    fetch("/cctv/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers ?? []));
   }, []);
 
   useEffect(() => {
     if (!customerId) { setInvoices([]); return; }
-    fetch(`/api/invoices/open?type=customer&partyId=${customerId}`).then((r) => r.json()).then((d) => setInvoices(d.invoices ?? []));
+    fetch(`/cctv/api/invoices/open?type=customer&partyId=${customerId}`).then((r) => r.json()).then((d) => setInvoices(d.invoices ?? []));
   }, [customerId]);
 
   const selectedCustomer = customers.find((c) => c.id === customerId);
@@ -46,7 +46,7 @@ export default function NewReceiptPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch("/api/receipts", {
+      const res = await fetch("/cctv/api/receipts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

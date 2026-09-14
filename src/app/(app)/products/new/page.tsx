@@ -37,8 +37,8 @@ export default function NewProductPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/categories").then((r) => r.json()),
-      fetch("/api/units").then((r) => r.json()),
+      fetch("/cctv/api/categories").then((r) => r.json()),
+      fetch("/cctv/api/units").then((r) => r.json()),
     ]).then(([c, u]) => {
       setCategories(c.categories ?? []);
       setUnits(u.units ?? []);
@@ -57,7 +57,7 @@ export default function NewProductPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch("/api/products", {
+      const res = await fetch("/cctv/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -120,7 +120,7 @@ export default function NewProductPage() {
                   {/* F7-S1: inline category creation */}
                   <InlineEntityCreator
                     label="Category"
-                    endpoint="/api/categories"
+                    endpoint="/cctv/api/categories"
                     bodyBuilder={(name) => ({ name })}
                     onCreated={(c) => {
                       setCategories((cats) => [...cats, c].sort((a, b) => a.name.localeCompare(b.name)));
@@ -149,7 +149,7 @@ export default function NewProductPage() {
                   {/* F7-S1: inline unit creation */}
                   <InlineEntityCreator
                     label="Unit"
-                    endpoint="/api/units"
+                    endpoint="/cctv/api/units"
                     bodyBuilder={(name) => ({ name })}
                     onCreated={(u) => {
                       setUnits((us) => [...us, u].sort((a, b) => a.name.localeCompare(b.name)));

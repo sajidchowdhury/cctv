@@ -34,7 +34,7 @@ export default function CrmPage() {
       const params = new URLSearchParams();
       if (search) params.set("q", search);
       if (callListDays > 0) params.set("days", String(callListDays));
-      return (await (await fetch(`/api/crm/customers?${params}`)).json()).customers as Customer[];
+      return (await (await fetch(`/cctv/api/crm/customers?${params}`)).json()).customers as Customer[];
     },
   });
   const customers = data ?? [];

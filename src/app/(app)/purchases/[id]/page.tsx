@@ -21,7 +21,7 @@ export default function PurchaseDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["purchase", id],
-    queryFn: async () => (await (await fetch(`/api/purchases/${id}`)).json()).purchase,
+    queryFn: async () => (await (await fetch(`/cctv/api/purchases/${id}`)).json()).purchase,
     enabled: !!id,
   });
 
@@ -64,7 +64,7 @@ export default function PurchaseDetailPage() {
               onConfirm={async () => {
                 setDeleting(true);
                 try {
-                  const res = await fetch(`/api/purchases/${id}`, { method: "DELETE" });
+                  const res = await fetch(`/cctv/api/purchases/${id}`, { method: "DELETE" });
                   const data = await res.json();
                   if (!res.ok) {
                     toast({ title: "Failed", description: data.error ?? "Delete failed.", variant: "destructive" });

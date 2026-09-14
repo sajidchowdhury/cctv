@@ -16,7 +16,7 @@ export default function StockByCategoryReportPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-stock-by-category"],
-    queryFn: async () => await (await fetch("/api/reports/stock-by-category")).json(),
+    queryFn: async () => await (await fetch("/cctv/api/reports/stock-by-category")).json(),
   });
 
   const categories: any[] = data?.categories ?? [];

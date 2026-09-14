@@ -20,7 +20,7 @@ export default function IncomeExpenseReportPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-ie", af, at],
-    queryFn: async () => (await (await fetch(`/api/reports/income-expense?from=${af}&to=${at}`)).json()),
+    queryFn: async () => (await (await fetch(`/cctv/api/reports/income-expense?from=${af}&to=${at}`)).json()),
   });
 
   const heads = data?.heads ?? [];

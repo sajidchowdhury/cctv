@@ -27,12 +27,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
   // Register service worker for PWA offline support (doc §6).
   useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
+      navigator.serviceWorker.register("/cctv/sw.js").catch(() => {});
     }
   }, []);
 
   return (
-    <SessionProvider>
+    <SessionProvider basePath="/cctv/api/auth">
       <QueryClientProvider client={queryClient}>
         <ThemeProvider
           attribute="class"

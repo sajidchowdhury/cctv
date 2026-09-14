@@ -35,14 +35,14 @@ export default function QuotationDetailPage() {
 
   const { data: detail, isLoading } = useQuery({
     queryKey: ["quotation", id],
-    queryFn: async () => (await (await fetch(`/api/quotations/${id}`)).json()).quotation,
+    queryFn: async () => (await (await fetch(`/cctv/api/quotations/${id}`)).json()).quotation,
     enabled: !!id,
   });
 
   async function updateStatus(status: string, lossReason?: string) {
     setBusy(status);
     try {
-      const res = await fetch(`/api/quotations/${id}`, {
+      const res = await fetch(`/cctv/api/quotations/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, lossReason: lossReason ?? null }),
@@ -62,7 +62,7 @@ export default function QuotationDetailPage() {
   async function onConvert() {
     setBusy("convert");
     try {
-      const res = await fetch(`/api/quotations/${id}/convert`, { method: "POST" });
+      const res = await fetch(`/cctv/api/quotations/${id}/convert`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
         toast({ title: "Failed", description: data.error, variant: "destructive" });
@@ -83,7 +83,7 @@ export default function QuotationDetailPage() {
   async function onDuplicate() {
     setBusy("dup");
     try {
-      const res = await fetch(`/api/quotations/${id}/duplicate`, { method: "POST" });
+      const res = await fetch(`/cctv/api/quotations/${id}/duplicate`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
         toast({ title: "Failed", description: data.error, variant: "destructive" });

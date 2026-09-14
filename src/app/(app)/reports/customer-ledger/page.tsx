@@ -27,7 +27,7 @@ export default function CustomerLedgerReportPage() {
   // Load customer list for the party picker.
   const { data: customersData } = useQuery({
     queryKey: ["customers"],
-    queryFn: async () => (await (await fetch("/api/customers")).json()).customers as Customer[],
+    queryFn: async () => (await (await fetch("/cctv/api/customers")).json()).customers as Customer[],
   });
   const customers = customersData ?? [];
 
@@ -35,7 +35,7 @@ export default function CustomerLedgerReportPage() {
     queryKey: ["report-customer-ledger", appliedCustomerId, appliedFrom, appliedTo],
     queryFn: async () => {
       if (!appliedCustomerId) return null;
-      return await (await fetch(`/api/reports/customer-ledger?partyId=${appliedCustomerId}&from=${appliedFrom}&to=${appliedTo}`)).json();
+      return await (await fetch(`/cctv/api/reports/customer-ledger?partyId=${appliedCustomerId}&from=${appliedFrom}&to=${appliedTo}`)).json();
     },
     enabled: !!appliedCustomerId,
   });

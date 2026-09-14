@@ -22,7 +22,7 @@ export default function SaleDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["sale", id],
-    queryFn: async () => (await (await fetch(`/api/sales/${id}`)).json()).sale,
+    queryFn: async () => (await (await fetch(`/cctv/api/sales/${id}`)).json()).sale,
     enabled: !!id,
   });
 
@@ -51,7 +51,7 @@ export default function SaleDetailPage() {
               <Printer className="mr-2 h-4 w-4" /> Print
             </Button>
             <Button asChild variant="outline" size="sm">
-              <a href={`/api/sales/${id}/warranty-card.pdf`} target="_blank" rel="noopener noreferrer">
+              <a href={`/cctv/api/sales/${id}/warranty-card.pdf`} target="_blank" rel="noopener noreferrer">
                 <ShieldCheck className="mr-2 h-4 w-4" /> Warranty card
               </a>
             </Button>
@@ -62,7 +62,7 @@ export default function SaleDetailPage() {
               onClick={async () => {
                 setSmsBusy(true);
                 try {
-                  const res = await fetch(`/api/sales/${id}/send-warranty-sms`, { method: "POST" });
+                  const res = await fetch(`/cctv/api/sales/${id}/send-warranty-sms`, { method: "POST" });
                   const data = await res.json();
                   if (!res.ok) {
                     toast({ title: "Failed", description: data.error ?? "SMS not sent.", variant: "destructive" });
@@ -98,7 +98,7 @@ export default function SaleDetailPage() {
               onConfirm={async () => {
                 setDeleting(true);
                 try {
-                  const res = await fetch(`/api/sales/${id}`, { method: "DELETE" });
+                  const res = await fetch(`/cctv/api/sales/${id}`, { method: "DELETE" });
                   const data = await res.json();
                   if (!res.ok) {
                     toast({ title: "Failed", description: data.error ?? "Delete failed.", variant: "destructive" });

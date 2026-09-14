@@ -24,7 +24,7 @@ export default function PurchaseReportPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-purchase", af, at],
-    queryFn: async () => (await (await fetch(`/api/reports/purchase?from=${af}&to=${at}`)).json()),
+    queryFn: async () => (await (await fetch(`/cctv/api/reports/purchase?from=${af}&to=${at}`)).json()),
   });
 
   const purchases: Purchase[] = data?.purchases ?? [];

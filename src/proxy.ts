@@ -36,12 +36,12 @@ export default withAuth(
     if (role === "SUPER_ADMIN") return NextResponse.next();
 
     // Locked / pending activation → must visit /payment (only reachable screen).
-    if (
-      (status === "LOCKED" || status === "PENDING_ACTIVATION") &&
-      path !== "/payment"
-    ) {
-      return NextResponse.redirect(new URL("/payment", req.url));
-    }
+if (
+  (status === "LOCKED" || status === "PENDING_ACTIVATION") &&
+  path !== "/cctv/payment"
+) {
+  return NextResponse.redirect(new URL("/cctv/payment", req.url));
+}
   },
   {
     callbacks: {
@@ -55,6 +55,6 @@ export const config = {
   // Match page routes only. API routes handle auth via withTenant/withRole/withAdmin.
   // Excluded: api, auth pages, admin (self-gates on role), static assets, uploads.
   matcher: [
-    "/((?!api|login|signup|verify-email|change-email|payment|admin|manifest.json|sw.js|_next/static|_next/image|favicon.ico|logo.svg|robots.txt|uploads).*)",
-  ],
+  "/((?!api|login|signup|verify-email|change-email|payment|admin|manifest.json|sw.js|_next/static|_next/image|favicon.ico|logo.svg|robots.txt|uploads).*)",
+],
 };

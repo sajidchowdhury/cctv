@@ -22,7 +22,7 @@ export default function NewEmployeePage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch("/api/employees", {
+      const res = await fetch("/cctv/api/employees", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

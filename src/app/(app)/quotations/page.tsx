@@ -36,7 +36,7 @@ const STATUS_TONE: Record<string, string> = {
 export default function QuotationsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["quotations"],
-    queryFn: async () => (await (await fetch("/api/quotations")).json()).quotations as Quote[],
+    queryFn: async () => (await (await fetch("/cctv/api/quotations")).json()).quotations as Quote[],
   });
   const quotes = data ?? [];
 

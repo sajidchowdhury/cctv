@@ -25,7 +25,7 @@ export default function SignupPage() {
   const [feeDisplay, setFeeDisplay] = useState("BDT 500");
 
   useEffect(() => {
-    fetch("/api/public/fee")
+    fetch("/cctv/api/public/fee")
       .then((r) => r.json())
       .then((d) => { if (d.monthlyFeeDisplay) setFeeDisplay(d.monthlyFeeDisplay); })
       .catch(() => {}); // fall back to default
@@ -43,7 +43,7 @@ export default function SignupPage() {
     setError(null);
     setEmailTaken(false);
     try {
-      const res = await fetch("/api/auth/signup", {
+      const res = await fetch("/cctv/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),

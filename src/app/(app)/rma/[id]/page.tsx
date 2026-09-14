@@ -32,7 +32,7 @@ export default function RmaDetailPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["rma-detail", id],
-    queryFn: async () => (await (await fetch(`/api/rma/${id}`)).json()).ticket,
+    queryFn: async () => (await (await fetch(`/cctv/api/rma/${id}`)).json()).ticket,
     enabled: !!id,
   });
 
@@ -47,7 +47,7 @@ export default function RmaDetailPage() {
   async function transition(stage: string) {
     setBusy(true);
     try {
-      const res = await fetch(`/api/rma/${id}/transition`, {
+      const res = await fetch(`/cctv/api/rma/${id}/transition`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ stage, notes: transitionNotes || null }),
       });

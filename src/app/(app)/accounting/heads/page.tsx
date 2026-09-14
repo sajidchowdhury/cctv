@@ -25,14 +25,14 @@ export default function AccountHeadsPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch("/api/account-heads").then((r) => r.json()).then((d) => { setHeads(d.accountHeads ?? []); setLoading(false); });
+    fetch("/cctv/api/account-heads").then((r) => r.json()).then((d) => { setHeads(d.accountHeads ?? []); setLoading(false); });
   }, []);
 
   async function onAdd(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch("/api/account-heads", {
+      const res = await fetch("/cctv/api/account-heads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, kind }),

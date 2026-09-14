@@ -2,10 +2,16 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+
+  // CCTV SaaS is served at https://inventoryos.xyz/cctv
+  basePath: "/cctv",
+
   typescript: {
     ignoreBuildErrors: true,
   },
+
   reactStrictMode: false,
+
   // PWA: allow manifest + service worker
   async headers() {
     return [

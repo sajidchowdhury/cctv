@@ -33,7 +33,7 @@ export default function RmaPage() {
   const [stageFilter, setStageFilter] = useState("");
   const { data, isLoading } = useQuery({
     queryKey: ["rma-tickets", search, stageFilter],
-    queryFn: async () => (await (await fetch(`/api/rma?q=${encodeURIComponent(search)}${stageFilter ? `&stage=${stageFilter}` : ""}`)).json()).tickets as Ticket[],
+    queryFn: async () => (await (await fetch(`/cctv/api/rma?q=${encodeURIComponent(search)}${stageFilter ? `&stage=${stageFilter}` : ""}`)).json()).tickets as Ticket[],
   });
   const tickets = data ?? [];
 

@@ -36,7 +36,7 @@ export default function QuotationRegisterReportPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-quote-register", af, at, status],
-    queryFn: async () => (await (await fetch(`/api/reports/quotation-register?from=${af}&to=${at}${status !== "ALL" ? `&status=${status}` : ""}`)).json()),
+    queryFn: async () => (await (await fetch(`/cctv/api/reports/quotation-register?from=${af}&to=${at}${status !== "ALL" ? `&status=${status}` : ""}`)).json()),
   });
 
   const quotes: Quote[] = data?.quotes ?? [];

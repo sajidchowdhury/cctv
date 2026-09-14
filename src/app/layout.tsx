@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     "accounting",
   ],
   authors: [{ name: "CCTV Inventory SaaS" }],
-  manifest: "/manifest.json",
+  manifest: "/cctv/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

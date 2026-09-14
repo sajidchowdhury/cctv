@@ -28,7 +28,7 @@ export default function NewTransactionPage() {
   const [narration, setNarration] = useState("");
 
   useEffect(() => {
-    fetch("/api/account-heads").then((r) => r.json()).then((d) => setHeads(d.accountHeads ?? []));
+    fetch("/cctv/api/account-heads").then((r) => r.json()).then((d) => setHeads(d.accountHeads ?? []));
   }, []);
 
   const filteredHeads = heads.filter((h) => h.kind === type);
@@ -37,7 +37,7 @@ export default function NewTransactionPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch("/api/transactions", {
+      const res = await fetch("/cctv/api/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

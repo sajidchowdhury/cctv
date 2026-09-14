@@ -27,13 +27,13 @@ export default function CustomerDetailPage() {
 
   const { data: detail, isLoading } = useQuery({
     queryKey: ["customer", id],
-    queryFn: async () => (await (await fetch(`/api/customers/${id}`)).json()).customer,
+    queryFn: async () => (await (await fetch(`/cctv/api/customers/${id}`)).json()).customer,
     enabled: !!id,
   });
 
   const { data: ledgerData } = useQuery({
     queryKey: ["customer-ledger", id],
-    queryFn: async () => (await (await fetch(`/api/customers/${id}/ledger`)).json()),
+    queryFn: async () => (await (await fetch(`/cctv/api/customers/${id}/ledger`)).json()),
     enabled: !!id,
   });
 
@@ -55,7 +55,7 @@ export default function CustomerDetailPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch(`/api/customers/${id}`, {
+      const res = await fetch(`/cctv/api/customers/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -80,7 +80,7 @@ export default function CustomerDetailPage() {
   }
 
   async function onDelete() {
-    const res = await fetch(`/api/customers/${id}`, { method: "DELETE" });
+    const res = await fetch(`/cctv/api/customers/${id}`, { method: "DELETE" });
     if (res.ok) {
       toast({ title: "Deleted", description: "Customer removed." });
       router.push("/customers");

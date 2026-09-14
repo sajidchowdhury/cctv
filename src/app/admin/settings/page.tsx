@@ -46,7 +46,7 @@ export default function AdminSettingsPage() {
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/settings");
+      const res = await fetch("/cctv/api/admin/settings");
       const data = await res.json();
       if (data.settings) {
         setSettings(data.settings);
@@ -67,7 +67,7 @@ export default function AdminSettingsPage() {
     setSaving(true);
     setToast(null);
     try {
-      const res = await fetch("/api/admin/settings", {
+      const res = await fetch("/cctv/api/admin/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

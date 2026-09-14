@@ -20,7 +20,7 @@ export default function SalarySheetReportPage() {
   const [month, setMonth] = useState("");
   const { data, isLoading } = useQuery({
     queryKey: ["report-salary-sheet", month],
-    queryFn: async () => (await (await fetch(`/api/reports/salary-sheet${month ? `?month=${month}` : ""}`)).json()),
+    queryFn: async () => (await (await fetch(`/cctv/api/reports/salary-sheet${month ? `?month=${month}` : ""}`)).json()),
   });
 
   const records: Record[] = data?.records ?? [];

@@ -26,7 +26,7 @@ export default function SupplierLedgerReportPage() {
 
   const { data: suppliersData } = useQuery({
     queryKey: ["suppliers"],
-    queryFn: async () => (await (await fetch("/api/suppliers")).json()).suppliers as Supplier[],
+    queryFn: async () => (await (await fetch("/cctv/api/suppliers")).json()).suppliers as Supplier[],
   });
   const suppliers = suppliersData ?? [];
 
@@ -34,7 +34,7 @@ export default function SupplierLedgerReportPage() {
     queryKey: ["report-supplier-ledger", appliedSupplierId, appliedFrom, appliedTo],
     queryFn: async () => {
       if (!appliedSupplierId) return null;
-      return await (await fetch(`/api/reports/supplier-ledger?partyId=${appliedSupplierId}&from=${appliedFrom}&to=${appliedTo}`)).json();
+      return await (await fetch(`/cctv/api/reports/supplier-ledger?partyId=${appliedSupplierId}&from=${appliedFrom}&to=${appliedTo}`)).json();
     },
     enabled: !!appliedSupplierId,
   });

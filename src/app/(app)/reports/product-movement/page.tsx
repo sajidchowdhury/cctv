@@ -26,7 +26,7 @@ export default function ProductMovementReportPage() {
 
   const { data: productsData } = useQuery({
     queryKey: ["products"],
-    queryFn: async () => (await (await fetch("/api/products")).json()).products as Product[],
+    queryFn: async () => (await (await fetch("/cctv/api/products")).json()).products as Product[],
   });
   const products = productsData ?? [];
 

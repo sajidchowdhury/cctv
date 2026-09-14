@@ -21,7 +21,7 @@ export default function CashBookPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["cash-book", appliedFrom, appliedTo],
-    queryFn: async () => (await (await fetch(`/api/reports/cash-book?from=${appliedFrom}&to=${appliedTo}`)).json()),
+    queryFn: async () => (await (await fetch(`/cctv/api/reports/cash-book?from=${appliedFrom}&to=${appliedTo}`)).json()),
   });
 
   const cb = data;

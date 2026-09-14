@@ -27,7 +27,7 @@ export default function EmployeeDetailPage() {
 
   const { data: employee, isLoading } = useQuery({
     queryKey: ["employee", id],
-    queryFn: async () => (await (await fetch(`/api/employees/${id}`)).json()).employee,
+    queryFn: async () => (await (await fetch(`/cctv/api/employees/${id}`)).json()).employee,
     enabled: !!id,
   });
 
@@ -39,7 +39,7 @@ export default function EmployeeDetailPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch(`/api/employees/${id}`, {
+      const res = await fetch(`/cctv/api/employees/${id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: form.name, phone: form.phone || null, role: form.role, salary: Number(form.salary) || 0, status: form.status }),
       });
@@ -50,12 +50,12 @@ export default function EmployeeDetailPage() {
   }
 
   async function onDelete() {
-    const res = await fetch(`/api/employees/${id}`, { method: "DELETE" });
+    const res = await fetch(`/cctv/api/employees/${id}`, { method: "DELETE" });
     if (res.ok) { toast({ title: "Deleted" }); router.push("/employees"); }
   }
 
   async function disburseSalary(recordId: string) {
-    const res = await fetch(`/api/salary-records/${recordId}/disburse`, { method: "POST" });
+    const res = await fetch(`/cctv/api/salary-records/${recordId}/disburse`, { method: "POST" });
     const data = await res.json();
     if (!res.ok) { toast({ title: "Failed", description: data.error, variant: "destructive" }); }
     else { toast({ title: "Disbursed", description: data.message }); qc.invalidateQueries({ queryKey: ["employee", id] }); }

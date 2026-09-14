@@ -32,7 +32,7 @@ export default function PurchaseDetailedReportPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-purchase-detailed", appliedFrom, appliedTo],
-    queryFn: async () => await (await fetch(`/api/reports/purchase-detailed?from=${appliedFrom}&to=${appliedTo}`)).json(),
+    queryFn: async () => await (await fetch(`/cctv/api/reports/purchase-detailed?from=${appliedFrom}&to=${appliedTo}`)).json(),
   });
 
   const rows: Row[] = data?.rows ?? [];

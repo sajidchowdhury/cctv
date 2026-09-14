@@ -30,7 +30,7 @@ export default function PurchasesPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["purchases", search],
     queryFn: async () => {
-      const r = await fetch(`/api/purchases?q=${encodeURIComponent(search)}`);
+      const r = await fetch(`/cctv/api/purchases?q=${encodeURIComponent(search)}`);
       return (await r.json()).purchases as Purchase[];
     },
   });

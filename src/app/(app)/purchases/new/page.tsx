@@ -72,8 +72,8 @@ function NewPurchaseForm() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
   useEffect(() => {
-    fetch("/api/products").then((r) => r.json()).then((d) => setProducts(d.products ?? []));
-    fetch("/api/suppliers").then((r) => r.json()).then((d) => setSuppliers(d.suppliers ?? []));
+    fetch("/cctv/api/products").then((r) => r.json()).then((d) => setProducts(d.products ?? []));
+    fetch("/cctv/api/suppliers").then((r) => r.json()).then((d) => setSuppliers(d.suppliers ?? []));
   }, []);
 
   // Pre-fill from existing purchase when ?resume=ID&edit=1.
@@ -81,7 +81,7 @@ function NewPurchaseForm() {
     if (!resumeId) return;
     (async () => {
       try {
-        const res = await fetch(`/api/purchases/${resumeId}`);
+        const res = await fetch(`/cctv/api/purchases/${resumeId}`);
         const data = await res.json();
         const purchase = data.purchase;
         if (!purchase) {
@@ -242,7 +242,7 @@ function NewPurchaseForm() {
         address: newSupplier.address.trim() || null,
         openingBalance: Number(newSupplier.openingBalance) || 0,
       };
-      const res = await fetch("/api/suppliers", {
+      const res = await fetch("/cctv/api/suppliers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

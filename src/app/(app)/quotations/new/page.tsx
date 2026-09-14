@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
@@ -44,10 +44,10 @@ export default function NewQuotationPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [productSearch, setProductSearch] = useState("");
-  useState(() => {
-    fetch("/api/products").then((r) => r.json()).then((d) => setProducts(d.products ?? []));
-    fetch("/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers ?? []));
-  });
+  useEffect(() => {
+    fetch("/cctv/api/products").then((r) => r.json()).then((d) => setProducts(d.products ?? []));
+    fetch("/cctv/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers ?? []));
+  }, []);
 
   const filteredProducts = products.filter((p) =>
     !productSearch ||
@@ -100,7 +100,7 @@ export default function NewQuotationPage() {
     }
     setSaving(true);
     try {
-      const res = await fetch("/api/quotations", {
+      const res = await fetch("/cctv/api/quotations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

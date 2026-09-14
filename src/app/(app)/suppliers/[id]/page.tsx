@@ -27,7 +27,7 @@ export default function SupplierDetailPage() {
   const { data: detail, isLoading } = useQuery({
     queryKey: ["supplier", id],
     queryFn: async () => {
-      const r = await fetch(`/api/suppliers/${id}`);
+      const r = await fetch(`/cctv/api/suppliers/${id}`);
       return (await r.json()).supplier;
     },
     enabled: !!id,
@@ -36,7 +36,7 @@ export default function SupplierDetailPage() {
   const { data: ledgerData } = useQuery({
     queryKey: ["supplier-ledger", id],
     queryFn: async () => {
-      const r = await fetch(`/api/suppliers/${id}/ledger`);
+      const r = await fetch(`/cctv/api/suppliers/${id}/ledger`);
       return await r.json();
     },
     enabled: !!id,
@@ -60,7 +60,7 @@ export default function SupplierDetailPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch(`/api/suppliers/${id}`, {
+      const res = await fetch(`/cctv/api/suppliers/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -85,7 +85,7 @@ export default function SupplierDetailPage() {
   }
 
   async function onDelete() {
-    const res = await fetch(`/api/suppliers/${id}`, { method: "DELETE" });
+    const res = await fetch(`/cctv/api/suppliers/${id}`, { method: "DELETE" });
     if (res.ok) {
       toast({ title: "Deleted", description: "Supplier removed." });
       router.push("/suppliers");

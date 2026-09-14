@@ -85,14 +85,14 @@ function NewSalePage() {
 
   // Load customers once.
   useEffect(() => {
-    fetch("/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers ?? []));
+    fetch("/cctv/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers ?? []));
   }, []);
 
   // Search products + serials via API (debounced).
   useEffect(() => {
     if (!productSearch.trim()) { setProducts([]); return; }
     const timer = setTimeout(() => {
-      fetch(`/api/sales/search?q=${encodeURIComponent(productSearch.trim())}`)
+      fetch(`/cctv/api/sales/search?q=${encodeURIComponent(productSearch.trim())}`)
         .then((r) => r.json())
         .then((d) => setProducts(d.results ?? []));
     }, 300);
@@ -102,7 +102,7 @@ function NewSalePage() {
   // Resume: load a held sale's items into the cart.
   useEffect(() => {
     if (!resumeId) return;
-    fetch(`/api/sales/${resumeId}`)
+    fetch(`/cctv/api/sales/${resumeId}`)
       .then((r) => r.json())
       .then((data) => {
         const sale = data.sale;
@@ -295,7 +295,7 @@ function NewSalePage() {
       let res;
       if (resumeId && isEditMode) {
         // Full edit: PATCH with editMode + all items + stock/ledger reversal.
-        res = await fetch(`/api/sales/${resumeId}`, {
+        res = await fetch(`/cctv/api/sales/${resumeId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -319,13 +319,13 @@ function NewSalePage() {
         });
       } else if (resumeId) {
         // Finalize the held sale: PATCH to un-hold + update fields.
-        res = await fetch(`/api/sales/${resumeId}`, {
+        res = await fetch(`/cctv/api/sales/${resumeId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ isHeld: hold, paid: paidNum, mode, notes: notes || null }),
         });
       } else {
-        res = await fetch("/api/sales", {
+        res = await fetch("/cctv/api/sales", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -396,7 +396,7 @@ function NewSalePage() {
                 {/* F7-S1: inline customer creation */}
                 <InlineEntityCreator
                   label="Customer"
-                  endpoint="/api/customers"
+                  endpoint="/cctv/api/customers"
                   bodyBuilder={(name, extra) => ({
                     name,
                     phone: extra.phone || null,

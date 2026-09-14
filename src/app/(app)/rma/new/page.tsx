@@ -36,20 +36,20 @@ export default function NewRmaPage() {
   const [selectedUnit, setSelectedUnit] = useState<InventoryUnit | null>(null);
 
   useEffect(() => {
-    fetch("/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers ?? []));
-    fetch("/api/suppliers").then((r) => r.json()).then((d) => setSuppliers(d.suppliers ?? []));
+    fetch("/cctv/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers ?? []));
+    fetch("/cctv/api/suppliers").then((r) => r.json()).then((d) => setSuppliers(d.suppliers ?? []));
   }, []);
 
   useEffect(() => {
     if (!serialSearch) { setInventoryUnits([]); return; }
-    fetch(`/api/inventory-units?status=ALL&q=${encodeURIComponent(serialSearch)}`).then((r) => r.json()).then((d) => setInventoryUnits(d.inventoryUnits ?? []));
+    fetch(`/cctv/api/inventory-units?status=ALL&q=${encodeURIComponent(serialSearch)}`).then((r) => r.json()).then((d) => setInventoryUnits(d.inventoryUnits ?? []));
   }, [serialSearch]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch("/api/rma", {
+      const res = await fetch("/cctv/api/rma", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerId: customerId || null,

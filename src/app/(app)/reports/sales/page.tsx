@@ -24,7 +24,7 @@ export default function SalesReportPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-sales", appliedFrom, appliedTo],
-    queryFn: async () => (await (await fetch(`/api/reports/sales?from=${appliedFrom}&to=${appliedTo}`)).json()),
+    queryFn: async () => (await (await fetch(`/cctv/api/reports/sales?from=${appliedFrom}&to=${appliedTo}`)).json()),
   });
 
   const sales: Sale[] = data?.sales ?? [];

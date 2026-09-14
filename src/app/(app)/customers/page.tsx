@@ -26,7 +26,7 @@ export default function CustomersPage() {
   const [search, setSearch] = useState("");
   const { data, isLoading } = useQuery({
     queryKey: ["customers", search],
-    queryFn: async () => (await (await fetch(`/api/customers?q=${encodeURIComponent(search)}`)).json()).customers as Customer[],
+    queryFn: async () => (await (await fetch(`/cctv/api/customers?q=${encodeURIComponent(search)}`)).json()).customers as Customer[],
   });
   const customers = data ?? [];
 

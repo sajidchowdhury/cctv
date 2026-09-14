@@ -39,7 +39,7 @@ export default function SuppliersPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["suppliers", search],
     queryFn: async () => {
-      const r = await fetch(`/api/suppliers?q=${encodeURIComponent(search)}`);
+      const r = await fetch(`/cctv/api/suppliers?q=${encodeURIComponent(search)}`);
       return (await r.json()).suppliers as Supplier[];
     },
   });
@@ -68,7 +68,7 @@ export default function SuppliersPage() {
     }
     setSavingEdit(true);
     try {
-      const res = await fetch(`/api/suppliers/${editing.id}`, {
+      const res = await fetch(`/cctv/api/suppliers/${editing.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

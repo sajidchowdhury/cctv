@@ -34,7 +34,7 @@ export default function StockPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["stock-summary", lowOnly],
     queryFn: async () => {
-      const r = await fetch(`/api/reports/stock-summary${lowOnly ? "?lowStock=1" : ""}`);
+      const r = await fetch(`/cctv/api/reports/stock-summary${lowOnly ? "?lowStock=1" : ""}`);
       return await r.json();
     },
   });

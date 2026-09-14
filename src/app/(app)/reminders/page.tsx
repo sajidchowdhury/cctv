@@ -46,14 +46,14 @@ export default function RemindersPage() {
       const params = new URLSearchParams();
       if (typeFilter) params.set("type", typeFilter);
       if (showInactive) params.set("active", "0");
-      return (await (await fetch(`/api/reminders?${params}`)).json()).reminders as Reminder[];
+      return (await (await fetch(`/cctv/api/reminders?${params}`)).json()).reminders as Reminder[];
     },
   });
   const reminders = data ?? [];
 
   async function snooze(id: string, days: number) {
     const newDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const res = await fetch(`/api/reminders/${id}`, {
+    const res = await fetch(`/cctv/api/reminders/${id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nextDue: newDate }),
     });
@@ -64,7 +64,7 @@ export default function RemindersPage() {
   }
 
   async function toggleActive(id: string, active: boolean) {
-    await fetch(`/api/reminders/${id}`, {
+    await fetch(`/cctv/api/reminders/${id}`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ active }),
     });

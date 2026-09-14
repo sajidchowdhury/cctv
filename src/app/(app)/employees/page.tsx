@@ -22,7 +22,7 @@ export default function EmployeesPage() {
   const [search, setSearch] = useState("");
   const { data, isLoading } = useQuery({
     queryKey: ["employees", search],
-    queryFn: async () => (await (await fetch(`/api/employees?q=${encodeURIComponent(search)}`)).json()).employees as Employee[],
+    queryFn: async () => (await (await fetch(`/cctv/api/employees?q=${encodeURIComponent(search)}`)).json()).employees as Employee[],
   });
   const employees = data ?? [];
 

@@ -23,7 +23,7 @@ function VerifyEmailForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const res = await fetch("/api/auth/verify-email", {
+    const res = await fetch("/cctv/api/auth/verify-email", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, code }),

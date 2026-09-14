@@ -33,7 +33,7 @@ export default function CrmCustomerDetailPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["crm-customer-timeline", id],
-    queryFn: async () => (await (await fetch(`/api/crm/customers/${id}/timeline`)).json()),
+    queryFn: async () => (await (await fetch(`/cctv/api/crm/customers/${id}/timeline`)).json()),
     enabled: !!id,
   });
 
@@ -42,7 +42,7 @@ export default function CrmCustomerDetailPage() {
     if (!note.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch("/api/follow-ups", {
+      const res = await fetch("/cctv/api/follow-ups", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ customerId: id, note, rating, nextDueDate: nextDue || null }),
       });

@@ -32,7 +32,7 @@ export default function NewReminderPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch("/api/reminders", {
+      const res = await fetch("/cctv/api/reminders", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: form.type, title: form.title,

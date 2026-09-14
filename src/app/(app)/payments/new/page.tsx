@@ -32,19 +32,19 @@ export default function NewPaymentPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
 
   useEffect(() => {
-    fetch("/api/suppliers").then((r) => r.json()).then((d) => setSuppliers(d.suppliers ?? []));
+    fetch("/cctv/api/suppliers").then((r) => r.json()).then((d) => setSuppliers(d.suppliers ?? []));
   }, []);
 
   useEffect(() => {
     if (!supplierId) { setInvoices([]); return; }
-    fetch(`/api/invoices/open?type=supplier&partyId=${supplierId}`).then((r) => r.json()).then((d) => setInvoices(d.invoices ?? []));
+    fetch(`/cctv/api/invoices/open?type=supplier&partyId=${supplierId}`).then((r) => r.json()).then((d) => setInvoices(d.invoices ?? []));
   }, [supplierId]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch("/api/payments", {
+      const res = await fetch("/cctv/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

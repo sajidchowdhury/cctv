@@ -31,7 +31,7 @@ export default function SalesDetailedReportPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-sales-detailed", appliedFrom, appliedTo],
-    queryFn: async () => await (await fetch(`/api/reports/sales-detailed?from=${appliedFrom}&to=${appliedTo}`)).json(),
+    queryFn: async () => await (await fetch(`/cctv/api/reports/sales-detailed?from=${appliedFrom}&to=${appliedTo}`)).json(),
   });
 
   const rows: Row[] = data?.rows ?? [];

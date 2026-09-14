@@ -73,8 +73,8 @@ export default function PaymentPage() {
     setLoading(true);
     try {
       const [histRes, setRes] = await Promise.all([
-        fetch("/api/billing/history"),
-        fetch("/api/billing/settings"),
+        fetch("/cctv/api/billing/history"),
+        fetch("/cctv/api/billing/settings"),
       ]);
       if (histRes.ok) {
         const data = await histRes.json();
@@ -104,7 +104,7 @@ export default function PaymentPage() {
     setError(null);
     setSuccess(null);
     try {
-      const res = await fetch("/api/billing/submit-payment", {
+      const res = await fetch("/cctv/api/billing/submit-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),

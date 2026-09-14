@@ -16,7 +16,7 @@ export default function StockByModelReportPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-stock-by-model"],
-    queryFn: async () => await (await fetch("/api/reports/stock-by-model")).json(),
+    queryFn: async () => await (await fetch("/cctv/api/reports/stock-by-model")).json(),
   });
 
   // Drill-down serials — separate query when a model is selected.
@@ -24,7 +24,7 @@ export default function StockByModelReportPage() {
     queryKey: ["report-stock-by-model-serials", selectedModel],
     queryFn: async () => {
       if (!selectedModel) return null;
-      return await (await fetch(`/api/reports/stock-by-model?model=${encodeURIComponent(selectedModel)}`)).json();
+      return await (await fetch(`/cctv/api/reports/stock-by-model?model=${encodeURIComponent(selectedModel)}`)).json();
     },
     enabled: !!selectedModel,
   });

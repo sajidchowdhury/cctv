@@ -18,7 +18,7 @@ export default function ChangeEmailPage() {
     setLoading(true);
     setError(null);
     setMsg(null);
-    const res = await fetch("/api/auth/change-email", {
+    const res = await fetch("/cctv/api/auth/change-email", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ newEmail }),

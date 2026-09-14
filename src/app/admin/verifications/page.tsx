@@ -50,7 +50,7 @@ export default function AdminVerificationsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/verifications?status=${filter}`);
+      const res = await fetch(`/cctv/api/admin/verifications?status=${filter}`);
       if (res.status === 401) {
         router.push("/admin/login");
         return;
@@ -77,7 +77,7 @@ export default function AdminVerificationsPage() {
   async function verify(item: QueueItem) {
     setActioning(item.id);
     try {
-      const res = await fetch(`/api/admin/verifications/${item.id}/verify`, { method: "POST" });
+      const res = await fetch(`/cctv/api/admin/verifications/${item.id}/verify`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
         setToast(`Verify failed: ${data.error}`);
@@ -95,7 +95,7 @@ export default function AdminVerificationsPage() {
     if (!rejectItem) return;
     setActioning(rejectItem.id);
     try {
-      const res = await fetch(`/api/admin/verifications/${rejectItem.id}/reject`, {
+      const res = await fetch(`/cctv/api/admin/verifications/${rejectItem.id}/reject`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: rejectReason }),
@@ -119,7 +119,7 @@ export default function AdminVerificationsPage() {
     if (!confirm(`Unlock ${tenantName} with 7-day grace extension?`)) return;
     setActioning(tenantId);
     try {
-      const res = await fetch(`/api/admin/tenants/${tenantId}/unlock`, { method: "POST" });
+      const res = await fetch(`/cctv/api/admin/tenants/${tenantId}/unlock`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
         setToast(`Unlock failed: ${data.error}`);

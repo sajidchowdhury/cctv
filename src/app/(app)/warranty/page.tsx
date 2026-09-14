@@ -46,7 +46,7 @@ export default function WarrantyPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["warranty-lookup", activeQuery],
     queryFn: async () => {
-      const r = await fetch(`/api/warranty/lookup?q=${encodeURIComponent(activeQuery)}`);
+      const r = await fetch(`/cctv/api/warranty/lookup?q=${encodeURIComponent(activeQuery)}`);
       return await r.json();
     },
     enabled: activeQuery.length > 0,

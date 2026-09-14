@@ -46,20 +46,46 @@ export default function DashboardPage() {
   const { data: session, status } = useSession();
   const { t } = useTranslation();
 
-  const { data: stockData } = useQuery({
-    queryKey: ["stock-summary-dashboard"],
-    queryFn: async () => {
-      const r = await fetch("/api/reports/stock-summary");
-      return await r.json();
-    },
+
+const { data: stockData } = useQuery({
+  queryKey: ["stock-summary-dashboard"],
+  queryFn: async () => {
+    const r = await fetch("/cctv/api/reports/stock-summary");
+    const data = await r.json();
+
+    if (!r.ok || !Array.isArray(data.rows)) {
+      return {
+        rows: [],
+        totals: {
+          productCount: 0,
+          totalUnits: 0,
+          totalValue: 0,
+          lowStockCount: 0,
+        },
+      };
+    }
+
+    return data;
+  },
     enabled: status === "authenticated" && session?.user?.role !== "SUPER_ADMIN",
   });
 
-  const { data: dueReminders } = useQuery({
-    queryKey: ["reminders-due-today"],
-    queryFn: async () => (await (await fetch("/api/reminders/due-today")).json()),
-    enabled: status === "authenticated" && session?.user?.role !== "SUPER_ADMIN",
-  });
+
+
+const { data: dueReminders } = useQuery({
+  queryKey: ["reminders-due-today"],
+  queryFn: async () => {
+    const r = await fetch("/cctv/api/reminders/due-today");
+    const data = await r.json();
+
+    if (!r.ok || !Array.isArray(data.reminders)) {
+      return { reminders: [], count: 0 };
+    }
+
+    return data;
+  },
+  enabled: status === "authenticated" && session?.user?.role !== "SUPER_ADMIN",
+});
 
   if (status === "loading") {
     return (

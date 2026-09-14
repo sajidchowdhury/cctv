@@ -40,9 +40,9 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/products/${id}`).then((r) => r.json()),
-      fetch("/api/categories").then((r) => r.json()),
-      fetch("/api/units").then((r) => r.json()),
+      fetch(`/cctv/api/products/${id}`).then((r) => r.json()),
+      fetch("/cctv/api/categories").then((r) => r.json()),
+      fetch("/cctv/api/units").then((r) => r.json()),
     ]).then(([p, c, u]) => {
       if (p.product) {
         setProduct(p.product);
@@ -58,7 +58,7 @@ export default function ProductDetailPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch(`/api/products/${id}`, {
+      const res = await fetch(`/cctv/api/products/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -83,7 +83,7 @@ export default function ProductDetailPage() {
   }
 
   async function onDelete() {
-    const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+    const res = await fetch(`/cctv/api/products/${id}`, { method: "DELETE" });
     if (res.ok) {
       toast({ title: "Deleted", description: "Product removed." });
       router.push("/products");
@@ -152,7 +152,7 @@ export default function ProductDetailPage() {
                     {/* F7-S1: inline category creation */}
                     <InlineEntityCreator
                       label="Category"
-                      endpoint="/api/categories"
+                      endpoint="/cctv/api/categories"
                       bodyBuilder={(name) => ({ name })}
                       onCreated={(c) => {
                         setCategories((cats) => [...cats, c].sort((a, b) => a.name.localeCompare(b.name)));
@@ -177,7 +177,7 @@ export default function ProductDetailPage() {
                     {/* F7-S1: inline unit creation */}
                     <InlineEntityCreator
                       label="Unit"
-                      endpoint="/api/units"
+                      endpoint="/cctv/api/units"
                       bodyBuilder={(name) => ({ name })}
                       onCreated={(u) => {
                         setUnits((us) => [...us, u].sort((a, b) => a.name.localeCompare(b.name)));

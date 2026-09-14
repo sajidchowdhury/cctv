@@ -28,7 +28,7 @@ export default function NewCustomerPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch("/api/customers", {
+      const res = await fetch("/cctv/api/customers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

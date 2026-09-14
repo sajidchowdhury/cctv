@@ -26,7 +26,7 @@ export default function LedgerPage() {
   const [type, setType] = useState("");
   const { data, isLoading } = useQuery({
     queryKey: ["transactions", type],
-    queryFn: async () => (await (await fetch(`/api/transactions${type ? `?type=${type}` : ""}`)).json()).transactions as Txn[],
+    queryFn: async () => (await (await fetch(`/cctv/api/transactions${type ? `?type=${type}` : ""}`)).json()).transactions as Txn[],
   });
   const txns = data ?? [];
 

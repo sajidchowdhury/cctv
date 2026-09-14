@@ -24,7 +24,7 @@ export default function ProfitLossReportPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-pl", af, at],
-    queryFn: async () => (await (await fetch(`/api/reports/profit-loss?from=${af}&to=${at}`)).json()),
+    queryFn: async () => (await (await fetch(`/cctv/api/reports/profit-loss?from=${af}&to=${at}`)).json()),
   });
 
   const rows: Row[] = data?.rows ?? [];

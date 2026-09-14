@@ -19,7 +19,7 @@ export default function WarrantyExpiryReportPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-warranty-expiry", from, to],
-    queryFn: async () => (await (await fetch(`/api/reports/warranty-expiry?from=${from}&to=${to}`)).json()),
+    queryFn: async () => (await (await fetch(`/cctv/api/reports/warranty-expiry?from=${from}&to=${to}`)).json()),
   });
 
   const units: Unit[] = data?.units ?? [];

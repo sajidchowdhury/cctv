@@ -24,7 +24,7 @@ const STAGE_TONE: Record<string, string> = {
 export default function RmaStatusReportPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["report-rma-status"],
-    queryFn: async () => (await (await fetch("/api/reports/rma-status")).json()),
+    queryFn: async () => (await (await fetch("/cctv/api/reports/rma-status")).json()),
   });
 
   const tickets: Ticket[] = data?.tickets ?? [];
