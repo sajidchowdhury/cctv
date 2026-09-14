@@ -13,7 +13,12 @@ const nextConfig: NextConfig = {
   // causing `Cannot find module '#standard-fonts/Helvetica'` at runtime (caution.md §22).
   // Marking @react-pdf/renderer as external keeps it + its deps (pdfkit,
   // @react-pdf/font) in node_modules, where the `imports` field works correctly.
-  serverExternalPackages: ["@react-pdf/renderer"],
+
+  serverExternalPackages: [
+    "@react-pdf/renderer",
+    "@react-pdf/font",
+    "pdfkit",
+  ],
 
   reactStrictMode: false,
 
