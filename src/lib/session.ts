@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions, type Role, type SubscriptionStatus } from "@/lib/auth";
 import { runWithTenant } from "@/lib/tenant-context";
+import { appPath } from "@/lib/app-path";
 
 export type SessionUser = {
   id: string;
@@ -61,7 +62,9 @@ export function withTenant(
       return NextResponse.json(
         {
           error: "Subscription not active.",
-          redirect: "/payment",
+          // appPath() adds the /cctv basePath so the frontend can use this
+          // redirect with window.location without landing on a 404.
+          redirect: appPath("/payment"),
           subscriptionStatus: status,
         },
         { status: 402 }

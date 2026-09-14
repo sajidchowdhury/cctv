@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { appPath } from "@/lib/app-path";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -163,7 +164,7 @@ export default function AdminVerificationsPage() {
             <Button asChild variant="outline" size="sm">
               <Link href="/admin/settings"><Settings className="mr-2 h-4 w-4" /> Settings</Link>
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: "/admin/login", redirect: false })}>
+            <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: appPath("/admin/login") })}>
               <LogOut className="mr-2 h-4 w-4" /> Log out
             </Button>
           </div>

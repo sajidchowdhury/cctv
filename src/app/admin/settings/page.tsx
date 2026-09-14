@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { appPath } from "@/lib/app-path";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -116,7 +117,7 @@ export default function AdminSettingsPage() {
               <p className="text-[11px] text-muted-foreground">{session.user.email}</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: "/admin/login", redirect: false })}>
+          <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: appPath("/admin/login") })}>
             <LogOut className="mr-2 h-4 w-4" /> Log out
           </Button>
         </div>

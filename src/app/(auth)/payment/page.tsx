@@ -6,6 +6,7 @@ import { useSession, signOut } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { appPath } from "@/lib/app-path";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -145,7 +146,7 @@ export default function PaymentPage() {
             </div>
             <span className="font-semibold text-sm">Subscription</span>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: "/login" })}>
+          <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: appPath("/login") })}>
             <LogOut className="mr-2 h-4 w-4" /> Log out
           </Button>
         </div>

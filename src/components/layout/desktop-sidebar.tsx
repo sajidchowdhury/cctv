@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { visibleNavItems } from "@/lib/nav";
+import { appPath } from "@/lib/app-path";
 import { ShieldCheck, LogOut, Sun, Moon, Languages } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -97,7 +98,7 @@ export function DesktopSidebar() {
           variant="ghost"
           size="sm"
           className="w-full justify-start text-muted-foreground min-h-[44px]"
-          onClick={() => signOut({ callbackUrl: "/login" })}
+          onClick={() => signOut({ callbackUrl: appPath("/login") })}
         >
           <LogOut className="mr-2 h-4 w-4" /> Log out
         </Button>

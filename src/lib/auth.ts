@@ -19,6 +19,7 @@ import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { adminDb } from "@/lib/db";
+import { appPath } from "@/lib/app-path";
 
 /** Role enum — tenant roles + platform super-admin (doc §3, §3.3.1). */
 export type Role = "OWNER" | "MANAGER" | "SALESMAN" | "ACCOUNTANT" | "SUPER_ADMIN";
@@ -127,8 +128,10 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 }, // 30 days
 
   pages: {
-    signIn: "/login",
-    error: "/login",
+    // NextAuth does NOT auto-prepend Next.js basePath. Must use appPath()
+    // so redirects go to /cctv/login (not /login → 404).
+    signIn: appPath("/login"),
+    error: appPath("/login"),
   },
 
   callbacks: {
