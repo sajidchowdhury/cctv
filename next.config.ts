@@ -6,10 +6,6 @@ const nextConfig: NextConfig = {
   // CCTV SaaS is served at https://inventoryos.xyz/cctv
   basePath: "/cctv",
 
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-
   reactStrictMode: false,
 
   // PWA: allow manifest + service worker
