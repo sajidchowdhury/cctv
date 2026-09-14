@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -14,13 +15,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, ArrowLeft, Save, ScanLine, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { suggestIsSerialised } from "@/lib/onhand";
-import { InlineEntityCreator } from "@/components/layout/inline-entity-creator";
+import { EntityPicker } from "@/components/layout/entity-picker";
 
 type Category = { id: string; name: string };
 type Unit = { id: string; name: string };
 
 export default function NewProductPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const { toast } = useToast();
   const [categories, setCategories] = useState<Category[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
@@ -77,6 +79,9 @@ export default function NewProductPage() {
         return;
       }
       toast({ title: "Product created", description: `${data.name} — SKU ${data.sku} — ${data.isSerialised ? "Serialised" : "Non-serialised"}` });
+      // Invalidate the products query so the list refetches on navigation
+      // (without this, React Query returns the cached list missing the new product).
+      qc.invalidateQueries({ queryKey: ["products"] });
       router.push("/products");
     } finally {
       setSaving(false);
@@ -117,11 +122,13 @@ export default function NewProductPage() {
                       {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  {/* F7-S1: inline category creation */}
-                  <InlineEntityCreator
+                  {/* EntityPicker: search/select existing + add new (no page refresh) */}
+                  <EntityPicker
                     label="Category"
-                    endpoint="/cctv/api/categories"
-                    bodyBuilder={(name) => ({ name })}
+                    items={categories}
+                    createEndpoint="/cctv/api/categories"
+                    createBodyBuilder={(name) => ({ name })}
+                    onSelect={(c) => onCategoryChange(c.id)}
                     onCreated={(c) => {
                       setCategories((cats) => [...cats, c].sort((a, b) => a.name.localeCompare(b.name)));
                       onCategoryChange(c.id);
@@ -146,11 +153,13 @@ export default function NewProductPage() {
                       {units.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  {/* F7-S1: inline unit creation */}
-                  <InlineEntityCreator
+                  {/* EntityPicker: search/select existing + add new (no page refresh) */}
+                  <EntityPicker
                     label="Unit"
-                    endpoint="/cctv/api/units"
-                    bodyBuilder={(name) => ({ name })}
+                    items={units}
+                    createEndpoint="/cctv/api/units"
+                    createBodyBuilder={(name) => ({ name })}
+                    onSelect={(u) => setForm((f) => ({ ...f, unitId: u.id }))}
                     onCreated={(u) => {
                       setUnits((us) => [...us, u].sort((a, b) => a.name.localeCompare(b.name)));
                       setForm((f) => ({ ...f, unitId: u.id }));

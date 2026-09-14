@@ -59,11 +59,6 @@ export function DesktopSidebar() {
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="flex-1">{lang === "bn" ? item.labelBn : item.label}</span>
-                  {item.phase && (
-                    <span className="text-[10px] text-muted-foreground">
-                      {item.phase}
-                    </span>
-                  )}
                 </Link>
               </li>
             );

@@ -36,7 +36,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <footer className="mt-auto border-t bg-card md:pl-[var(--sidebar-width)]">
         <div className="mx-auto max-w-7xl px-4 md:px-6 lg:px-8 py-4 text-center text-xs text-muted-foreground">
-          CCTV Inventory SaaS · Phase P0 · Session S04
+          CCTV InventoryOS made with love &amp; coffee by{" "}
+          <a
+            href="https://mycreativecode.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-foreground hover:underline"
+          >
+            my creative code
+          </a>
         </div>
       </footer>
 

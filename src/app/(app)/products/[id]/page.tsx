@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -15,7 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { ArrowLeft, Save, Trash2, Printer, Loader2, AlertTriangle, ScanLine, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT } from "@/lib/format";
-import { InlineEntityCreator } from "@/components/layout/inline-entity-creator";
+import { EntityPicker } from "@/components/layout/entity-picker";
 
 type Category = { id: string; name: string };
 type Unit = { id: string; name: string };
@@ -30,6 +31,7 @@ type Product = {
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const qc = useQueryClient();
   const { toast } = useToast();
   const [product, setProduct] = useState<Product | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -76,6 +78,7 @@ export default function ProductDetailPage() {
         toast({ title: "Failed", description: data.error ?? "Update failed.", variant: "destructive" });
       } else {
         toast({ title: "Saved", description: "Product updated." });
+        qc.invalidateQueries({ queryKey: ["products"] });
       }
     } finally {
       setSaving(false);
@@ -86,6 +89,7 @@ export default function ProductDetailPage() {
     const res = await fetch(`/cctv/api/products/${id}`, { method: "DELETE" });
     if (res.ok) {
       toast({ title: "Deleted", description: "Product removed." });
+      qc.invalidateQueries({ queryKey: ["products"] });
       router.push("/products");
     }
   }
@@ -149,11 +153,13 @@ export default function ProductDetailPage() {
                       <SelectTrigger className="flex-1"><SelectValue placeholder="—" /></SelectTrigger>
                       <SelectContent>{categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                     </Select>
-                    {/* F7-S1: inline category creation */}
-                    <InlineEntityCreator
+                    {/* EntityPicker: search/select existing + add new (no page refresh) */}
+                    <EntityPicker
                       label="Category"
-                      endpoint="/cctv/api/categories"
-                      bodyBuilder={(name) => ({ name })}
+                      items={categories}
+                      createEndpoint="/cctv/api/categories"
+                      createBodyBuilder={(name) => ({ name })}
+                      onSelect={(c) => setForm((f) => ({ ...f, categoryId: c.id }))}
                       onCreated={(c) => {
                         setCategories((cats) => [...cats, c].sort((a, b) => a.name.localeCompare(b.name)));
                         setForm((f) => ({ ...f, categoryId: c.id }));
@@ -174,11 +180,13 @@ export default function ProductDetailPage() {
                       <SelectTrigger className="flex-1"><SelectValue placeholder="—" /></SelectTrigger>
                       <SelectContent>{units.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent>
                     </Select>
-                    {/* F7-S1: inline unit creation */}
-                    <InlineEntityCreator
+                    {/* EntityPicker: search/select existing + add new (no page refresh) */}
+                    <EntityPicker
                       label="Unit"
-                      endpoint="/cctv/api/units"
-                      bodyBuilder={(name) => ({ name })}
+                      items={units}
+                      createEndpoint="/cctv/api/units"
+                      createBodyBuilder={(name) => ({ name })}
+                      onSelect={(u) => setForm((f) => ({ ...f, unitId: u.id }))}
                       onCreated={(u) => {
                         setUnits((us) => [...us, u].sort((a, b) => a.name.localeCompare(b.name)));
                         setForm((f) => ({ ...f, unitId: u.id }));
