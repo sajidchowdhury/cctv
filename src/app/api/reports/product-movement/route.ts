@@ -2,25 +2,21 @@
  * GET /api/reports/product-movement — all IN/OUT movements per product with running
  * stock balance (F4-S1).
  *
+ * Phase 3: server-side pagination + search. Accepts ?page=1&pageSize=50&q=search
+ * Returns: { rows, total, page, pageSize, totalPages, products, summary }
+ *
+ * Paginate the movements array in-memory (after merging + running-balance
+ * computation). Summary (per-product + overall totals) is computed across the
+ * FULL set (accurate regardless of search). Search filters movements by productName.
+ *
  * Query params:
  *   ?productId=<id>   (optional) — filter to one product; if omitted, aggregates all
  *   ?from=YYYY-MM-DD   (optional, defaults to today)
  *   ?to=YYYY-MM-DD     (optional, defaults to from)
  *
- * Returns:
- *   {
- *     products: [{ id, name, sku, isSerialised, openingStock, totalIn, totalOut, closingStock }],
- *     movements: [{ date, type: "PURCHASE"|"SALE", ref, partyName, direction: "in"|"out",
- *                   qty, unitPrice, lineTotal, balance, productName, productId, ...Display }]
- *   }
- *
  * Stock movement sources:
  *   - PurchaseItem (IN): qty in, ref=purchase.invoiceNo, party=supplier.name
  *   - SaleItem where lineType=PRODUCT (OUT): qty out, ref=sale.invoiceNo, party=customer.name
- *
- * Opening stock = computeOnHand for everything before `from` (serialised = count
- * of IN_STOCK InventoryUnits created before from; non-serialised = ΣPurchaseItem.qty
- * before from − ΣSaleItem.qty before from).
  *
  * Note: InventoryUnit status changes (RMA, scrapped) are NOT tracked as movement
  * events here — there's no event log table. Only purchases + sales feed this report.
@@ -30,12 +26,14 @@ import { db } from "@/lib/db";
 import { withTenant } from "@/lib/session";
 import { formatBDT } from "@/lib/format";
 import { computeOnHandAt } from "@/lib/onhand";
+import { parsePagination, paginateArray } from "@/lib/pagination";
 
 export const GET = withTenant(async (user, req: Request) => {
   const url = new URL(req.url);
   const productId = url.searchParams.get("productId") ?? undefined;
   const fromStr = url.searchParams.get("from") ?? new Date().toISOString().slice(0, 10);
   const toStr = url.searchParams.get("to") ?? fromStr;
+  const { page, pageSize, q } = parsePagination(req);
 
   const fromDate = new Date(fromStr + "T00:00:00");
   const toDate = new Date(toStr + "T23:59:59");
@@ -51,7 +49,11 @@ export const GET = withTenant(async (user, req: Request) => {
   });
 
   if (products.length === 0) {
-    return NextResponse.json({ products: [], movements: [], summary: { totalIn: 0, totalOut: 0, productCount: 0 } });
+    return NextResponse.json({
+      ...paginateArray([], page, pageSize),
+      products: [],
+      summary: { totalIn: 0, totalOut: 0, productCount: 0 },
+    });
   }
 
   const productIds = products.map((p) => p.id);
@@ -135,7 +137,7 @@ export const GET = withTenant(async (user, req: Request) => {
     })),
   ].sort((a, b) => a.date.getTime() - b.date.getTime());
 
-  // Compute running balance per product.
+  // Compute running balance per product on the FULL set.
   const runningStock = new Map<string, number>(openingStockMap);
   const movements: Movement[] = rawMovements.map((m) => {
     const current = runningStock.get(m.productId) ?? 0;
@@ -144,7 +146,7 @@ export const GET = withTenant(async (user, req: Request) => {
     return { ...m, balance: newBalance };
   });
 
-  // Summary per product.
+  // Summary per product (computed from the FULL movement set).
   const productSummaries = products.map((p) => {
     const opening = openingStockMap.get(p.id) ?? 0;
     const inMoves = movements.filter((m) => m.productId === p.id && m.direction === "in");
@@ -164,13 +166,19 @@ export const GET = withTenant(async (user, req: Request) => {
     };
   });
 
-  // Overall summary.
+  // Overall summary (from FULL movement set — accurate regardless of search).
   const totalIn = movements.reduce((s, m) => (m.direction === "in" ? s + m.qty : s), 0);
   const totalOut = movements.reduce((s, m) => (m.direction === "out" ? s + m.qty : s), 0);
 
-  return NextResponse.json({
-    products: productSummaries,
-    movements: movements.map((m) => ({
+  // Apply search filter (in-memory) BEFORE paginating.
+  const qLower = q.toLowerCase();
+  const filtered = q
+    ? movements.filter((m) => m.productName.toLowerCase().includes(qLower))
+    : movements;
+
+  // Paginate the (filtered) movements.
+  const pageResult = paginateArray(
+    filtered.map((m) => ({
       ...m,
       date: m.date.toISOString(),
       qtyDisplay: String(m.qty),
@@ -178,6 +186,13 @@ export const GET = withTenant(async (user, req: Request) => {
       lineTotalDisplay: formatBDT(m.lineTotal),
       balanceDisplay: String(m.balance),
     })),
+    page,
+    pageSize
+  );
+
+  return NextResponse.json({
+    ...pageResult,
+    products: productSummaries,
     summary: {
       productCount: products.length,
       movementCount: movements.length,

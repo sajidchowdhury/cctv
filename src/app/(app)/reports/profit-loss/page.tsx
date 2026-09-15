@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { DateRangePicker } from "@/components/layout/date-range-picker";
 import { DataTable } from "@/components/layout/data-table";
+import { ReportPagination, type PaginationState } from "@/components/layout/report-pagination";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Download, Loader2, TrendingUp, TrendingDown, Search } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatBDT, formatDate } from "@/lib/format";
@@ -23,10 +25,32 @@ export default function ProfitLossReportPage() {
   const [af, setAf] = useState(from);
   const [at, setAt] = useState(to);
   const [hasGenerated, setHasGenerated] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+
+  // Debounce search input — 300ms after the user stops typing.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(search.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["report-pl", af, at],
-    queryFn: async () => (await (await fetch(`/cctv/api/reports/profit-loss?from=${af}&to=${at}`)).json()),
+    queryKey: ["report-pl", af, at, page, pageSize, appliedSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        from: af,
+        to: at,
+        page: String(page),
+        pageSize: String(pageSize),
+        ...(appliedSearch ? { q: appliedSearch } : {}),
+      });
+      return await (await fetch(`/cctv/api/reports/profit-loss?${params}`)).json();
+    },
     enabled: hasGenerated,
   });
 
@@ -47,14 +71,25 @@ export default function ProfitLossReportPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Profit / Loss" description="Per invoice & aggregate: revenue − cost − discount (doc §5.3)." action={<Button variant="outline" size="sm" onClick={() => exportToCSV(`profit-loss-${af}-to-${at}`, rows)} disabled={!rows.length}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>} />
-      <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAf(from); setAt(to); setHasGenerated(true); }} />
+      <div className="flex flex-col sm:flex-row gap-3">
+        <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAf(from); setAt(to); setHasGenerated(true); setPage(1); }} />
+        <div className="relative flex-1 min-w-[12rem]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search invoice / customer…"
+            className="pl-9"
+          />
+        </div>
+      </div>
       {!hasGenerated ? (
         <EmptyState
           icon={TrendingUp}
           title="Profit / Loss"
           description="Set a date range and click Generate to load the report data."
           action={
-            <Button onClick={() => { setAf(from); setAt(to); setHasGenerated(true); }}>
+            <Button onClick={() => { setAf(from); setAt(to); setHasGenerated(true); setPage(1); }}>
               <Search className="mr-2 h-4 w-4" /> Generate report
             </Button>
           }
@@ -77,7 +112,15 @@ export default function ProfitLossReportPage() {
             </CardContent></Card>
             <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Margin</p><p className="text-xl font-bold tabular-nums">{(summary?.margin ?? 0).toFixed(1)}%</p></CardContent></Card>
           </div>
-          {rows.length === 0 ? <p className="text-sm text-muted-foreground py-8 text-center">No sales in this period.</p> : <DataTable columns={columns} data={rows} maxHeight="max-h-[32rem]" />}
+          {rows.length === 0 ? <p className="text-sm text-muted-foreground py-8 text-center">No sales in this period.</p> : <>
+            <DataTable columns={columns} data={rows} maxHeight="max-h-[32rem]" />
+            <ReportPagination
+              page={data?.page ?? 1}
+              pageSize={data?.pageSize ?? pageSize}
+              total={data?.total ?? 0}
+              onChange={({ page: p, pageSize: ps }: PaginationState) => { setPage(p); setPageSize(ps); }}
+            />
+          </>}
         </>
       )}
         </>

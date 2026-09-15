@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
+import { ReportPagination, type PaginationState } from "@/components/layout/report-pagination";
 import { DateRangePicker } from "@/components/layout/date-range-picker";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download, Loader2, Printer, ArrowLeftRight, ArrowDownCircle, ArrowUpCircle, Search } from "lucide-react";
@@ -25,6 +27,19 @@ export default function ProductMovementReportPage() {
   const [productId, setProductId] = useState("");
   const [appliedProductId, setAppliedProductId] = useState("");
   const [hasGenerated, setHasGenerated] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+
+  // Debounce search input — 300ms after the user stops typing.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(search.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const { data: productsData } = useQuery({
     queryKey: ["products"],
@@ -33,15 +48,22 @@ export default function ProductMovementReportPage() {
   const products = productsData ?? [];
 
   const { data, isLoading } = useQuery({
-    queryKey: ["report-product-movement", appliedProductId, appliedFrom, appliedTo],
+    queryKey: ["report-product-movement", appliedProductId, appliedFrom, appliedTo, page, pageSize, appliedSearch],
     queryFn: async () => {
-      const url = `/cctv/api/reports/product-movement?from=${appliedFrom}&to=${appliedTo}${appliedProductId ? `&productId=${appliedProductId}` : ""}`;
-      return await (await fetch(url)).json();
+      const params = new URLSearchParams({
+        from: appliedFrom,
+        to: appliedTo,
+        page: String(page),
+        pageSize: String(pageSize),
+        ...(appliedProductId ? { productId: appliedProductId } : {}),
+        ...(appliedSearch ? { q: appliedSearch } : {}),
+      });
+      return await (await fetch(`/cctv/api/reports/product-movement?${params}`)).json();
     },
     enabled: hasGenerated,
   });
 
-  const movements: any[] = data?.movements ?? [];
+  const movements: any[] = data?.rows ?? [];
   const productSummaries: any[] = data?.products ?? [];
   const summary = data?.summary;
 
@@ -50,6 +72,7 @@ export default function ProductMovementReportPage() {
     setAppliedTo(to);
     setAppliedProductId(productId);
     setHasGenerated(true);
+    setPage(1);
   }
 
   return (
@@ -69,7 +92,7 @@ export default function ProductMovementReportPage() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Product (optional — leave blank for all)</Label>
-              <Select value={productId} onValueChange={setProductId}>
+              <Select value={productId} onValueChange={(v) => { setProductId(v); setPage(1); }}>
                 <SelectTrigger><SelectValue placeholder="All products…" /></SelectTrigger>
                 <SelectContent>
                   {products.map((p) => (
@@ -84,6 +107,15 @@ export default function ProductMovementReportPage() {
               <Label>Date range</Label>
               <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={applyFilters} />
             </div>
+          </div>
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search reference / product / party…"
+              className="pl-9"
+            />
           </div>
           <div className="flex justify-end">
             <Button onClick={applyFilters}>
@@ -251,6 +283,12 @@ export default function ProductMovementReportPage() {
               </li>
             ))}
           </ul>
+          <ReportPagination
+            page={data?.page ?? 1}
+            pageSize={data?.pageSize ?? pageSize}
+            total={data?.total ?? 0}
+            onChange={({ page: p, pageSize: ps }: PaginationState) => { setPage(p); setPageSize(ps); }}
+          />
         </>
       )}
         </>

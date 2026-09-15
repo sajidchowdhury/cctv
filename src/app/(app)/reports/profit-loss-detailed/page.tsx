@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { DateRangePicker } from "@/components/layout/date-range-picker";
+import { ReportPagination, type PaginationState } from "@/components/layout/report-pagination";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Download, Loader2, Printer, Coins, TrendingUp, TrendingDown, Search } from "lucide-react";
 import { formatBDT, formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
@@ -32,10 +34,32 @@ export default function ProfitLossDetailedReportPage() {
   const [appliedFrom, setAppliedFrom] = useState(from);
   const [appliedTo, setAppliedTo] = useState(to);
   const [hasGenerated, setHasGenerated] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+
+  // Debounce search input — 300ms after the user stops typing.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(search.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["report-profit-loss-detailed", appliedFrom, appliedTo],
-    queryFn: async () => await (await fetch(`/cctv/api/reports/profit-loss-detailed?from=${appliedFrom}&to=${appliedTo}`)).json(),
+    queryKey: ["report-profit-loss-detailed", appliedFrom, appliedTo, page, pageSize, appliedSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        from: appliedFrom,
+        to: appliedTo,
+        page: String(page),
+        pageSize: String(pageSize),
+        ...(appliedSearch ? { q: appliedSearch } : {}),
+      });
+      return await (await fetch(`/cctv/api/reports/profit-loss-detailed?${params}`)).json();
+    },
     enabled: hasGenerated,
   });
 
@@ -68,7 +92,18 @@ export default function ProfitLossDetailedReportPage() {
       />
 
       <div data-print-hidden>
-        <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAppliedFrom(from); setAppliedTo(to); setHasGenerated(true); }} />
+        <div className="flex flex-col sm:flex-row gap-3">
+          <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAppliedFrom(from); setAppliedTo(to); setHasGenerated(true); setPage(1); }} />
+          <div className="relative flex-1 min-w-[12rem]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search invoice / customer / product / serial…"
+              className="pl-9"
+            />
+          </div>
+        </div>
       </div>
 
       {!hasGenerated ? (
@@ -77,7 +112,7 @@ export default function ProfitLossDetailedReportPage() {
           title="Profit / Loss (detailed)"
           description="Set a date range and click Generate to load the report data."
           action={
-            <Button onClick={() => { setAppliedFrom(from); setAppliedTo(to); setHasGenerated(true); }}>
+            <Button onClick={() => { setAppliedFrom(from); setAppliedTo(to); setHasGenerated(true); setPage(1); }}>
               <Search className="mr-2 h-4 w-4" /> Generate report
             </Button>
           }
@@ -183,6 +218,12 @@ export default function ProfitLossDetailedReportPage() {
               );
             })}
           </ul>
+          <ReportPagination
+            page={data?.page ?? 1}
+            pageSize={data?.pageSize ?? pageSize}
+            total={data?.total ?? 0}
+            onChange={({ page: p, pageSize: ps }: PaginationState) => { setPage(p); setPageSize(ps); }}
+          />
         </>
       )}
         </>

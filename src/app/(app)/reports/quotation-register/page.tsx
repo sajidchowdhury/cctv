@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { DateRangePicker } from "@/components/layout/date-range-picker";
 import { DataTable } from "@/components/layout/data-table";
+import { ReportPagination, type PaginationState } from "@/components/layout/report-pagination";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Download, Loader2, FileText, Search } from "lucide-react";
@@ -35,14 +37,37 @@ export default function QuotationRegisterReportPage() {
   const [at, setAt] = useState(to);
   const [status, setStatus] = useState("ALL");
   const [hasGenerated, setHasGenerated] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+
+  // Debounce search input — 300ms after the user stops typing.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(search.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["report-quote-register", af, at, status],
-    queryFn: async () => (await (await fetch(`/cctv/api/reports/quotation-register?from=${af}&to=${at}${status !== "ALL" ? `&status=${status}` : ""}`)).json()),
+    queryKey: ["report-quote-register", af, at, status, page, pageSize, appliedSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        from: af,
+        to: at,
+        page: String(page),
+        pageSize: String(pageSize),
+        ...(status !== "ALL" ? { status } : {}),
+        ...(appliedSearch ? { q: appliedSearch } : {}),
+      });
+      return await (await fetch(`/cctv/api/reports/quotation-register?${params}`)).json();
+    },
     enabled: hasGenerated,
   });
 
-  const quotes: Quote[] = data?.quotes ?? [];
+  const quotes: Quote[] = data?.rows ?? [];
   const summary = data?.summary;
 
   const columns: ColumnDef<Quote>[] = [
@@ -60,10 +85,10 @@ export default function QuotationRegisterReportPage() {
     <div className="space-y-6">
       <PageHeader title="Quotation register" description="All quotes by status + win/loss + conversion rate (doc §5.3)." action={<Button variant="outline" size="sm" onClick={() => exportToCSV(`quotation-register-${af}-to-${at}`, quotes)} disabled={!quotes.length}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>} />
       <div className="flex flex-col sm:flex-row gap-4">
-        <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAf(from); setAt(to); setHasGenerated(true); }} />
+        <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAf(from); setAt(to); setHasGenerated(true); setPage(1); }} />
         <div className="space-y-1">
           <Label className="text-xs">Status filter</Label>
-          <Select value={status} onValueChange={setStatus}>
+          <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
             <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All</SelectItem>
@@ -75,6 +100,15 @@ export default function QuotationRegisterReportPage() {
             </SelectContent>
           </Select>
         </div>
+        <div className="relative flex-1 min-w-[12rem] sm:self-end">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search quote / customer / type…"
+            className="pl-9"
+          />
+        </div>
       </div>
       {!hasGenerated ? (
         <EmptyState
@@ -82,7 +116,7 @@ export default function QuotationRegisterReportPage() {
           title="Quotation register"
           description="Set a date range (and optionally a status), then click Generate to load the report data."
           action={
-            <Button onClick={() => { setAf(from); setAt(to); setHasGenerated(true); }}>
+            <Button onClick={() => { setAf(from); setAt(to); setHasGenerated(true); setPage(1); }}>
               <Search className="mr-2 h-4 w-4" /> Generate report
             </Button>
           }
@@ -99,7 +133,15 @@ export default function QuotationRegisterReportPage() {
             <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Total value</p><p className="text-xl font-bold tabular-nums">{summary?.totalValueDisplay ?? "—"}</p></CardContent></Card>
             <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Avg quote</p><p className="text-xl font-bold tabular-nums">{summary ? formatBDT(summary.avgQuoteValue) : "—"}</p></CardContent></Card>
           </div>
-          {quotes.length === 0 ? <p className="text-sm text-muted-foreground py-8 text-center">No quotes in this period.</p> : <DataTable columns={columns} data={quotes} maxHeight="max-h-[32rem]" />}
+          {quotes.length === 0 ? <p className="text-sm text-muted-foreground py-8 text-center">No quotes in this period.</p> : <>
+            <DataTable columns={columns} data={quotes} maxHeight="max-h-[32rem]" />
+            <ReportPagination
+              page={data?.page ?? 1}
+              pageSize={data?.pageSize ?? pageSize}
+              total={data?.total ?? 0}
+              onChange={({ page: p, pageSize: ps }: PaginationState) => { setPage(p); setPageSize(ps); }}
+            />
+          </>}
         </>
       )}
         </>

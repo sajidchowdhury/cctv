@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
+import { ReportPagination, type PaginationState } from "@/components/layout/report-pagination";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Download, Loader2, ShieldCheck, ShieldAlert, BookOpen, Search } from "lucide-react";
 import { formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
@@ -18,18 +20,49 @@ export default function WarrantyExpiryReportPage() {
   const [from] = useState(now.toISOString().slice(0, 10));
   const [to] = useState(new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
   const [hasGenerated, setHasGenerated] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+
+  // Debounce search input — 300ms after the user stops typing.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(search.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["report-warranty-expiry", from, to],
-    queryFn: async () => (await (await fetch(`/cctv/api/reports/warranty-expiry?from=${from}&to=${to}`)).json()),
+    queryKey: ["report-warranty-expiry", from, to, page, pageSize, appliedSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        from,
+        to,
+        page: String(page),
+        pageSize: String(pageSize),
+        ...(appliedSearch ? { q: appliedSearch } : {}),
+      });
+      return await (await fetch(`/cctv/api/reports/warranty-expiry?${params}`)).json();
+    },
     enabled: hasGenerated,
   });
 
-  const units: Unit[] = data?.units ?? [];
+  const units: Unit[] = data?.rows ?? [];
 
   return (
     <div className="space-y-6">
       <PageHeader title="Warranty expiry" description={`Upcoming warranty ends: ${from} to ${to} (doc §5.3).`} action={<Button variant="outline" size="sm" onClick={() => exportToCSV(`warranty-expiry-${from}-to-${to}`, units)} disabled={!units.length}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>} />
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search product / serial / customer…"
+          className="pl-9"
+        />
+      </div>
       {!hasGenerated ? (
         <EmptyState
           icon={BookOpen}
@@ -55,24 +88,32 @@ export default function WarrantyExpiryReportPage() {
           {units.length === 0 ? (
             <div className="text-center py-8"><ShieldCheck className="h-10 w-10 text-muted-foreground mx-auto mb-2" /><p className="text-sm text-muted-foreground">No warranties expiring in this window.</p></div>
           ) : (
-            <div className="overflow-x-auto rounded-lg border scroll-area-thin">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 sticky top-0"><tr><th className="text-left font-medium px-3 py-2">Product</th><th className="text-left font-medium px-3 py-2">Serial</th><th className="text-left font-medium px-3 py-2">Customer</th><th className="text-left font-medium px-3 py-2">Invoice</th><th className="text-left font-medium px-3 py-2">Warranty until</th><th className="text-left font-medium px-3 py-2">Days left</th><th className="text-left font-medium px-3 py-2">Status</th></tr></thead>
-                <tbody>
-                  {units.map((u) => (
-                    <tr key={u.id} className="border-t">
-                      <td className="px-3 py-2"><p className="font-medium">{u.productName}</p><p className="text-xs text-muted-foreground">{u.productModel ?? "—"}</p></td>
-                      <td className="px-3 py-2 font-mono text-xs">{u.serialNo}</td>
-                      <td className="px-3 py-2">{u.customerName}{u.customerPhone && <p className="text-xs text-muted-foreground">{u.customerPhone}</p>}</td>
-                      <td className="px-3 py-2 text-xs">{u.saleInvoice ?? "—"}</td>
-                      <td className="px-3 py-2">{u.warrantyEnd ? formatDate(u.warrantyEnd) : "—"}</td>
-                      <td className="px-3 py-2 tabular-nums">{u.daysLeft !== null ? (u.expired ? `${Math.abs(u.daysLeft)}d ago` : `${u.daysLeft}d`) : "—"}</td>
-                      <td className="px-3 py-2">{u.expired ? <Badge variant="secondary" className="bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"><ShieldAlert className="h-3 w-3 mr-1" />Expired</Badge> : (u.daysLeft ?? 999) <= 30 ? <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">Expiring soon</Badge> : <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"><ShieldCheck className="h-3 w-3 mr-1" />Active</Badge>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <div className="overflow-x-auto rounded-lg border scroll-area-thin">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50 sticky top-0"><tr><th className="text-left font-medium px-3 py-2">Product</th><th className="text-left font-medium px-3 py-2">Serial</th><th className="text-left font-medium px-3 py-2">Customer</th><th className="text-left font-medium px-3 py-2">Invoice</th><th className="text-left font-medium px-3 py-2">Warranty until</th><th className="text-left font-medium px-3 py-2">Days left</th><th className="text-left font-medium px-3 py-2">Status</th></tr></thead>
+                  <tbody>
+                    {units.map((u) => (
+                      <tr key={u.id} className="border-t">
+                        <td className="px-3 py-2"><p className="font-medium">{u.productName}</p><p className="text-xs text-muted-foreground">{u.productModel ?? "—"}</p></td>
+                        <td className="px-3 py-2 font-mono text-xs">{u.serialNo}</td>
+                        <td className="px-3 py-2">{u.customerName}{u.customerPhone && <p className="text-xs text-muted-foreground">{u.customerPhone}</p>}</td>
+                        <td className="px-3 py-2 text-xs">{u.saleInvoice ?? "—"}</td>
+                        <td className="px-3 py-2">{u.warrantyEnd ? formatDate(u.warrantyEnd) : "—"}</td>
+                        <td className="px-3 py-2 tabular-nums">{u.daysLeft !== null ? (u.expired ? `${Math.abs(u.daysLeft)}d ago` : `${u.daysLeft}d`) : "—"}</td>
+                        <td className="px-3 py-2">{u.expired ? <Badge variant="secondary" className="bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"><ShieldAlert className="h-3 w-3 mr-1" />Expired</Badge> : (u.daysLeft ?? 999) <= 30 ? <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">Expiring soon</Badge> : <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"><ShieldCheck className="h-3 w-3 mr-1" />Active</Badge>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <ReportPagination
+                page={data?.page ?? 1}
+                pageSize={data?.pageSize ?? pageSize}
+                total={data?.total ?? 0}
+                onChange={({ page: p, pageSize: ps }: PaginationState) => { setPage(p); setPageSize(ps); }}
+              />
+            </>
           )}
         </>
       )}

@@ -1,24 +1,34 @@
 /**
  * GET /api/reports/cash-book — day-wise cash in/out with closing balance (doc §4.4, §5.3).
  *
+ * Phase 3: server-side pagination + search. Accepts ?page=1&pageSize=50&q=search
+ * Returns: { rows, total, page, pageSize, totalPages, period, openingCash, closingCash, totalIn, totalOut }
+ *
  * Daily cash summary = opening cash + receipts (sales cash + other income)
  *                     − payments (expense + supplier).
  *
  * For S15: computes from IN/EXP transactions + sales cash + purchases cash.
  * Receipts (S16) + supplier payments (S16) added later.
  *
+ * Summary (opening/closing/totalIn/totalOut) is computed across the FULL entries
+ * array (not just the page). Running balances are computed chronologically on
+ * the full set — the search only narrows which entries are displayed per page.
+ *
  * Query: date (single day) or from + to (range).
+ * Search: filter entries by type, ref, narration.
  */
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { withTenant } from "@/lib/session";
 import { formatBDT } from "@/lib/format";
+import { parsePagination, paginateArray } from "@/lib/pagination";
 
 export const GET = withTenant(async (user, req: Request) => {
   const url = new URL(req.url);
   const dateStr = url.searchParams.get("date");
   const from = url.searchParams.get("from") ?? dateStr ?? new Date().toISOString().slice(0, 10);
   const to = url.searchParams.get("to") ?? dateStr ?? from;
+  const { page, pageSize, q } = parsePagination(req);
 
   const fromDate = new Date(from + "T00:00:00");
   const toDate = new Date(to + "T23:59:59");
@@ -132,26 +142,45 @@ export const GET = withTenant(async (user, req: Request) => {
   // Sort by date.
   entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  // Compute running balance.
+  // Compute running balance on the FULL set (accurate, even if search filters display).
   let running = openingCash;
   const withBalance = entries.map((e) => {
     running += e.direction === "in" ? e.amount : -e.amount;
     return { ...e, balance: running, balanceDisplay: formatBDT(running) };
   });
 
+  // Summary totals (from FULL entries — accurate regardless of search).
   const totalIn = entries.filter((e) => e.direction === "in").reduce((s, e) => s + e.amount, 0);
   const totalOut = entries.filter((e) => e.direction === "out").reduce((s, e) => s + e.amount, 0);
 
+  // Apply search filter (in-memory) BEFORE paginating.
+  const qLower = q.toLowerCase();
+  const filtered = q
+    ? withBalance.filter(
+        (e) =>
+          (e.type ?? "").toLowerCase().includes(qLower) ||
+          (e.ref ?? "").toLowerCase().includes(qLower) ||
+          (e.narration ?? "").toLowerCase().includes(qLower)
+      )
+    : withBalance;
+
+  // Paginate the (filtered) entries.
+  const pageResult = paginateArray(
+    filtered.map((e) => ({
+      ...e,
+      amountDisplay: formatBDT(e.amount),
+      date: new Date(e.date).toISOString(),
+    })),
+    page,
+    pageSize
+  );
+
   return NextResponse.json({
+    ...pageResult,
     period: { from, to },
     openingCash,
     closingCash: openingCash + totalIn - totalOut,
     totalIn,
     totalOut,
-    entries: withBalance.map((e) => ({
-      ...e,
-      amountDisplay: formatBDT(e.amount),
-      date: new Date(e.date).toISOString(),
-    })),
   });
 });

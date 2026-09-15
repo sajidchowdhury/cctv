@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { DataTable } from "@/components/layout/data-table";
+import { ReportPagination, type PaginationState } from "@/components/layout/report-pagination";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Download, Loader2, Wrench, AlertTriangle, Search } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatDate } from "@/lib/format";
@@ -25,13 +27,34 @@ const STAGE_TONE: Record<string, string> = {
 
 export default function RmaStatusReportPage() {
   const [hasGenerated, setHasGenerated] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+
+  // Debounce search input — 300ms after the user stops typing.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(search.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const { data, isLoading } = useQuery({
-    queryKey: ["report-rma-status"],
-    queryFn: async () => (await (await fetch("/cctv/api/reports/rma-status")).json()),
+    queryKey: ["report-rma-status", page, pageSize, appliedSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+        ...(appliedSearch ? { q: appliedSearch } : {}),
+      });
+      return await (await fetch(`/cctv/api/reports/rma-status?${params}`)).json();
+    },
     enabled: hasGenerated,
   });
 
-  const tickets: Ticket[] = data?.tickets ?? [];
+  const tickets: Ticket[] = data?.rows ?? [];
   const summary = data?.summary;
 
   const columns: ColumnDef<Ticket>[] = [
@@ -48,6 +71,15 @@ export default function RmaStatusReportPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="RMA status" description="Open RMAs by stage, vendor turnaround, overdue list (doc §5.3)." action={<Button variant="outline" size="sm" onClick={() => exportToCSV("rma-status", tickets)} disabled={!tickets.length}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>} />
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search RMA / customer / product…"
+          className="pl-9"
+        />
+      </div>
       {!hasGenerated ? (
         <EmptyState
           icon={Wrench}
@@ -73,7 +105,15 @@ export default function RmaStatusReportPage() {
           {tickets.length === 0 ? (
             <div className="text-center py-8"><Wrench className="h-10 w-10 text-muted-foreground mx-auto mb-2" /><p className="text-sm text-muted-foreground">No RMA tickets. The RMA module (S21) will populate this report.</p></div>
           ) : (
-            <DataTable columns={columns} data={tickets} maxHeight="max-h-[32rem]" />
+            <>
+              <DataTable columns={columns} data={tickets} maxHeight="max-h-[32rem]" />
+              <ReportPagination
+                page={data?.page ?? 1}
+                pageSize={data?.pageSize ?? pageSize}
+                total={data?.total ?? 0}
+                onChange={({ page: p, pageSize: ps }: PaginationState) => { setPage(p); setPageSize(ps); }}
+              />
+            </>
           )}
         </>
       )}

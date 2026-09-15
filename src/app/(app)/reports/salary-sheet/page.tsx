@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { DataTable } from "@/components/layout/data-table";
+import { ReportPagination, type PaginationState } from "@/components/layout/report-pagination";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,13 +21,35 @@ type Record = { id: string; month: string; employeeName: string; employeeRole: s
 export default function SalarySheetReportPage() {
   const [month, setMonth] = useState("");
   const [hasGenerated, setHasGenerated] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+
+  // Debounce search input — 300ms after the user stops typing.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(search.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const { data, isLoading } = useQuery({
-    queryKey: ["report-salary-sheet", month],
-    queryFn: async () => (await (await fetch(`/cctv/api/reports/salary-sheet${month ? `?month=${month}` : ""}`)).json()),
+    queryKey: ["report-salary-sheet", month, page, pageSize, appliedSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+        ...(month ? { month } : {}),
+        ...(appliedSearch ? { q: appliedSearch } : {}),
+      });
+      return await (await fetch(`/cctv/api/reports/salary-sheet?${params}`)).json();
+    },
     enabled: hasGenerated,
   });
 
-  const records: Record[] = data?.records ?? [];
+  const records: Record[] = data?.rows ?? [];
   const summary = data?.summary;
 
   const columns: ColumnDef<Record>[] = [
@@ -43,9 +66,20 @@ export default function SalarySheetReportPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Employee salary sheet" description="Monthly payroll summary (doc §5.3)." action={<Button variant="outline" size="sm" onClick={() => exportToCSV(`salary-sheet-${month || "all"}`, records)} disabled={!records.length}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>} />
-      <div className="space-y-1 max-w-xs">
-        <Label className="text-xs">Filter by month (YYYY-MM)</Label>
-        <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} placeholder="All months" />
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="space-y-1 max-w-xs">
+          <Label className="text-xs">Filter by month (YYYY-MM)</Label>
+          <Input type="month" value={month} onChange={(e) => { setMonth(e.target.value); setPage(1); }} placeholder="All months" />
+        </div>
+        <div className="relative flex-1 min-w-[12rem] sm:self-end">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search employee / role…"
+            className="pl-9"
+          />
+        </div>
       </div>
       {!hasGenerated ? (
         <EmptyState
@@ -73,7 +107,15 @@ export default function SalarySheetReportPage() {
           {records.length === 0 ? (
             <div className="text-center py-8"><Briefcase className="h-10 w-10 text-muted-foreground mx-auto mb-2" /><p className="text-sm text-muted-foreground">No salary records. Generate payroll from Employees → Payroll.</p></div>
           ) : (
-            <DataTable columns={columns} data={records} maxHeight="max-h-[32rem]" />
+            <>
+              <DataTable columns={columns} data={records} maxHeight="max-h-[32rem]" />
+              <ReportPagination
+                page={data?.page ?? 1}
+                pageSize={data?.pageSize ?? pageSize}
+                total={data?.total ?? 0}
+                onChange={({ page: p, pageSize: ps }: PaginationState) => { setPage(p); setPageSize(ps); }}
+              />
+            </>
           )}
         </>
       )}

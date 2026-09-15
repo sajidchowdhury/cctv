@@ -1825,3 +1825,109 @@ const { data, isLoading } = useQuery({
 - No `@ts-ignore` / `@ts-nocheck` / `any` introduced.
 - All changes additive (new imports + new state + new `enabled` line + new EmptyState JSX wrapper). No existing logic removed.
 - No commits made — working tree left for user review per caution.md §23.
+
+---
+Task ID: Phase-3-APIs
+Agent: general-purpose
+Task: Add server-side pagination + search to the remaining 13 report API routes, mirroring the two reference patterns (stock-summary + sales). Use shared helpers in src/lib/pagination.ts (parsePagination / paginateResponse / paginateArray).
+
+Work Log:
+- Read references: src/lib/pagination.ts (shared helpers), src/app/api/reports/stock-summary/route.ts (in-memory paginate pattern), src/app/api/reports/sales/route.ts (Prisma skip/take pattern).
+- Read all 13 target files to understand their existing structure (response shapes, summary fields, includes, sort orders, extras).
+- Categorized routes per spec: Category A = simple findMany (5), Category B = flattened reports (4), Category C = in-memory merged (4).
+
+Category A — Prisma skip/take + count, summary from lightweight fetch of ALL rows:
+- purchase/route.ts: search invoiceNo + supplier.name. Lightweight select {id,total,paid,due} for summary; full include {supplier,items.lineTotal} for page. Response key purchases → rows.
+- quotation-register/route.ts: search quoteNo + customerName + customer.name. Lightweight select {id,total,status} for summary; full include {customer,items.id} for page. Response key quotes → rows.
+- rma-status/route.ts: removed hardcoded take:100. Search rmaNo + customer.name + faultReason. Lightweight select {id,stage,eta} for summary (computes byStage + overdueCount); full include for page. Response key tickets → rows.
+- warranty-expiry/route.ts: search serialNo + product.name + saleItem.sale.customer.name. count() for total; full include for page (product, saleItem.sale.customer). Response key units → rows. Kept `count` field alongside `total`.
+- salary-sheet/route.ts: search employee.name. Lightweight select for summary; full include {employee} for page. Response key records → rows.
+
+Category B — paginate the parent, flatten only the page:
+- sales-detailed/route.ts: search invoiceNo + customer.name + items.product.name (via items: { some: { product: { name: contains }}}). Lightweight fetch {id, items{qty,lineTotal,discount}} for summary; full include for page; flatten only page's items. Response key rows (kept). Summary: invoiceCount, lineItemCount, totalQty, totalRevenue, totalDiscount all from full set.
+- purchase-detailed/route.ts: search invoiceNo + supplier.name + items.product.name. Lightweight fetch {id, items{qty,lineTotal,serials}} for summary (parses serials JSON to compute totalSerials); full include for page; flatten only page's items. Response key rows (kept).
+- profit-loss/route.ts: search invoiceNo + customer.name. Lightweight fetch {id,total,discount, items{qty,lineType,product.purchaseItems(take:1)}} for summary (computes revenue/cost/discount/profit per invoice + aggregates); full include for page; one row per invoice. Response key rows (kept).
+- profit-loss-detailed/route.ts: search invoiceNo + customer.name + items.product.name. Lightweight fetch {id, items{qty,unitPrice,discount,lineType,product.id,product.purchaseItems}} for summary + productCostMap; full include for page; flatten only page's items. Response key rows (kept).
+- For all Category B: total = parent count (matching invoices), summary computed from FULL parent set so card totals stay accurate regardless of page.
+
+Category C — in-memory merged, paginateArray:
+- customer-ledger/route.ts: kept merge logic (sales + receipts + OPENING entry, chronological running balance). Summary computed from FULL entries array (openingBalance, totalDebit, totalCredit, closingBalance). Added q filter on entries (ref + narration, case-insensitive) BEFORE paginateArray. Response key ledger → rows.
+- supplier-ledger/route.ts: mirror of customer-ledger for purchases + payments. Response key ledger → rows.
+- cash-book/route.ts: kept merge logic (txns IN/EXP/RECV/PAY + cash sales + cash purchases). Running balance computed on FULL set. Summary (openingCash, totalIn, totalOut, closingCash) from FULL entries. q filter on type+ref+narration BEFORE paginateArray. Response key entries → rows.
+- product-movement/route.ts: kept merge logic (purchaseItems + saleItems, chronological running balance per product). Per-product summaries computed from FULL movement set. Overall totalIn/totalOut from FULL set. q filter on productName BEFORE paginateArray. Response key movements → rows.
+- For all Category C: summary/running-balance stays accurate (full data) — search only narrows which rows are displayed per page. Used .toLowerCase().includes() for case-insensitive search in JS.
+
+Common patterns applied:
+- Every route imports { parsePagination, paginateResponse } or { parsePagination, paginateArray } from "@/lib/pagination".
+- Every route destructures { page, pageSize, skip, take, q } from parsePagination(req) at the top.
+- Every route returns { rows, total, page, pageSize, totalPages, ...existingExtras } via spread paginateResponse(...) or paginateArray(...).
+- Auth wrapper (withTenant) untouched. Date-range params (from/to) untouched. status/month/days/productId/partyId filters preserved.
+- Summary/totals computed from ALL matching rows (not the page). Search narrows both the page rows (Category A/B) and the displayed entries (Category C).
+
+Verification:
+- `npx tsc --noEmit` initially produced ONE error on profit-loss-detailed/route.ts line 90: "'item.product' is possibly 'null'" inside the summary loop. Fixed by adding non-null assertion `item.product!.id` (matches the existing pattern used in the page-flattening loop on line 150 of the same file).
+- `npx tsc --noEmit` re-run: PASSES with zero errors.
+
+Stage Summary:
+- Deliverables: 13 report API routes refactored to support server-side pagination + search. All return the standard { rows, total, page, pageSize, totalPages } envelope alongside their existing extras (period, summary, totals, customer/supplier, products, etc.).
+- Key decisions:
+  (1) Category A: two findMany calls (lightweight for summary totals, full include with skip/take for page). Total = count of all matching rows.
+  (2) Category B: two findMany calls (lightweight parent with item-lite fields for summary, full-include parent with skip/take for page). Total = parent count. Flatten only the page's items.
+  (3) Category C: keep single in-memory merge, compute summary/running-balance on FULL array, filter by q in JS, paginateArray() for display. Total = filtered entries length.
+- Acceptance: all 13 files compile clean against `npx tsc --noEmit`. No new `any` types added beyond the existing `rows: any[]` pattern already present in sales-detailed/purchase-detailed/profit-loss-detailed (preserved to match the reference routes' style).
+- Artifacts: 13 modified route.ts files (no new files created). No frontend changes in this pass — frontend already has report-pagination component (src/components/layout/report-pagination.tsx) wired to consume this envelope.
+- Phase status: Phase 3 (report pagination) backend complete. Next step (separate task): wire frontend report pages to use the new paginated envelope + render the pagination control + search box.
+
+---
+Task ID: Phase-3-Frontend
+Agent: general-purpose
+Task: Update report frontend pages to consume the new paginated + searchable API envelope `{ rows, total, page, pageSize, totalPages, ...extras }`. Pattern mirrored from the already-done `reports/stock/page.tsx` (debounced search, ReportPagination, lazy hasGenerated).
+
+Work Log:
+- Read reference page `src/app/(app)/reports/stock/page.tsx` + `src/components/layout/report-pagination.tsx` to lock the pattern: state (page/pageSize/search/appliedSearch), 300ms debounce useEffect, queryKey includes (page, pageSize, appliedSearch), URLSearchParams with page/pageSize + optional q, reads `data.rows`, renders `<ReportPagination>` below the table.
+- Read all 14 target pages first to capture existing state names (af/at vs appliedFrom/appliedTo), filter UI (DateRangePicker, party Select, status Select, month Input, etc.), and the unique structure of each (DataTable vs custom table, mobile cards, print blocks, summary cards).
+
+Edits applied (14 files):
+1. `reports/sales/page.tsx` — `data.sales` → `data.rows`; added search + ReportPagination; reset page on Generate / DateRangePicker apply.
+2. `reports/sales-detailed/page.tsx` — already used `data.rows`; added search + ReportPagination + page reset in `onApply` and Generate.
+3. `reports/purchase/page.tsx` — `data.purchases` → `data.rows`; added search + ReportPagination; af/at state names preserved.
+4. `reports/purchase-detailed/page.tsx` — `data.rows` (already); added search + ReportPagination.
+5. `reports/profit-loss/page.tsx` — `data.rows` (already); added search + ReportPagination; af/at preserved.
+6. `reports/profit-loss-detailed/page.tsx` — `data.rows` (already); added search + ReportPagination.
+7. `reports/quotation-register/page.tsx` — `data.quotes` → `data.rows`; added search alongside existing status Select + DateRangePicker; status change now also resets page=1.
+8. `reports/rma-status/page.tsx` — `data.tickets` → `data.rows`; added search + ReportPagination; previously had no params, now sends page/pageSize/q.
+9. `reports/warranty/page.tsx` — `data.units` → `data.rows`; added search + ReportPagination; kept fixed 90-day window.
+10. `reports/salary-sheet/page.tsx` — `data.records` → `data.rows`; added search + ReportPagination; month change also resets page=1.
+11. `reports/customer-ledger/page.tsx` — `data.ledger` → `data.rows`; added search + ReportPagination + page reset on party/date change; kept `enabled: !!appliedCustomerId` + Apply button.
+12. `reports/supplier-ledger/page.tsx` — `data.ledger` → `data.rows`; mirror of customer-ledger.
+13. `reports/product-movement/page.tsx` — `data.movements` → `data.rows`; added search + ReportPagination + page reset on product/date change; kept per-product summary + Apply button.
+14. `accounting/cash-book/page.tsx` — `data.entries` → `data.rows`; added search + ReportPagination; no hasGenerated flag in original (auto-loads), so no EmptyState Generate button added (only date-range + search + auto-query). Page reset on DateRangePicker apply.
+
+Common pattern applied to every page:
+- Imports: added `useEffect` (if not present), `Input`, `Search` (lucide), `ReportPagination` + `type PaginationState` from `@/components/layout/report-pagination`.
+- State: `page` (1), `pageSize` (50), `search` (""), `appliedSearch` ("").
+- Debounce: `useEffect(() => { const t = setTimeout(() => { setAppliedSearch(search.trim()); setPage(1); }, 300); return () => clearTimeout(t); }, [search]);`
+- queryKey: appended `page, pageSize, appliedSearch` to existing keys (e.g. appliedFrom/appliedTo/af/at/status/month/partyId/productId).
+- Fetch: switched from string interpolation to `new URLSearchParams({ ... })` so q / page / pageSize are properly URL-encoded and conditionally included.
+- Data: every `data.<oldKey>` (sales/purchases/quotes/tickets/units/records/ledger/entries/movements) → `data.rows`.
+- Search input: rendered alongside existing filter UI (DateRangePicker, status Select, party Select, month Input). For ledger pages, search sits inside the filter Card below the party/date grid.
+- ReportPagination: rendered as the LAST element inside the `hasGenerated` (or `appliedCustomerId` / `appliedSupplierId`) branch — below DataTable / desktop table / mobile cards, only when rows.length > 0.
+- onChange handler: `({ page: p, pageSize: ps }: PaginationState) => { setPage(p); setPageSize(ps); }`.
+- Filter reset: every existing `onApply` callback (DateRangePicker, status Select, party Select, month Input, product Select) now also calls `setPage(1)`.
+- EmptyState Generate buttons: updated onClick to also call `setPage(1)` when first generating.
+- hasGenerated + EmptyState + existing filter UI preserved per the task constraints.
+
+Verification:
+- `npx tsc --noEmit` → exit code 0, zero errors.
+- `npx eslint` over all 14 files → zero warnings/errors.
+
+Stage Summary:
+- Deliverables: 14 frontend report/accounting pages migrated to the paginated + searchable API envelope. All existing filter UIs, summary cards, print headers, CSV exports, mobile cards, and the Phase-2 `hasGenerated` lazy-load EmptyState preserved.
+- Key decisions:
+  (1) Used URLSearchParams instead of string concatenation so optional params (q, status, month, productId) are dropped cleanly when empty.
+  (2) Pagination state (`page`, `pageSize`, `search`, `appliedSearch`) is local per-page — no shared context — to keep each report independent and avoid cross-page coupling.
+  (3) For ledger pages (customer-ledger, supplier-ledger, product-movement, cash-book) the search input was placed inside the existing filter Card (alongside party Select / DateRangePicker) for visual cohesion, not next to the table.
+  (4) Cash-book kept its auto-load behaviour (no hasGenerated flag) since it lives under `/accounting/` not `/reports/` and was already a live query.
+- Acceptance: `npx tsc --noEmit` passes; ESLint clean; every page now reads `data.rows`, includes `page/pageSize/appliedSearch` in queryKey, sends `page/pageSize/q` in the fetch URL, renders `<ReportPagination>` below the table, and resets `page=1` whenever any filter changes.
+- Phase status: Phase 3 (report pagination) frontend complete. The full Phase-3 stack (lib/pagination helper → 13 backend routes → 14 frontend pages → ReportPagination component) is now wired end-to-end.
+- Artifacts: 14 modified page.tsx files (no new components created; ReportPagination already existed from earlier work).

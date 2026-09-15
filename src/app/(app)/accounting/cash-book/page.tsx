@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
+import { ReportPagination, type PaginationState } from "@/components/layout/report-pagination";
 import { DateRangePicker } from "@/components/layout/date-range-picker";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Wallet, Loader2, Download, Printer } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Wallet, Loader2, Download, Printer, Search } from "lucide-react";
 import { formatBDT, formatDateTime } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
 
@@ -18,14 +20,36 @@ export default function CashBookPage() {
   const [to, setTo] = useState(now.toISOString().slice(0, 10));
   const [appliedFrom, setAppliedFrom] = useState(from);
   const [appliedTo, setAppliedTo] = useState(to);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+
+  // Debounce search input — 300ms after the user stops typing.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(search.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["cash-book", appliedFrom, appliedTo],
-    queryFn: async () => (await (await fetch(`/cctv/api/reports/cash-book?from=${appliedFrom}&to=${appliedTo}`)).json()),
+    queryKey: ["cash-book", appliedFrom, appliedTo, page, pageSize, appliedSearch],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        from: appliedFrom,
+        to: appliedTo,
+        page: String(page),
+        pageSize: String(pageSize),
+        ...(appliedSearch ? { q: appliedSearch } : {}),
+      });
+      return await (await fetch(`/cctv/api/reports/cash-book?${params}`)).json();
+    },
   });
 
   const cb = data;
-  const entries: any[] = cb?.entries ?? [];
+  const entries: any[] = cb?.rows ?? [];
 
   return (
     <div className="space-y-6">
@@ -52,8 +76,17 @@ export default function CashBookPage() {
         }
       />
 
-      <div data-print-hidden>
-        <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAppliedFrom(from); setAppliedTo(to); }} />
+      <div data-print-hidden className="flex flex-col sm:flex-row gap-3">
+        <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAppliedFrom(from); setAppliedTo(to); setPage(1); }} />
+        <div className="relative flex-1 min-w-[12rem]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search reference / narration / type…"
+            className="pl-9"
+          />
+        </div>
       </div>
 
       {/* Print header — only visible when printing */}
@@ -129,6 +162,12 @@ export default function CashBookPage() {
                   </li>
                 ))}
               </ul>
+              <ReportPagination
+                page={cb?.page ?? 1}
+                pageSize={cb?.pageSize ?? pageSize}
+                total={cb?.total ?? 0}
+                onChange={({ page: p, pageSize: ps }: PaginationState) => { setPage(p); setPageSize(ps); }}
+              />
             </>
           )}
         </>

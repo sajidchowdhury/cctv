@@ -1,24 +1,33 @@
 /**
  * GET /api/reports/supplier-ledger — standalone supplier ledger report (F4-S1).
  *
+ * Phase 3: server-side pagination + search. Accepts ?page=1&pageSize=50&q=search
+ * Returns: { rows, total, page, pageSize, totalPages, supplier, summary }
+ *
+ * Search: filter entries by ref (invoiceNo/narration) containing `q`.
+ * Summary is computed across the FULL entries array (not just the page) and
+ * running balances are computed chronologically on the full set — the search
+ * only narrows which entries are displayed per page.
+ *
  * Query params:
  *   ?partyId=<supplierId>  (required) — the supplier to build the ledger for
  *   ?from=YYYY-MM-DD       (optional, defaults to today)
  *   ?to=YYYY-MM-DD         (optional, defaults to from)
  *
- * Returns same shape as customer-ledger. Purchase = debit (increases payable),
- * Payment = credit (reduces).
+ * Purchase = debit (increases payable), Payment = credit (reduces).
  */
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { withTenant } from "@/lib/session";
 import { formatBDT } from "@/lib/format";
+import { parsePagination, paginateArray } from "@/lib/pagination";
 
 export const GET = withTenant(async (user, req: Request) => {
   const url = new URL(req.url);
   const partyId = url.searchParams.get("partyId");
   const fromStr = url.searchParams.get("from") ?? new Date().toISOString().slice(0, 10);
   const toStr = url.searchParams.get("to") ?? fromStr;
+  const { page, pageSize, q } = parsePagination(req);
 
   if (!partyId) {
     return NextResponse.json({ error: "Missing partyId." }, { status: 400 });
@@ -118,11 +127,36 @@ export const GET = withTenant(async (user, req: Request) => {
     entries.push({ ...e, balance: running });
   }
 
+  // Summary totals (from FULL entries — accurate regardless of search).
   const totalDebit = entries.reduce((s, e) => s + e.debit, 0);
   const totalCredit = entries.reduce((s, e) => s + e.credit, 0);
   const closingBalance = openingBalance + totalDebit - totalCredit;
 
+  // Apply search filter (in-memory) BEFORE paginating.
+  const qLower = q.toLowerCase();
+  const filtered = q
+    ? entries.filter(
+        (e) =>
+          e.ref.toLowerCase().includes(qLower) ||
+          (e.narration?.toLowerCase().includes(qLower) ?? false)
+      )
+    : entries;
+
+  // Paginate the (filtered) entries.
+  const pageResult = paginateArray(
+    filtered.map((e) => ({
+      ...e,
+      date: e.date.toISOString(),
+      debitDisplay: e.debit ? formatBDT(e.debit) : "—",
+      creditDisplay: e.credit ? formatBDT(e.credit) : "—",
+      balanceDisplay: formatBDT(e.balance),
+    })),
+    page,
+    pageSize
+  );
+
   return NextResponse.json({
+    ...pageResult,
     supplier: {
       id: supplier.id, name: supplier.name, phone: supplier.phone, company: supplier.company,
       openingBalance: supplier.openingBalance,
@@ -139,12 +173,5 @@ export const GET = withTenant(async (user, req: Request) => {
       totalCreditDisplay: formatBDT(totalCredit),
       closingDisplay: formatBDT(closingBalance),
     },
-    ledger: entries.map((e) => ({
-      ...e,
-      date: e.date.toISOString(),
-      debitDisplay: e.debit ? formatBDT(e.debit) : "—",
-      creditDisplay: e.credit ? formatBDT(e.credit) : "—",
-      balanceDisplay: formatBDT(e.balance),
-    })),
   });
 });

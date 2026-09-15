@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
@@ -8,7 +8,9 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { DataTable } from "@/components/layout/data-table";
+import { ReportPagination, type PaginationState } from "@/components/layout/report-pagination";
 import { Boxes, AlertTriangle, Loader2, PackagePlus, ScanLine, Package, Search } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatBDT } from "@/lib/format";
@@ -31,20 +33,42 @@ type Row = {
 
 export default function StockReportPage() {
   const [lowOnly, setLowOnly] = useState(false);
-  // Lazy-load: don't fetch until user clicks "Generate report".
-  // With 1000+ products, auto-loading on mount would make the page very slow.
   const [hasGenerated, setHasGenerated] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+
+  // Debounce search input — 300ms after the user stops typing.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(search.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["stock-summary", lowOnly],
+    queryKey: ["stock-summary", lowOnly, page, pageSize, appliedSearch],
     queryFn: async () => {
-      const r = await fetch(`/cctv/api/reports/stock-summary${lowOnly ? "?lowStock=1" : ""}`);
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+        ...(lowOnly ? { lowStock: "1" } : {}),
+        ...(appliedSearch ? { q: appliedSearch } : {}),
+      });
+      const r = await fetch(`/cctv/api/reports/stock-summary?${params}`);
       return await r.json();
     },
     enabled: hasGenerated,
   });
   const rows: Row[] = data?.rows ?? [];
   const totals = data?.totals;
+
+  function onPaginationChange({ page: p, pageSize: ps }: PaginationState) {
+    setPage(p);
+    setPageSize(ps);
+  }
 
   const columns = useMemo<ColumnDef<Row>[]>(
     () => [
@@ -97,7 +121,7 @@ export default function StockReportPage() {
     <div className="space-y-6">
       <PageHeader
         title="Stock summary report"
-        description="Product-wise on-hand quantity, value, and low-stock flags. Click Generate to load."
+        description="Product-wise on-hand quantity, value, and low-stock flags. Search + paginate below."
         action={
           <Button asChild size="sm" variant="outline">
             <Link href="/purchases/new"><PackagePlus className="mr-2 h-4 w-4" /> Restock</Link>
@@ -109,7 +133,7 @@ export default function StockReportPage() {
         <EmptyState
           icon={Boxes}
           title="Stock summary report"
-          description="Click Generate to load all products with on-hand quantity, stock value, and low-stock flags. Use the Low stock only filter after generating."
+          description="Click Generate to load the report. With 1000+ products, only 50 rows load per page — fast and searchable."
           action={
             <Button onClick={() => setHasGenerated(true)}>
               <Search className="mr-2 h-4 w-4" /> Generate report
@@ -127,8 +151,21 @@ export default function StockReportPage() {
             </div>
           )}
 
-          <div className="flex justify-end">
-            <Button variant={lowOnly ? "default" : "outline"} onClick={() => setLowOnly((v) => !v)}>
+          {/* Search + low-stock filter */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name, SKU, or model…"
+                className="pl-9"
+              />
+            </div>
+            <Button
+              variant={lowOnly ? "default" : "outline"}
+              onClick={() => { setLowOnly((v) => !v); setPage(1); }}
+            >
               <AlertTriangle className="mr-2 h-4 w-4" /> Low stock only
             </Button>
           </div>
@@ -136,9 +173,17 @@ export default function StockReportPage() {
           {isLoading ? (
             <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : rows.length === 0 ? (
-            <EmptyState icon={Boxes} title="No stock data" description="No products found. Add products and record purchases to see stock here." />
+            <EmptyState icon={Boxes} title="No products found" description={appliedSearch ? `No products match "${appliedSearch}".` : "No products found. Add products and record purchases to see stock here."} />
           ) : (
-            <DataTable columns={columns} data={rows} maxHeight="max-h-[32rem]" />
+            <>
+              <DataTable columns={columns} data={rows} maxHeight="max-h-[32rem]" />
+              <ReportPagination
+                page={data?.page ?? 1}
+                pageSize={data?.pageSize ?? pageSize}
+                total={data?.total ?? 0}
+                onChange={onPaginationChange}
+              />
+            </>
           )}
         </>
       )}

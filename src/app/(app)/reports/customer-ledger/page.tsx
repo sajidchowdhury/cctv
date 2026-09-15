@@ -3,13 +3,15 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
+import { ReportPagination, type PaginationState } from "@/components/layout/report-pagination";
 import { DateRangePicker } from "@/components/layout/date-range-picker";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Loader2, Printer, Users } from "lucide-react";
+import { Download, Loader2, Printer, Users, Search } from "lucide-react";
 import { formatBDT, formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
 
@@ -23,6 +25,19 @@ export default function CustomerLedgerReportPage() {
   const [appliedTo, setAppliedTo] = useState(to);
   const [customerId, setCustomerId] = useState("");
   const [appliedCustomerId, setAppliedCustomerId] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+
+  // Debounce search input — 300ms after the user stops typing.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAppliedSearch(search.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Load customer list for the party picker.
   const { data: customersData } = useQuery({
@@ -32,15 +47,23 @@ export default function CustomerLedgerReportPage() {
   const customers = customersData ?? [];
 
   const { data, isLoading } = useQuery({
-    queryKey: ["report-customer-ledger", appliedCustomerId, appliedFrom, appliedTo],
+    queryKey: ["report-customer-ledger", appliedCustomerId, appliedFrom, appliedTo, page, pageSize, appliedSearch],
     queryFn: async () => {
       if (!appliedCustomerId) return null;
-      return await (await fetch(`/cctv/api/reports/customer-ledger?partyId=${appliedCustomerId}&from=${appliedFrom}&to=${appliedTo}`)).json();
+      const params = new URLSearchParams({
+        partyId: appliedCustomerId,
+        from: appliedFrom,
+        to: appliedTo,
+        page: String(page),
+        pageSize: String(pageSize),
+        ...(appliedSearch ? { q: appliedSearch } : {}),
+      });
+      return await (await fetch(`/cctv/api/reports/customer-ledger?${params}`)).json();
     },
     enabled: !!appliedCustomerId,
   });
 
-  const ledger: any[] = data?.ledger ?? [];
+  const ledger: any[] = data?.rows ?? [];
   const summary = data?.summary;
   const customer = data?.customer;
 
@@ -48,6 +71,7 @@ export default function CustomerLedgerReportPage() {
     setAppliedFrom(from);
     setAppliedTo(to);
     setAppliedCustomerId(customerId);
+    setPage(1);
   }
 
   return (
@@ -68,7 +92,7 @@ export default function CustomerLedgerReportPage() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Customer *</Label>
-              <Select value={customerId} onValueChange={setCustomerId}>
+              <Select value={customerId} onValueChange={(v) => { setCustomerId(v); setPage(1); }}>
                 <SelectTrigger><SelectValue placeholder="Select customer…" /></SelectTrigger>
                 <SelectContent>
                   {customers.map((c) => (
@@ -83,6 +107,15 @@ export default function CustomerLedgerReportPage() {
               <Label>Date range</Label>
               <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={applyFilters} />
             </div>
+          </div>
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search reference / narration / type…"
+              className="pl-9"
+            />
           </div>
           <div className="flex justify-end">
             <Button onClick={applyFilters} disabled={!customerId}>
@@ -184,6 +217,12 @@ export default function CustomerLedgerReportPage() {
                   </li>
                 ))}
               </ul>
+              <ReportPagination
+                page={data?.page ?? 1}
+                pageSize={data?.pageSize ?? pageSize}
+                total={data?.total ?? 0}
+                onChange={({ page: p, pageSize: ps }: PaginationState) => { setPage(p); setPageSize(ps); }}
+              />
             </>
           )}
         </>
