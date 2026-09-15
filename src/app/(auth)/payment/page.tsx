@@ -10,7 +10,7 @@ import { appPath } from "@/lib/app-path";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Lock, CreditCard, Loader2, ArrowRight, LogOut, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { Lock, CreditCard, Loader2, ArrowRight, ArrowLeft, LogOut, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { formatBDT, formatDate } from "@/lib/format";
 
 type HistoryItem = {
@@ -146,9 +146,17 @@ export default function PaymentPage() {
             </div>
             <span className="font-semibold text-sm">Subscription</span>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: appPath("/login") })}>
-            <LogOut className="mr-2 h-4 w-4" /> Log out
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/"><ArrowLeft className="mr-2 h-4 w-4" /> Home</Link>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={async () => {
+              await signOut({ redirect: false });
+              window.location.href = appPath("/login");
+            }}>
+              <LogOut className="mr-2 h-4 w-4" /> Log out
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -321,6 +329,13 @@ export default function PaymentPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Bottom back-to-home button (always visible, not just when ACTIVE) */}
+        <div className="text-center pt-2">
+          <Button asChild variant="outline">
+            <Link href="/"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Home</Link>
+          </Button>
+        </div>
 
         {subStatus === "ACTIVE" && (
           <div className="text-center">

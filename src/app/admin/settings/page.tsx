@@ -117,7 +117,10 @@ export default function AdminSettingsPage() {
               <p className="text-[11px] text-muted-foreground">{session.user.email}</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: appPath("/admin/login") })}>
+          <Button variant="ghost" size="sm" onClick={async () => {
+            await signOut({ redirect: false });
+            window.location.href = appPath("/admin/login");
+          }}>
             <LogOut className="mr-2 h-4 w-4" /> Log out
           </Button>
         </div>

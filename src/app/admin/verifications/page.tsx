@@ -164,7 +164,10 @@ export default function AdminVerificationsPage() {
             <Button asChild variant="outline" size="sm">
               <Link href="/admin/settings"><Settings className="mr-2 h-4 w-4" /> Settings</Link>
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => signOut({ callbackUrl: appPath("/admin/login") })}>
+            <Button variant="ghost" size="sm" onClick={async () => {
+              await signOut({ redirect: false });
+              window.location.href = appPath("/admin/login");
+            }}>
               <LogOut className="mr-2 h-4 w-4" /> Log out
             </Button>
           </div>

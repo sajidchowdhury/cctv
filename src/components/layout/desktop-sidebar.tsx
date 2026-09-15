@@ -11,6 +11,7 @@ import { ShieldCheck, LogOut, Sun, Moon, Languages, Settings } from "lucide-reac
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/lib/lang-store";
+import { HelpButton } from "./help-button";
 
 /**
  * Desktop sidebar — full module list + brand + user + theme toggle (doc §6).
@@ -112,11 +113,28 @@ export function DesktopSidebar() {
           )}
           {theme === "dark" ? "Light mode" : "Dark mode"}
         </Button>
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="justify-start min-h-[44px] flex-1"
+            onClick={() => {}}
+            tabIndex={-1}
+          >
+            <span className="text-muted-foreground">Help</span>
+          </Button>
+          <HelpButton />
+        </div>
         <Button
           variant="ghost"
           size="sm"
           className="w-full justify-start text-muted-foreground min-h-[44px]"
-          onClick={() => signOut({ callbackUrl: appPath("/login") })}
+          onClick={async () => {
+            // signOut destroys the session cookie, then we hard-redirect
+            // to /cctv/login to bypass any cached page state.
+            await signOut({ redirect: false });
+            window.location.href = appPath("/login");
+          }}
         >
           <LogOut className="mr-2 h-4 w-4" /> Log out
         </Button>
@@ -174,6 +192,7 @@ export function MobileTopBar() {
         >
           {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
+        <HelpButton />
         <Link
           href="/payment"
           className="inline-flex h-9 items-center rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"

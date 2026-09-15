@@ -3,7 +3,6 @@
 import { DesktopSidebar, MobileTopBar } from "./desktop-sidebar";
 import { MobileBottomNav } from "./mobile-bottom-nav";
 import { SubscriptionBanner } from "./subscription-banner";
-import { HelpButton } from "./help-button";
 
 /**
  * AppShell — the mobile-first authenticated layout (doc §6).
@@ -20,6 +19,10 @@ import { HelpButton } from "./help-button";
  * arbitrary value syntax: md:pl-[var(--sidebar-width)].
  *
  * Role-aware nav: SALESMAN doesn't see Ledger/Reports (visibleNavItems).
+ *
+ * Phase F-S1: HelpButton is now rendered INSIDE the sidebar footer + MobileTopBar
+ * (next to the theme toggle), not as a floating button. The floating button was
+ * covering the mobile bottom nav.
  */
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -50,7 +53,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </footer>
 
       <MobileBottomNav />
-      <HelpButton />
     </div>
   );
 }

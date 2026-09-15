@@ -1,12 +1,14 @@
 "use client";
 
 /**
- * HelpButton — floating "?" button + left-side off-canvas with Bangla help.
+ * HelpButton — opens a right-side off-canvas with Bangla help.
  *
- * - Floating button fixed at bottom-left corner (z-50), visible on every page.
- * - On click: opens a left-side Sheet (off-canvas) with route-aware Bangla help.
- * - Help content is matched via usePathname() + findHelp() from help-content.ts.
- * - Falls back to DEFAULT_HELP for unmatched routes.
+ * Phase F-S1: moved from a floating bottom-right button to an inline button
+ * in the sidebar footer + mobile top bar (next to the theme toggle).
+ * The floating button was covering the mobile bottom nav.
+ *
+ * Usage: <HelpButton /> renders just the trigger button. The Sheet (off-canvas)
+ * is managed internally.
  */
 import { useState } from "react";
 import { usePathname } from "next/navigation";
@@ -26,17 +28,17 @@ export function HelpButton() {
 
   return (
     <>
-      {/* Floating button — bottom-right corner */}
+      {/* Inline trigger button — placed in sidebar footer / mobile top bar */}
       <Button
         type="button"
-        variant="default"
+        variant="ghost"
         size="icon"
         onClick={() => setOpen(true)}
-        className="fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full shadow-lg hover:shadow-xl transition-shadow"
+        className="h-9 w-9 shrink-0"
         aria-label="সাহায্য (Help)"
         title="সাহায্য — এই পেজ সম্পর্কে জানুন"
       >
-        <HelpCircle className="h-6 w-6" />
+        <HelpCircle className="h-4 w-4" />
       </Button>
 
       {/* Right-side off-canvas */}
