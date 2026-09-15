@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, Loader2, Printer, ListTree, ChevronDown, ChevronRight, ArrowLeft, Search } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Download, Loader2, Printer, ListTree, ChevronDown, ChevronRight, ArrowLeft, Search, Filter, X } from "lucide-react";
 import { formatBDT } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
 
@@ -15,6 +16,10 @@ export default function StockByModelReportPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [hasGenerated, setHasGenerated] = useState(false);
+  // Phase E: model filter — user can pick specific models to view.
+  // Empty set = show all models. Non-empty = show only selected.
+  const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-stock-by-model"],
@@ -32,8 +37,22 @@ export default function StockByModelReportPage() {
     enabled: !!selectedModel,
   });
 
-  const models: any[] = data?.models ?? [];
-  const totals = data?.totals;
+  const allModels: any[] = data?.models ?? [];
+
+  // Phase E: filter models based on selection.
+  const models = useMemo(() => {
+    if (selectedModels.size === 0) return allModels;
+    return allModels.filter((m) => selectedModels.has(m.name));
+  }, [allModels, selectedModels]);
+
+  // Compute filtered totals (so summary cards reflect the filter, not all data).
+  const filteredTotals = useMemo(() => {
+    const productCount = models.reduce((s, m) => s + (m.productCount ?? 0), 0);
+    const totalQty = models.reduce((s, m) => s + (m.totalQty ?? 0), 0);
+    const totalValue = models.reduce((s, m) => s + (m.stockValue ?? 0), 0);
+    return { modelCount: models.length, productCount, totalQty, totalValue };
+  }, [models]);
+
   const serials: any[] = serialData?.serials ?? [];
 
   function toggle(name: string) {
@@ -43,6 +62,23 @@ export default function StockByModelReportPage() {
       else next.add(name);
       return next;
     });
+  }
+
+  function toggleModelFilter(name: string) {
+    setSelectedModels((s) => {
+      const next = new Set(s);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  function clearModelFilter() {
+    setSelectedModels(new Set());
+  }
+
+  function selectAllModels() {
+    setSelectedModels(new Set(allModels.map((m) => m.name)));
   }
 
   function exportAll() {
@@ -80,6 +116,18 @@ export default function StockByModelReportPage() {
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back to models
               </Button>
             )}
+            {hasGenerated && allModels.length > 0 && !selectedModel && (
+              <Button
+                variant={selectedModels.size > 0 ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterOpen((o) => !o)}
+              >
+                <Filter className="mr-2 h-4 w-4" /> Filter
+                {selectedModels.size > 0 && (
+                  <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs">{selectedModels.size}</Badge>
+                )}
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => window.print()} disabled={!models.length}>
               <Printer className="mr-2 h-4 w-4" /> Print
             </Button>
@@ -107,6 +155,46 @@ export default function StockByModelReportPage() {
         <h1 className="text-xl font-bold">Stock by Model</h1>
         <p className="text-sm">Snapshot as of {new Date().toLocaleDateString()}</p>
       </div>
+
+      {/* Phase E: model filter panel — multi-select checkboxes */}
+      {filterOpen && allModels.length > 0 && !selectedModel && (
+        <Card>
+          <CardContent className="py-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Filter by model</p>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={selectAllModels}>Select all</Button>
+                <Button variant="ghost" size="sm" onClick={clearModelFilter}>Clear</Button>
+                <Button variant="ghost" size="sm" onClick={() => setFilterOpen(false)}><X className="h-4 w-4" /></Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {selectedModels.size === 0
+                ? "Showing all models. Click models below to filter."
+                : `Showing ${selectedModels.size} of ${allModels.length} models.`}
+            </p>
+            <ScrollArea className="h-48 rounded-md border p-2">
+              <div className="space-y-1">
+                {allModels.map((m) => (
+                  <label
+                    key={m.name}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedModels.has(m.name)}
+                      onChange={() => toggleModelFilter(m.name)}
+                      className="rounded"
+                    />
+                    <span className="flex-1 truncate">{m.name}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{m.productCount} products</span>
+                  </label>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      )}
 
       {isLoading || !data ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -184,15 +272,24 @@ export default function StockByModelReportPage() {
       ) : models.length === 0 ? (
         <div className="text-center py-12">
           <ListTree className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">No products found.</p>
+          <p className="text-sm text-muted-foreground">
+            {selectedModels.size > 0
+              ? "No models match the current filter."
+              : "No products found."}
+          </p>
+          {selectedModels.size > 0 && (
+            <Button variant="outline" size="sm" className="mt-3" onClick={clearModelFilter}>
+              Clear filter
+            </Button>
+          )}
         </div>
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-4">
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Models</p><p className="text-xl font-bold tabular-nums">{totals?.modelCount ?? 0}</p></CardContent></Card>
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Products</p><p className="text-xl font-bold tabular-nums">{totals?.productCount ?? 0}</p></CardContent></Card>
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Total units</p><p className="text-xl font-bold tabular-nums">{totals?.totalQty ?? 0}</p></CardContent></Card>
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Total value</p><p className="text-xl font-bold tabular-nums">{formatBDT(totals?.totalValue ?? 0)}</p></CardContent></Card>
+            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Models</p><p className="text-xl font-bold tabular-nums">{filteredTotals.modelCount}</p></CardContent></Card>
+            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Products</p><p className="text-xl font-bold tabular-nums">{filteredTotals.productCount}</p></CardContent></Card>
+            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Total units</p><p className="text-xl font-bold tabular-nums">{filteredTotals.totalQty}</p></CardContent></Card>
+            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Total value</p><p className="text-xl font-bold tabular-nums">{formatBDT(filteredTotals.totalValue)}</p></CardContent></Card>
           </div>
 
           {/* Models table — click a row to drill into serials */}

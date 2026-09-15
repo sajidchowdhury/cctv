@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Fragment } from "react";
+import { useState, Fragment, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
@@ -8,13 +8,18 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, Loader2, Printer, Layers, ChevronDown, ChevronRight, Search } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Download, Loader2, Printer, Layers, ChevronDown, ChevronRight, Search, Filter, X } from "lucide-react";
 import { formatBDT } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
 
 export default function StockByCategoryReportPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [hasGenerated, setHasGenerated] = useState(false);
+  // Phase E: category filter — user can pick specific categories to view.
+  // Empty set = show all categories. Non-empty = show only selected.
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [filterOpen, setFilterOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-stock-by-category"],
@@ -22,8 +27,21 @@ export default function StockByCategoryReportPage() {
     enabled: hasGenerated,
   });
 
-  const categories: any[] = data?.categories ?? [];
-  const totals = data?.totals;
+  const allCategories: any[] = data?.categories ?? [];
+
+  // Phase E: filter categories based on selection.
+  const categories = useMemo(() => {
+    if (selectedCategories.size === 0) return allCategories;
+    return allCategories.filter((c) => selectedCategories.has(c.name));
+  }, [allCategories, selectedCategories]);
+
+  // Compute filtered totals (so summary cards reflect the filter, not all data).
+  const filteredTotals = useMemo(() => {
+    const productCount = categories.reduce((s, c) => s + (c.productCount ?? 0), 0);
+    const totalQty = categories.reduce((s, c) => s + (c.totalQty ?? 0), 0);
+    const totalValue = categories.reduce((s, c) => s + (c.stockValue ?? 0), 0);
+    return { categoryCount: categories.length, productCount, totalQty, totalValue };
+  }, [categories]);
 
   function toggle(name: string) {
     setExpanded((s) => {
@@ -34,8 +52,25 @@ export default function StockByCategoryReportPage() {
     });
   }
 
+  function toggleCategoryFilter(name: string) {
+    setSelectedCategories((s) => {
+      const next = new Set(s);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  function clearCategoryFilter() {
+    setSelectedCategories(new Set());
+  }
+
+  function selectAllCategories() {
+    setSelectedCategories(new Set(allCategories.map((c) => c.name)));
+  }
+
   function exportAll() {
-    // Flatten: one row per product.
+    // Export only the filtered categories.
     const rows: any[] = [];
     for (const cat of categories) {
       for (const p of cat.products) {
@@ -59,6 +94,18 @@ export default function StockByCategoryReportPage() {
         description="Stock qty + value grouped by category with drill-down to products (snapshot)."
         action={
           <div className="flex gap-2" data-print-hidden>
+            {hasGenerated && allCategories.length > 0 && (
+              <Button
+                variant={selectedCategories.size > 0 ? "default" : "outline"}
+                size="sm"
+                onClick={() => setFilterOpen((o) => !o)}
+              >
+                <Filter className="mr-2 h-4 w-4" /> Filter
+                {selectedCategories.size > 0 && (
+                  <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-xs">{selectedCategories.size}</Badge>
+                )}
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => window.print()} disabled={!categories.length}>
               <Printer className="mr-2 h-4 w-4" /> Print
             </Button>
@@ -87,20 +134,69 @@ export default function StockByCategoryReportPage() {
         <p className="text-sm">Snapshot as of {new Date().toLocaleDateString()}</p>
       </div>
 
+      {/* Phase E: category filter panel — multi-select checkboxes */}
+      {filterOpen && allCategories.length > 0 && (
+        <Card>
+          <CardContent className="py-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Filter by category</p>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={selectAllCategories}>Select all</Button>
+                <Button variant="ghost" size="sm" onClick={clearCategoryFilter}>Clear</Button>
+                <Button variant="ghost" size="sm" onClick={() => setFilterOpen(false)}><X className="h-4 w-4" /></Button>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {selectedCategories.size === 0
+                ? "Showing all categories. Click categories below to filter."
+                : `Showing ${selectedCategories.size} of ${allCategories.length} categories.`}
+            </p>
+            <ScrollArea className="h-48 rounded-md border p-2">
+              <div className="space-y-1">
+                {allCategories.map((cat) => (
+                  <label
+                    key={cat.name}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedCategories.has(cat.name)}
+                      onChange={() => toggleCategoryFilter(cat.name)}
+                      className="rounded"
+                    />
+                    <span className="flex-1">{cat.name}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{cat.productCount} products</span>
+                  </label>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      )}
+
       {isLoading || !data ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : categories.length === 0 ? (
         <div className="text-center py-12">
           <Layers className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-          <p className="text-sm text-muted-foreground">No products found.</p>
+          <p className="text-sm text-muted-foreground">
+            {selectedCategories.size > 0
+              ? "No categories match the current filter."
+              : "No products found."}
+          </p>
+          {selectedCategories.size > 0 && (
+            <Button variant="outline" size="sm" className="mt-3" onClick={clearCategoryFilter}>
+              Clear filter
+            </Button>
+          )}
         </div>
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-4">
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Categories</p><p className="text-xl font-bold tabular-nums">{totals?.categoryCount ?? 0}</p></CardContent></Card>
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Products</p><p className="text-xl font-bold tabular-nums">{totals?.productCount ?? 0}</p></CardContent></Card>
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Total units</p><p className="text-xl font-bold tabular-nums">{totals?.totalQty ?? 0}</p></CardContent></Card>
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Total value</p><p className="text-xl font-bold tabular-nums">{formatBDT(totals?.totalValue ?? 0)}</p></CardContent></Card>
+            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Categories</p><p className="text-xl font-bold tabular-nums">{filteredTotals.categoryCount}</p></CardContent></Card>
+            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Products</p><p className="text-xl font-bold tabular-nums">{filteredTotals.productCount}</p></CardContent></Card>
+            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Total units</p><p className="text-xl font-bold tabular-nums">{filteredTotals.totalQty}</p></CardContent></Card>
+            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Total value</p><p className="text-xl font-bold tabular-nums">{formatBDT(filteredTotals.totalValue)}</p></CardContent></Card>
           </div>
 
           {/* Desktop table — category summary */}
