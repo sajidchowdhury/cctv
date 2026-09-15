@@ -30,7 +30,7 @@ export const GET = withTenant(async (user, req: Request) => {
     where: {
       deletedAt: null,
       type: "PAY",
-      ...(search ? { narration: { contains: search } } : {}),
+      ...(search ? { narration: { contains: search, mode: "insensitive" } } : {}),
     },
     include: { supplier: { select: { id: true, name: true } } },
     orderBy: { date: "desc" },

@@ -10,6 +10,7 @@
  * so the summary stays accurate regardless of which page the user is viewing.
  */
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { withTenant } from "@/lib/session";
 import { parsePagination, paginateResponse } from "@/lib/pagination";
@@ -18,14 +19,14 @@ export const GET = withTenant(async (user, req: Request) => {
   const { page, pageSize, skip, take, q } = parsePagination(req);
 
   // Build where clause with search.
-  const where = {
+  const where: Prisma.RmaTicketWhereInput = {
     deletedAt: null,
     ...(q
       ? {
           OR: [
-            { rmaNo: { contains: q } },
-            { faultReason: { contains: q } },
-            { customer: { name: { contains: q } } },
+            { rmaNo: { contains: q, mode: "insensitive" } },
+            { faultReason: { contains: q, mode: "insensitive" } },
+            { customer: { name: { contains: q, mode: "insensitive" } } },
           ],
         }
       : {}),

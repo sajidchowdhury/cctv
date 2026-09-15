@@ -15,7 +15,7 @@ export const GET = withTenant(async (user, req: Request) => {
   const cats = await db.category.findMany({
     where: {
       deletedAt: null,
-      ...(search ? { name: { contains: search } } : {}),
+      ...(search ? { name: { contains: search, mode: "insensitive" } } : {}),
     },
     orderBy: { name: "asc" },
     include: { _count: { select: { products: true } } },

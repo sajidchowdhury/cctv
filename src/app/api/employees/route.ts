@@ -22,7 +22,7 @@ export const GET = withTenant(async (user, req: Request) => {
   const employees = await db.employee.findMany({
     where: {
       deletedAt: null,
-      ...(search ? { name: { contains: search } } : {}),
+      ...(search ? { name: { contains: search, mode: "insensitive" } } : {}),
       ...(status ? { status } : {}),
     },
     include: {

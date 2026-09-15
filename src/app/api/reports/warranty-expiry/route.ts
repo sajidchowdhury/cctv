@@ -11,6 +11,7 @@
  * Search: serialNo (on inventoryUnit), productName, customerName.
  */
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { withTenant } from "@/lib/session";
 import { formatBDT } from "@/lib/format";
@@ -24,7 +25,7 @@ export const GET = withTenant(async (user, req: Request) => {
   const { page, pageSize, skip, take, q } = parsePagination(req);
 
   // Build where clause with date range + search across serialNo, productName, customerName.
-  const where = {
+  const where: Prisma.InventoryUnitWhereInput = {
     deletedAt: null,
     status: "SOLD",
     warrantyEnd: {
@@ -34,9 +35,9 @@ export const GET = withTenant(async (user, req: Request) => {
     ...(q
       ? {
           OR: [
-            { serialNo: { contains: q } },
-            { product: { name: { contains: q } } },
-            { saleItem: { sale: { customer: { name: { contains: q } } } } },
+            { serialNo: { contains: q, mode: "insensitive" } },
+            { product: { name: { contains: q, mode: "insensitive" } } },
+            { saleItem: { sale: { customer: { name: { contains: q, mode: "insensitive" } } } } },
           ],
         }
       : {}),

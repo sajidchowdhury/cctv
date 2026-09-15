@@ -10,6 +10,7 @@
  * Search: employee name.
  */
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { withTenant } from "@/lib/session";
 import { formatBDT } from "@/lib/format";
@@ -21,10 +22,10 @@ export const GET = withTenant(async (user, req: Request) => {
   const { page, pageSize, skip, take, q } = parsePagination(req);
 
   // Build where clause with month + search on employee name.
-  const where = {
+  const where: Prisma.SalaryRecordWhereInput = {
     tenantId: user.tenantId!,
     ...(month ? { month } : {}),
-    ...(q ? { employee: { name: { contains: q } } } : {}),
+    ...(q ? { employee: { name: { contains: q, mode: "insensitive" } } } : {}),
   };
 
   // Fetch ALL matching records for summary totals (lightweight select).

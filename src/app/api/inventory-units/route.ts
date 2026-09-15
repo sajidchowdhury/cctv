@@ -19,7 +19,7 @@ export const GET = withTenant(async (user, req: Request) => {
       deletedAt: null,
       ...(productId ? { productId } : {}),
       ...(status !== "ALL" ? { status } : {}),
-      ...(search ? { serialNo: { contains: search } } : {}),
+      ...(search ? { serialNo: { contains: search, mode: "insensitive" } } : {}),
     },
     include: {
       product: { select: { id: true, name: true, model: true, sku: true } },

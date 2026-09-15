@@ -58,7 +58,7 @@ export const GET = withTenant(async (user, req: Request) => {
     where: {
       deletedAt: null,
       ...(heldOnly ? { isHeld: true } : {}),
-      ...(search ? { invoiceNo: { contains: search } } : {}),
+      ...(search ? { invoiceNo: { contains: search, mode: "insensitive" } } : {}),
     },
     include: {
       customer: { select: { id: true, name: true } },

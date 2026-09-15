@@ -17,7 +17,7 @@ export const GET = withTenant(async (user, req: Request) => {
   const customers = await db.customer.findMany({
     where: {
       deletedAt: null,
-      ...(search ? { OR: [{ name: { contains: search } }, { phone: { contains: search } }] } : {}),
+      ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" } }, { phone: { contains: search, mode: "insensitive" } }] } : {}),
     },
     include: {
       sales: {

@@ -57,7 +57,7 @@ export const GET = withTenant(async (user, req: Request) => {
     where: {
       deletedAt: null,
       ...(supplierId ? { supplierId } : {}),
-      ...(search ? { invoiceNo: { contains: search } } : {}),
+      ...(search ? { invoiceNo: { contains: search, mode: "insensitive" } } : {}),
     },
     include: {
       supplier: { select: { id: true, name: true } },

@@ -26,9 +26,9 @@ export const GET = withTenant(async (user, req: Request) => {
       ...(search
         ? {
             OR: [
-              { name: { contains: search } },
-              { company: { contains: search } },
-              { phone: { contains: search } },
+              { name: { contains: search, mode: "insensitive" } },
+              { company: { contains: search, mode: "insensitive" } },
+              { phone: { contains: search, mode: "insensitive" } },
             ],
           }
         : {}),

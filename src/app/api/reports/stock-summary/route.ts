@@ -29,12 +29,12 @@ export const GET = withTenant(async (user, req: Request) => {
   const { page, pageSize, skip, take, q } = parsePagination(req);
 
   // Build search filter — search across name, sku, model.
-  const searchWhere = q
+  const searchWhere: Prisma.ProductWhereInput = q
     ? {
         OR: [
-          { name: { contains: q } },
-          { sku: { contains: q } },
-          { model: { contains: q } },
+          { name: { contains: q, mode: "insensitive" } },
+          { sku: { contains: q, mode: "insensitive" } },
+          { model: { contains: q, mode: "insensitive" } },
         ],
       }
     : {};

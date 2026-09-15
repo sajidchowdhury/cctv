@@ -25,7 +25,12 @@ export const GET = withTenant(async (user, req: Request) => {
     where: {
       deletedAt: null,
       ...(search
-        ? { OR: [{ name: { contains: search } }, { phone: { contains: search } }] }
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { phone: { contains: search, mode: "insensitive" } },
+            ]
+          }
         : {}),
     },
     orderBy: { name: "asc" },

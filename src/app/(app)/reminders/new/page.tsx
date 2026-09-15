@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -17,6 +18,7 @@ const FREQUENCIES = ["DAILY", "WEEKLY", "MONTHLY", "YEARLY", "ONCE"];
 
 export default function NewReminderPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -42,7 +44,11 @@ export default function NewReminderPage() {
       });
       const data = await res.json();
       if (!res.ok) { toast({ title: "Failed", description: data.error, variant: "destructive" }); }
-      else { toast({ title: "Reminder created" }); router.push("/reminders"); }
+      else {
+        toast({ title: "Reminder created" });
+        qc.invalidateQueries({ queryKey: ["reminders"] });
+        router.push("/reminders");
+      }
     } finally { setSaving(false); }
   }
 

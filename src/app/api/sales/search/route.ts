@@ -37,7 +37,7 @@ export const GET = withTenant(async (user, req: Request) => {
     where: {
       deletedAt: null,
       status: "IN_STOCK",
-      serialNo: { contains: q },
+      serialNo: { contains: q, mode: "insensitive" },
     },
     include: {
       product: {
@@ -55,9 +55,9 @@ export const GET = withTenant(async (user, req: Request) => {
     where: {
       deletedAt: null,
       OR: [
-        { name: { contains: q } },
-        { model: { contains: q } },
-        { sku: { contains: q } },
+        { name: { contains: q, mode: "insensitive" } },
+        { model: { contains: q, mode: "insensitive" } },
+        { sku: { contains: q, mode: "insensitive" } },
       ],
     },
     select: {

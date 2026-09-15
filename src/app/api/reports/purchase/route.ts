@@ -7,6 +7,7 @@
  * so the summary stays accurate regardless of which page the user is viewing.
  */
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { withTenant } from "@/lib/session";
 import { formatBDT } from "@/lib/format";
@@ -19,14 +20,14 @@ export const GET = withTenant(async (user, req: Request) => {
   const { page, pageSize, skip, take, q } = parsePagination(req);
 
   // Build where clause with date range + search.
-  const where = {
+  const where: Prisma.PurchaseWhereInput = {
     deletedAt: null,
     date: { gte: new Date(from + "T00:00:00"), lte: new Date(to + "T23:59:59") },
     ...(q
       ? {
           OR: [
-            { invoiceNo: { contains: q } },
-            { supplier: { name: { contains: q } } },
+            { invoiceNo: { contains: q, mode: "insensitive" } },
+            { supplier: { name: { contains: q, mode: "insensitive" } } },
           ],
         }
       : {}),

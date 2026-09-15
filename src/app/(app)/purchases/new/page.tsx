@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { SearchScanInput } from "@/components/layout/search-scan-input";
@@ -43,6 +44,7 @@ function toIsoLocal(d: Date): string {
 
 function NewPurchaseForm() {
   const router = useRouter();
+  const qc = useQueryClient();
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
@@ -56,10 +58,17 @@ function NewPurchaseForm() {
   const [paid, setPaid] = useState("");
   const [notes, setNotes] = useState("");
   const [invoiceNo, setInvoiceNo] = useState(""); // editable on edit-mode (auto-gen on create if blank)
-  const [date, setDate] = useState(toIsoLocal(new Date()));
+  // Initialize date in useEffect to avoid SSR/CSR hydration mismatch
+  // (new Date() produces different values depending on timezone + render time).
+  const [date, setDate] = useState("");
   const [lines, setLines] = useState<CartLine[]>([]);
   const [productSearch, setProductSearch] = useState("");
   const [showProductPicker, setShowProductPicker] = useState(false);
+
+  // Set today's date after hydration (prevents React #418 hydration mismatch).
+  useEffect(() => {
+    if (!date) setDate(toIsoLocal(new Date()));
+  }, [date]);
 
   // Inline supplier creation dialog state.
   const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
@@ -297,7 +306,7 @@ function NewPurchaseForm() {
         payload.invoiceNo = invoiceNo.trim() || null;
         payload.date = date ? new Date(date).toISOString() : null;
       }
-      const url = isEditMode && resumeId ? `/api/purchases/${resumeId}` : "/api/purchases";
+      const url = isEditMode && resumeId ? `/cctv/api/purchases/${resumeId}` : "/cctv/api/purchases";
       const method = isEditMode && resumeId ? "PATCH" : "POST";
       const res = await fetch(url, {
         method,
@@ -315,6 +324,8 @@ function NewPurchaseForm() {
       } else {
         toast({ title: "Purchase saved", description: `${data.invoiceNo} — ${data.inventoryUnitsCreated} serialised units created.` });
       }
+      // Invalidate the purchases query so the list refetches on navigation.
+      qc.invalidateQueries({ queryKey: ["purchases"] });
       router.push("/purchases");
     } finally {
       setSaving(false);

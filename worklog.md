@@ -1931,3 +1931,66 @@ Stage Summary:
 - Acceptance: `npx tsc --noEmit` passes; ESLint clean; every page now reads `data.rows`, includes `page/pageSize/appliedSearch` in queryKey, sends `page/pageSize/q` in the fetch URL, renders `<ReportPagination>` below the table, and resets `page=1` whenever any filter changes.
 - Phase status: Phase 3 (report pagination) frontend complete. The full Phase-3 stack (lib/pagination helper → 13 backend routes → 14 frontend pages → ReportPagination component) is now wired end-to-end.
 - Artifacts: 14 modified page.tsx files (no new components created; ReportPagination already existed from earlier work).
+
+---
+
+## Task: Phase-A-search-fix
+**Agent:** general-purpose
+**Date:** 2025-09-15
+**Scope:** Add `mode: "insensitive"` to all remaining Prisma `contains` filters across the API layer (PostgreSQL/production parity for case-insensitive search).
+
+### Background
+Prisma's `contains` filter is case-sensitive by default on PostgreSQL. The customers, suppliers, products, and sales/search routes had already been fixed in earlier work. This task fixed the remaining 11 list/lookup routes and all 11 paginated report routes.
+
+### Files modified (22 total)
+
+**List/lookup routes (11):**
+1. `src/app/api/employees/route.ts` — `name: { contains: search }` → added `mode: "insensitive"`.
+2. `src/app/api/warranty/lookup/route.ts` — 4 filters on `serialNo`, `product.name`, `product.model`, `product.sku` (uses `searchQuery` variable).
+3. `src/app/api/categories/route.ts` — `name`.
+4. `src/app/api/sales/route.ts` — `invoiceNo`.
+5. `src/app/api/purchases/route.ts` — `invoiceNo`.
+6. `src/app/api/rma/route.ts` — `rmaNo`.
+7. `src/app/api/crm/customers/route.ts` — `name` + `phone` inside OR.
+8. `src/app/api/inventory-units/route.ts` — `serialNo`.
+9. `src/app/api/quotations/route.ts` — `quoteNo`.
+10. `src/app/api/payments/route.ts` — `narration`.
+11. `src/app/api/receipts/route.ts` — `narration`.
+
+**Report routes (11) — all under `src/app/api/reports/`:**
+- `rma-status/route.ts` — `rmaNo`, `faultReason`, `customer.name` (3 filters).
+- `sales-detailed/route.ts` — `invoiceNo`, `customer.name`, `items.product.name` (3).
+- `salary-sheet/route.ts` — `employee.name` (1).
+- `warranty-expiry/route.ts` — `serialNo`, `product.name`, `saleItem.sale.customer.name` (3).
+- `purchase-detailed/route.ts` — `invoiceNo`, `supplier.name`, `items.product.name` (3).
+- `purchase/route.ts` — `invoiceNo`, `supplier.name` (2).
+- `stock-summary/route.ts` — `name`, `sku`, `model` (3).
+- `sales/route.ts` — `invoiceNo`, `customer.name`, `salesman.name` (3).
+- `profit-loss-detailed/route.ts` — `invoiceNo`, `customer.name`, `items.product.name` (3).
+- `profit-loss/route.ts` — `invoiceNo`, `customer.name` (2).
+- `quotation-register/route.ts` — `quoteNo`, `customerName`, `customer.name` (3).
+
+Total: 31 `contains` filters modified (not counting the 11 already-fixed routes).
+
+### TypeScript fix (cascading type widening)
+After the first round of edits, `npx tsc --noEmit` reported type errors in 10 of the 11 report routes. Root cause: the report routes build a `const where = { ... }` object literal *before* passing it to `findMany()`, so TypeScript widened `mode: "insensitive"` to `mode: string` (instead of the literal `QueryMode`), which in turn cascaded into "Property 'items'/'customer'/'supplier' does not exist" errors on the return type (the where clause failed `Exact<...>` validation, so findMany fell back to a less specific overload).
+
+Fix: imported `Prisma` from `@prisma/client` and annotated each `where` const (and the `searchWhere` const in stock-summary) with its matching `Prisma.<Model>WhereInput` type:
+- `Prisma.SaleWhereInput` — sales-detailed, sales, profit-loss-detailed, profit-loss
+- `Prisma.PurchaseWhereInput` — purchase-detailed, purchase
+- `Prisma.QuotationWhereInput` — quotation-register
+- `Prisma.RmaTicketWhereInput` — rma-status
+- `Prisma.SalaryRecordWhereInput` — salary-sheet
+- `Prisma.InventoryUnitWhereInput` — warranty-expiry
+- `Prisma.ProductWhereInput` — stock-summary (already had `import { Prisma }`)
+
+The 11 list/lookup routes (1–11 above) build their `where` inline in the `findMany({ where: { ... } })` call, so TypeScript used contextual typing and no annotation was needed.
+
+### Verification
+- `npx tsc --noEmit` → exit code 0, zero errors.
+- Grep confirms 53 `mode: "insensitive"` occurrences across 26 files (no `contains: X }` pattern left without `mode`).
+- Untouched (already fixed): `src/app/api/customers/`, `src/app/api/suppliers/`, `src/app/api/products/`, `src/app/api/sales/search/`.
+
+### Notes for future work
+- Any new API route that builds a `const where = { ... }` object before passing to `findMany` should annotate it with the proper `Prisma.<Model>WhereInput` type, otherwise `mode: "insensitive"` will widen to `string` and break type inference.
+- The simplest pattern (used in the list/lookup routes) is to inline the where clause directly in `findMany({ where: { ... } })` so TypeScript can use contextual typing — no annotation needed.

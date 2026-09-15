@@ -33,13 +33,13 @@ export const GET = withTenant(async (user, req: Request) => {
     where: {
       deletedAt: null,
       OR: [
-        { serialNo: { contains: searchQuery } },
+        { serialNo: { contains: searchQuery, mode: "insensitive" } },
         {
           product: {
             OR: [
-              { name: { contains: searchQuery } },
-              { model: { contains: searchQuery } },
-              { sku: { contains: searchQuery } },
+              { name: { contains: searchQuery, mode: "insensitive" } },
+              { model: { contains: searchQuery, mode: "insensitive" } },
+              { sku: { contains: searchQuery, mode: "insensitive" } },
             ],
           },
         },

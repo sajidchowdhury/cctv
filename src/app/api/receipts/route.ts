@@ -31,7 +31,7 @@ export const GET = withTenant(async (user, req: Request) => {
     where: {
       deletedAt: null,
       type: "RECV",
-      ...(search ? { narration: { contains: search } } : {}),
+      ...(search ? { narration: { contains: search, mode: "insensitive" } } : {}),
     },
     include: { customer: { select: { id: true, name: true } } },
     orderBy: { date: "desc" },
