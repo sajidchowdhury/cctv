@@ -3,6 +3,7 @@
 import { DesktopSidebar, MobileTopBar } from "./desktop-sidebar";
 import { MobileBottomNav } from "./mobile-bottom-nav";
 import { SubscriptionBanner } from "./subscription-banner";
+import { HelpButton } from "./help-button";
 
 /**
  * AppShell — the mobile-first authenticated layout (doc §6).
@@ -49,6 +50,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </footer>
 
       <MobileBottomNav />
+      <HelpButton />
     </div>
   );
 }

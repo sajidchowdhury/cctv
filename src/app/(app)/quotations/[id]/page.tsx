@@ -53,6 +53,7 @@ export default function QuotationDetailPage() {
       } else {
         toast({ title: `Status: ${status}` });
         qc.invalidateQueries({ queryKey: ["quotation", id] });
+        qc.invalidateQueries({ queryKey: ["quotations"] });
       }
     } finally {
       setBusy(null);
@@ -65,15 +66,23 @@ export default function QuotationDetailPage() {
       const res = await fetch(`/cctv/api/quotations/${id}/convert`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
-        toast({ title: "Failed", description: data.error, variant: "destructive" });
+        // 409 = oversell blocked. Show which products are short.
+        if (res.status === 409 && data.stockShortfalls?.length > 0) {
+          const lines = data.stockShortfalls.map(
+            (s: any) => `${s.productName}: need ${s.requested}, have ${s.available}`
+          );
+          toast({
+            title: "Stock insufficient — conversion blocked",
+            description: lines.join(" · "),
+            variant: "destructive",
+          });
+        } else {
+          toast({ title: "Failed", description: data.error ?? "Conversion failed.", variant: "destructive" });
+        }
       } else {
         toast({ title: "Converted to sale", description: data.message });
-        if (data.stockWarnings?.length > 0) {
-          data.stockWarnings.forEach((w: any) => {
-            toast({ title: `Low stock: ${w.productName}`, description: `Need ${w.requested}, have ${w.available}`, variant: "destructive" });
-          });
-        }
         qc.invalidateQueries({ queryKey: ["quotation", id] });
+        qc.invalidateQueries({ queryKey: ["quotations"] });
       }
     } finally {
       setBusy(null);
@@ -89,6 +98,7 @@ export default function QuotationDetailPage() {
         toast({ title: "Failed", description: data.error, variant: "destructive" });
       } else {
         toast({ title: "Duplicated", description: data.message });
+        qc.invalidateQueries({ queryKey: ["quotations"] });
         router.push(`/quotations/${data.id}`);
       }
     } finally {

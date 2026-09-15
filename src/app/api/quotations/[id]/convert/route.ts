@@ -2,17 +2,21 @@
  * POST /api/quotations/[id]/convert (doc §5.6)
  *
  * One-click action copies quote line items into a new Sales Invoice with
- * stock reservation check. If any quoted product is out of stock, the
- * system flags it and offers to create a backorder Purchase.
+ * stock check. If any quoted product is out of stock, returns 409 Conflict
+ * with the list of short items — the user must fix stock (purchase more)
+ * or adjust the quotation before converting.
  *
  * Creates a Sale (isHeld=true so the salesman reviews/finalizes in S11)
  * + SaleItems for each quote line. Quotation status → CONVERTED.
  *
- * Returns: the new sale ID + any out-of-stock flags.
+ * Stock check uses computeOnHandBatch (shared helper) which correctly
+ * handles both serialised products (count of IN_STOCK InventoryUnits) and
+ * non-serialised products (ΣPurchaseItem.qty − ΣSaleItem.qty).
  */
 import { NextResponse } from "next/server";
 import { db, adminDb } from "@/lib/db";
 import { withTenant } from "@/lib/session";
+import { computeOnHandBatch } from "@/lib/onhand";
 
 function genInvoiceNo(): string {
   const d = new Date();
@@ -34,9 +38,7 @@ export const POST = withTenant(async (user, _req: Request, ctx: any) => {
       items: {
         include: {
           product: {
-            include: {
-              inventoryUnits: { where: { status: "IN_STOCK" }, select: { id: true } },
-            },
+            select: { id: true, name: true, isSerialised: true },
           },
         },
       },
@@ -50,19 +52,50 @@ export const POST = withTenant(async (user, _req: Request, ctx: any) => {
     return NextResponse.json({ error: "Quotation already converted." }, { status: 409 });
   }
 
-  // Stock check: flag out-of-stock products (doc §5.6).
-  const stockWarnings: { productName: string; requested: number; available: number }[] = [];
-  for (const item of quote.items) {
-    if (item.lineType === "PRODUCT" && item.productId) {
-      const available = item.product?.inventoryUnits.length ?? 0;
-      if (item.qty > available) {
-        stockWarnings.push({
-          productName: item.product?.name ?? "Unknown",
-          requested: item.qty,
-          available,
-        });
-      }
+  // ── Stock check (oversell protection) ────────────────────────────
+  // Use computeOnHandBatch to get accurate on-hand for ALL product types:
+  //   - Serialised (cameras/DVRs): count of IN_STOCK InventoryUnits
+  //   - Non-serialised (cables/PSU): ΣPurchaseItem.qty − ΣSaleItem.qty
+  // Service/LABOR lines have no stock — skipped.
+  const productItems = quote.items.filter(
+    (it) => it.lineType === "PRODUCT" && it.productId && it.product
+  );
+  const onHandMap = await computeOnHandBatch(
+    db,
+    quote.tenantId,
+    productItems.map((it) => ({ id: it.productId!, isSerialised: it.product!.isSerialised }))
+  );
+
+  // Aggregate requested qty per product (a quotation may have multiple lines
+  // for the same product).
+  const requestedMap = new Map<string, number>();
+  for (const it of productItems) {
+    requestedMap.set(it.productId!, (requestedMap.get(it.productId!) ?? 0) + it.qty);
+  }
+
+  const stockShortfalls: { productName: string; requested: number; available: number }[] = [];
+  for (const [pid, requestedQty] of requestedMap.entries()) {
+    const available = onHandMap.get(pid) ?? 0;
+    if (requestedQty > available) {
+      const item = productItems.find((it) => it.productId === pid);
+      stockShortfalls.push({
+        productName: item?.product?.name ?? "Unknown",
+        requested: requestedQty,
+        available,
+      });
     }
+  }
+
+  // Hard block: don't create a sale if any product is oversold.
+  // The user must fix stock (purchase more) or adjust the quotation first.
+  if (stockShortfalls.length > 0) {
+    return NextResponse.json(
+      {
+        error: "Oversell blocked — insufficient stock for one or more products.",
+        stockShortfalls,
+      },
+      { status: 409 }
+    );
   }
 
   // Create the Sale + SaleItems (transactional).
@@ -118,11 +151,7 @@ export const POST = withTenant(async (user, _req: Request, ctx: any) => {
       ok: true,
       saleId: result.id,
       invoiceNo: result.invoiceNo,
-      stockWarnings,
-      message:
-        stockWarnings.length > 0
-          ? `Converted to sale ${result.invoiceNo}. ${stockWarnings.length} product(s) out of stock — consider creating a backorder Purchase.`
-          : `Converted to sale ${result.invoiceNo}. Review and finalize it.`,
+      message: `Converted to sale ${result.invoiceNo}. Review and finalize it.`,
     });
   } catch (err: any) {
     console.error("[quotations/convert] error:", err);

@@ -73,6 +73,7 @@ export default function CustomerDetailPage() {
         toast({ title: "Saved", description: "Customer updated." });
         qc.invalidateQueries({ queryKey: ["customer", id] });
         qc.invalidateQueries({ queryKey: ["customer-ledger", id] });
+        qc.invalidateQueries({ queryKey: ["customers"] });
       }
     } finally {
       setSaving(false);
@@ -83,6 +84,7 @@ export default function CustomerDetailPage() {
     const res = await fetch(`/cctv/api/customers/${id}`, { method: "DELETE" });
     if (res.ok) {
       toast({ title: "Deleted", description: "Customer removed." });
+      qc.invalidateQueries({ queryKey: ["customers"] });
       router.push("/customers");
     }
   }

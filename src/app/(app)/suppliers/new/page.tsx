@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -13,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function NewSupplierPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -45,6 +47,7 @@ export default function NewSupplierPage() {
         return;
       }
       toast({ title: "Supplier created", description: `${data.supplier.name}` });
+      qc.invalidateQueries({ queryKey: ["suppliers"] });
       router.push("/suppliers");
     } finally {
       setSaving(false);

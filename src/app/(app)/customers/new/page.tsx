@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function NewCustomerPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -46,6 +48,7 @@ export default function NewCustomerPage() {
         return;
       }
       toast({ title: "Customer created", description: data.customer.name });
+      qc.invalidateQueries({ queryKey: ["customers"] });
       router.push("/customers");
     } finally {
       setSaving(false);

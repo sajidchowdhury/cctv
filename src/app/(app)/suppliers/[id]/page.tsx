@@ -88,6 +88,7 @@ export default function SupplierDetailPage() {
     const res = await fetch(`/cctv/api/suppliers/${id}`, { method: "DELETE" });
     if (res.ok) {
       toast({ title: "Deleted", description: "Supplier removed." });
+      qc.invalidateQueries({ queryKey: ["suppliers"] });
       router.push("/suppliers");
     }
   }

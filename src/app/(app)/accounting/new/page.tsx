@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -17,6 +18,7 @@ type Head = { id: string; name: string; kind: string };
 
 export default function NewTransactionPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [heads, setHeads] = useState<Head[]>([]);
@@ -56,6 +58,7 @@ export default function NewTransactionPage() {
         return;
       }
       toast({ title: "Saved", description: `${type === "IN" ? "Income" : "Expense"} recorded.` });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
       router.push("/ledger");
     } finally {
       setSaving(false);
