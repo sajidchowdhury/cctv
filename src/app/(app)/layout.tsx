@@ -7,22 +7,16 @@
  *   - subscription banner slot
  *   - sticky footer
  *
- * CRITICAL: Sets Cache-Control: no-store on all (app) pages so the browser
- * NEVER caches authenticated content. Without this, after logout the browser
- * can serve a cached dashboard page directly (bypassing the middleware),
- * making it appear like the user is still logged in.
+ * Note: Cache-Control: no-store is set by the middleware (proxy.ts) on ALL
+ * responses, so we don't need to set it here. Using headers().set() in a
+ * layout is NOT supported — headers() returns a read-only object.
  */
 import { AppShell } from "@/components/layout/app-shell";
-import { headers } from "next/headers";
 
-export default async function AppLayout({
+export default function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Force no-store cache headers on all authenticated pages.
-  const headerList = await headers();
-  headerList.set("Cache-Control", "no-store, no-cache, must-revalidate");
-
   return <AppShell>{children}</AppShell>;
 }
