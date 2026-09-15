@@ -113,18 +113,7 @@ export function DesktopSidebar() {
           )}
           {theme === "dark" ? "Light mode" : "Dark mode"}
         </Button>
-        <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="justify-start min-h-[44px] flex-1"
-            onClick={() => {}}
-            tabIndex={-1}
-          >
-            <span className="text-muted-foreground">Help</span>
-          </Button>
-          <HelpButton />
-        </div>
+        <HelpButton showLabel />
         <Button
           variant="ghost"
           size="sm"

@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { HelpCircle, Lightbulb, ListChecks, Info } from "lucide-react";
 import { findHelp } from "@/lib/help-content";
 
-export function HelpButton() {
+export function HelpButton({ showLabel = false }: { showLabel?: boolean }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -28,17 +28,20 @@ export function HelpButton() {
 
   return (
     <>
-      {/* Inline trigger button — placed in sidebar footer / mobile top bar */}
+      {/* Inline trigger button — placed in sidebar footer / mobile top bar.
+          showLabel=true renders a full-width button with "Help" label + icon
+          (for desktop sidebar). showLabel=false renders just the icon (for mobile top bar). */}
       <Button
         type="button"
         variant="ghost"
-        size="icon"
+        size={showLabel ? "sm" : "icon"}
         onClick={() => setOpen(true)}
-        className="h-9 w-9 shrink-0"
+        className={showLabel ? "w-full justify-start min-h-[44px]" : "h-9 w-9 shrink-0"}
         aria-label="সাহায্য (Help)"
         title="সাহায্য — এই পেজ সম্পর্কে জানুন"
       >
-        <HelpCircle className="h-4 w-4" />
+        <HelpCircle className={showLabel ? "mr-2 h-4 w-4" : "h-4 w-4"} />
+        {showLabel && <span>Help</span>}
       </Button>
 
       {/* Right-side off-canvas */}

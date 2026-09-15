@@ -13,9 +13,10 @@
  *     (unless already there).
  *   - Otherwise → allow.
  *
- * The subscription status comes from the JWT (refreshed server-side every
- * 60s in the jwt callback, so an admin verify/lock takes effect within ~1 min
- * without a re-login — doc §3.3 "access restored within 60 seconds").
+ * CRITICAL: All responses include Cache-Control: no-store so the browser
+ * NEVER caches authenticated pages. Without this, after logout the browser
+ * can serve a cached dashboard page directly (bypassing the middleware),
+ * making it appear like the user is still logged in.
  */
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
@@ -33,20 +34,34 @@ export default withAuth(
     const path = req.nextUrl.pathname;
 
     // Super-admins go wherever they want (admin control plane).
-    if (role === "SUPER_ADMIN") return NextResponse.next();
+    if (role === "SUPER_ADMIN") {
+      const res = NextResponse.next();
+      res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+      return res;
+    }
 
     // Locked / pending activation → must visit /payment (only reachable screen).
-if (
-  (status === "LOCKED" || status === "PENDING_ACTIVATION") &&
-  path !== "/cctv/payment"
-) {
-  return NextResponse.redirect(new URL("/cctv/payment", req.url));
-}
+    if (
+      (status === "LOCKED" || status === "PENDING_ACTIVATION") &&
+      path !== "/cctv/payment"
+    ) {
+      const res = NextResponse.redirect(new URL("/cctv/payment", req.url));
+      res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+      return res;
+    }
+
+    // Authorized: allow the request through, but NEVER cache the page.
+    const res = NextResponse.next();
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    return res;
   },
   {
     callbacks: {
       // A token means "authenticated" → authorised to proceed past the gate.
       authorized: ({ token }) => !!token,
+    },
+    pages: {
+      signIn: "/cctv/login",
     },
   }
 );
@@ -55,6 +70,6 @@ export const config = {
   // Match page routes only. API routes handle auth via withTenant/withRole/withAdmin.
   // Excluded: api, auth pages, admin (self-gates on role), static assets, uploads.
   matcher: [
-  "/((?!api|login|signup|verify-email|change-email|payment|admin|manifest.json|sw.js|_next/static|_next/image|favicon.ico|logo.svg|robots.txt|uploads).*)",
-],
+    "/((?!api|login|signup|verify-email|change-email|payment|admin|manifest.json|sw.js|_next/static|_next/image|favicon.ico|logo.svg|robots.txt|uploads).*)",
+  ],
 };
