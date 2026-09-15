@@ -26,22 +26,22 @@ export function HelpButton() {
 
   return (
     <>
-      {/* Floating button — bottom-left corner */}
+      {/* Floating button — bottom-right corner */}
       <Button
         type="button"
         variant="default"
         size="icon"
         onClick={() => setOpen(true)}
-        className="fixed bottom-4 left-4 z-50 h-12 w-12 rounded-full shadow-lg hover:shadow-xl transition-shadow"
+        className="fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full shadow-lg hover:shadow-xl transition-shadow"
         aria-label="সাহায্য (Help)"
         title="সাহায্য — এই পেজ সম্পর্কে জানুন"
       >
         <HelpCircle className="h-6 w-6" />
       </Button>
 
-      {/* Left-side off-canvas */}
+      {/* Right-side off-canvas */}
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="left" className="w-full sm:max-w-md overflow-y-auto p-0">
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto p-0">
           <SheetHeader className="px-6 pt-6 pb-4 border-b bg-primary/5">
             <SheetTitle className="flex items-center gap-2 text-lg">
               <HelpCircle className="h-5 w-5 text-primary" />

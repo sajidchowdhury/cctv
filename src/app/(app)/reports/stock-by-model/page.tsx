@@ -3,20 +3,23 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState } from "@/components/layout/empty-state";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, Loader2, Printer, ListTree, ChevronDown, ChevronRight, ArrowLeft } from "lucide-react";
+import { Download, Loader2, Printer, ListTree, ChevronDown, ChevronRight, ArrowLeft, Search } from "lucide-react";
 import { formatBDT } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
 
 export default function StockByModelReportPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [hasGenerated, setHasGenerated] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-stock-by-model"],
     queryFn: async () => await (await fetch("/cctv/api/reports/stock-by-model")).json(),
+    enabled: hasGenerated,
   });
 
   // Drill-down serials — separate query when a model is selected.
@@ -87,6 +90,19 @@ export default function StockByModelReportPage() {
         }
       />
 
+      {!hasGenerated ? (
+        <EmptyState
+          icon={ListTree}
+          title="Stock by model"
+          description="Click Generate to load the report data."
+          action={
+            <Button onClick={() => setHasGenerated(true)}>
+              <Search className="mr-2 h-4 w-4" /> Generate report
+            </Button>
+          }
+        />
+      ) : (
+        <>
       <div className="hidden print:block">
         <h1 className="text-xl font-bold">Stock by Model</h1>
         <p className="text-sm">Snapshot as of {new Date().toLocaleDateString()}</p>
@@ -225,6 +241,8 @@ export default function StockByModelReportPage() {
               </li>
             ))}
           </ul>
+        </>
+      )}
         </>
       )}
     </div>

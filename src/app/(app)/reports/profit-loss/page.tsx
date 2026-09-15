@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState } from "@/components/layout/empty-state";
 import { DateRangePicker } from "@/components/layout/date-range-picker";
 import { DataTable } from "@/components/layout/data-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, Loader2, TrendingUp, TrendingDown } from "lucide-react";
+import { Download, Loader2, TrendingUp, TrendingDown, Search } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatBDT, formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
@@ -21,10 +22,12 @@ export default function ProfitLossReportPage() {
   const [to, setTo] = useState(now.toISOString().slice(0, 10));
   const [af, setAf] = useState(from);
   const [at, setAt] = useState(to);
+  const [hasGenerated, setHasGenerated] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-pl", af, at],
     queryFn: async () => (await (await fetch(`/cctv/api/reports/profit-loss?from=${af}&to=${at}`)).json()),
+    enabled: hasGenerated,
   });
 
   const rows: Row[] = data?.rows ?? [];
@@ -44,7 +47,20 @@ export default function ProfitLossReportPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Profit / Loss" description="Per invoice & aggregate: revenue − cost − discount (doc §5.3)." action={<Button variant="outline" size="sm" onClick={() => exportToCSV(`profit-loss-${af}-to-${at}`, rows)} disabled={!rows.length}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>} />
-      <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAf(from); setAt(to); }} />
+      <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAf(from); setAt(to); setHasGenerated(true); }} />
+      {!hasGenerated ? (
+        <EmptyState
+          icon={TrendingUp}
+          title="Profit / Loss"
+          description="Set a date range and click Generate to load the report data."
+          action={
+            <Button onClick={() => { setAf(from); setAt(to); setHasGenerated(true); }}>
+              <Search className="mr-2 h-4 w-4" /> Generate report
+            </Button>
+          }
+        />
+      ) : (
+        <>
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
@@ -62,6 +78,8 @@ export default function ProfitLossReportPage() {
             <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Margin</p><p className="text-xl font-bold tabular-nums">{(summary?.margin ?? 0).toFixed(1)}%</p></CardContent></Card>
           </div>
           {rows.length === 0 ? <p className="text-sm text-muted-foreground py-8 text-center">No sales in this period.</p> : <DataTable columns={columns} data={rows} maxHeight="max-h-[32rem]" />}
+        </>
+      )}
         </>
       )}
     </div>

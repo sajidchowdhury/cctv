@@ -1750,3 +1750,78 @@ Stage Summary:
     - src/app/api/sales/[id]/warranty-card.pdf/route.tsx: Buffer not assignable to BodyInit (1 error).
     - src/lib/onhand.ts: string|null not assignable to string on groupBy result (1 error).
 - No commit made yet — all changes (Theme A + E + B + D + C) left in working tree per caution.md §23 git workflow. Ready for user to review `git diff` and commit when satisfied.
+
+---
+
+## Task: Phase-2C — Lazy-load 13 report pages (apply Generate-button pattern)
+- **Task ID:** Phase-2C
+- **Agent:** general-purpose
+- **Scope:** Frontend — report pages under `src/app/(app)/reports/`
+- **Goal:** Convert 13 report pages from auto-fetch on mount to lazy-load: gate the main `useQuery` behind a `hasGenerated` flag, and render an `EmptyState` with a "Generate report" button when the flag is false. Pattern mirrors the already-fixed `reports/stock/page.tsx`.
+
+### Files modified (13)
+1. `src/app/(app)/reports/stock-by-category/page.tsx` — icon `Layers`. No filters. Added standalone Generate button.
+2. `src/app/(app)/reports/stock-by-model/page.tsx` — icon `ListTree`. No filters. MAIN query gated; drill-down serials query left untouched (`enabled: !!selectedModel`).
+3. `src/app/(app)/reports/sales/page.tsx` — icon `ShoppingCart`. DateRangePicker `onApply` now also `setHasGenerated(true)`. Generate button mirrors Apply semantics (sets applied dates + flips flag).
+4. `src/app/(app)/reports/sales-detailed/page.tsx` — icon `Receipt`. Same DateRangePicker-onApply pattern.
+5. `src/app/(app)/reports/purchase/page.tsx` — icon `PackagePlus`. Short-named `af`/`at` state preserved.
+6. `src/app/(app)/reports/purchase-detailed/page.tsx` — icon `PackageSearch`.
+7. `src/app/(app)/reports/profit-loss/page.tsx` — icon `TrendingUp`. Short-named `af`/`at` state preserved.
+8. `src/app/(app)/reports/profit-loss-detailed/page.tsx` — icon `Coins`.
+9. `src/app/(app)/reports/product-movement/page.tsx` — icon `ArrowLeftRight`. MAIN movement query gated; product lookup query left untouched. `applyFilters` function now also calls `setHasGenerated(true)`. Existing Apply button in filter card already triggers `applyFilters`, so the EmptyState Generate button also calls `applyFilters` for consistency.
+10. `src/app/(app)/reports/income-expense/page.tsx` — icon `ReceiptText`. Short-named `af`/`at` state preserved.
+11. `src/app/(app)/reports/salary-sheet/page.tsx` — icon `Briefcase`. Month filter left visible (input still editable before Generate).
+12. `src/app/(app)/reports/warranty/page.tsx` — icon `BookOpen`. No filter UI; hardcoded `from`/`to` (next 90 days) computed on mount.
+13. `src/app/(app)/reports/quotation-register/page.tsx` — icon `FileText`. DateRangePicker + Status filter left visible; `onApply` now also `setHasGenerated(true)`.
+14. `src/app/(app)/reports/rma-status/page.tsx` — icon `Wrench`. No params/state previously; added `useState` import (was missing). Added `hasGenerated` state + Generate button.
+
+### Pattern applied (consistent across all 13)
+```tsx
+// 1. useState already imported (except rma-status — added it).
+// 2. EmptyState imported from @/components/layout/empty-state.
+// 3. Search icon imported from lucide-react (for the Generate button).
+const [hasGenerated, setHasGenerated] = useState(false);
+
+const { data, isLoading } = useQuery({
+  queryKey: [...],
+  queryFn: ...,
+  enabled: hasGenerated,   // <-- gates the fetch
+});
+
+// 4. Filter UI (DateRangePicker / Select / Input) kept visible BEFORE the conditional
+//    so users can still set filters before generating.
+// 5. For pages with DateRangePicker: onApply also calls setHasGenerated(true).
+// 6. For product-movement: applyFilters() also calls setHasGenerated(true).
+// 7. Report content (after PageHeader + filters) wrapped:
+{!hasGenerated ? (
+  <EmptyState icon={...} title="..." description="..." action={
+    <Button onClick={() => setHasGenerated(true)}>
+      <Search className="mr-2 h-4 w-4" /> Generate report
+    </Button>
+  } />
+) : (
+  <> {/* existing report content — totals, table, mobile cards, etc. */} </>
+)}
+```
+
+### Lookup queries left UNTOUCHED (per spec)
+- `stock-by-model`: serial drill-down query `enabled: !!selectedModel` — preserved.
+- `product-movement`: products lookup query (`/cctv/api/products`) — still auto-loads to populate the product dropdown.
+
+### Verification
+- `npx tsc --noEmit` → **exit code 0** (zero TypeScript errors across the 13 edited files; no new errors introduced; no regressions).
+- All filter UIs preserved verbatim — users can still set filters before clicking Generate.
+- Generate button on DateRangePicker pages mirrors Apply semantics (sets applied dates + flips flag).
+- Print headers (where present) and PageHeader action buttons (Export CSV, Print) are now only rendered inside the generated branch — they were disabled when no data anyway, so UX is unchanged.
+
+### Decisions / rationale
+- For pages with both a DateRangePicker `onApply` AND a standalone Generate button in the EmptyState: both paths use the same setter pattern (`setAf/setAt` + `setHasGenerated(true)`), so user can either click Apply on the picker or Generate in the empty state — same result. This keeps the EmptyState self-contained (clicking Generate alone is sufficient, defaulting to whatever is currently in `from`/`to`).
+- For `product-movement`: the EmptyState's Generate button calls `applyFilters()` (the existing function) instead of just `setHasGenerated(true)`. This preserves the filter pipeline — generating without applying the picker's pending dates would fetch stale `appliedFrom`/`appliedTo`.
+- Did not re-indent the wrapped existing content (JSX is whitespace-insensitive inside expressions). Minimal diff per file.
+- Used the icon names specified per-file in the task brief.
+
+### Safety
+- No backend / API / DB / schema / NextAuth / subscription / email touched.
+- No `@ts-ignore` / `@ts-nocheck` / `any` introduced.
+- All changes additive (new imports + new state + new `enabled` line + new EmptyState JSX wrapper). No existing logic removed.
+- No commits made — working tree left for user review per caution.md §23.

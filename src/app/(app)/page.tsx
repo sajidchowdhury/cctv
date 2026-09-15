@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   TrendingUp,
   Package,
+  ReceiptText,
 } from "lucide-react";
 import { formatBDT } from "@/lib/format";
 import { useTranslation } from "@/lib/lang-store";
@@ -37,7 +38,7 @@ const QUICK_LINKS = [
   { href: "/sales", label: "New Sale", icon: ShoppingCart, phase: "S11" },
   { href: "/purchases", label: "New Purchase", icon: PackagePlus, phase: "S08" },
   { href: "/products", label: "Products", icon: Boxes, phase: "S06" },
-  { href: "/stock", label: "Stock", icon: Package, phase: "S09" },
+  { href: "/reports", label: "Reports", icon: ReceiptText, phase: "S18" },
   { href: "/ledger", label: "Ledger", icon: BookOpen, phase: "S15" },
   { href: "/rma", label: "RMA", icon: Wrench, phase: "S21" },
 ];
@@ -45,31 +46,6 @@ const QUICK_LINKS = [
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const { t } = useTranslation();
-
-
-const { data: stockData } = useQuery({
-  queryKey: ["stock-summary-dashboard"],
-  queryFn: async () => {
-    const r = await fetch("/cctv/api/reports/stock-summary");
-    const data = await r.json();
-
-    if (!r.ok || !Array.isArray(data.rows)) {
-      return {
-        rows: [],
-        totals: {
-          productCount: 0,
-          totalUnits: 0,
-          totalValue: 0,
-          lowStockCount: 0,
-        },
-      };
-    }
-
-    return data;
-  },
-    enabled: status === "authenticated" && session?.user?.role !== "SUPER_ADMIN",
-  });
-
 
 
 const { data: dueReminders } = useQuery({
@@ -105,9 +81,6 @@ const { data: dueReminders } = useQuery({
   if (!session?.user) return null;
   const u = session.user;
 
-  const totals = stockData?.totals;
-  const lowStockItems = (stockData?.rows ?? []).filter((r: any) => r.lowStock).slice(0, 5);
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -125,34 +98,8 @@ const { data: dueReminders } = useQuery({
       {/* Onboarding banner (S25) */}
       <OnboardingBanner />
 
-      {/* Stock snapshot */}
+      {/* Subscription status + stock report link (stock data moved to /reports/stock for lazy loading) */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1.5">
-              <Package className="h-3.5 w-3.5" /> {t("dashboard.stockValue")}
-            </CardDescription>
-            <CardTitle className="text-xl tabular-nums">{formatBDT(totals?.totalValue ?? 0)}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1.5">
-              <Boxes className="h-3.5 w-3.5" /> {t("dashboard.unitsOnHand")}
-            </CardDescription>
-            <CardTitle className="text-xl tabular-nums">{totals?.totalUnits ?? 0}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1.5">
-              <AlertTriangle className="h-3.5 w-3.5" /> {t("dashboard.lowStockItems")}
-            </CardDescription>
-            <CardTitle className={`text-xl tabular-nums ${(totals?.lowStockCount ?? 0) > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}>
-              {totals?.lowStockCount ?? 0}
-            </CardTitle>
-          </CardHeader>
-        </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-1.5">
@@ -166,6 +113,19 @@ const { data: dueReminders } = useQuery({
                 {u.subscriptionStatus ?? "—"}
               </Badge>
             </CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-1.5">
+              <Boxes className="h-3.5 w-3.5" /> Stock report
+            </CardDescription>
+            <CardTitle className="text-base">
+              <Button asChild variant="link" className="h-auto p-0 text-base">
+                <Link href="/reports/stock">View stock report →</Link>
+              </Button>
+            </CardTitle>
+            <CardDescription className="text-xs">Lazy-loaded — click to generate</CardDescription>
           </CardHeader>
         </Card>
       </div>
@@ -195,42 +155,26 @@ const { data: dueReminders } = useQuery({
         </CardContent>
       </Card>
 
-      {/* Low stock + reminders widgets */}
+      {/* Reminders + stock link widgets */}
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-base">{t("dashboard.lowStock")}</CardTitle>
             <Button asChild variant="ghost" size="sm">
-              <Link href="/stock">{t("dashboard.viewAll")} <ArrowRight className="ml-1 h-3 w-3" /></Link>
+              <Link href="/reports/stock">{t("dashboard.viewAll")} <ArrowRight className="ml-1 h-3 w-3" /></Link>
             </Button>
           </CardHeader>
           <CardContent>
-            {lowStockItems.length === 0 ? (
-              <EmptyState
-                icon={Boxes}
-                title={t("dashboard.noLowStock")}
-                description="All products are above their safety stock threshold."
-              />
-            ) : (
-              <ul className="space-y-2">
-                {lowStockItems.map((item: any) => (
-                  <li key={item.id} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2">
-                    <div className="min-w-0">
-                      <Link href={`/products/${item.id}`} className="text-sm font-medium hover:underline truncate block">
-                        {item.name}
-                      </Link>
-                      <p className="text-xs text-muted-foreground">{item.sku} · {item.categoryName ?? "Uncategorised"}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                        {item.onHand}/{item.safetyStock}
-                      </Badge>
-                      <p className="text-xs text-muted-foreground mt-1">restock {item.deficit}+</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <EmptyState
+              icon={Boxes}
+              title={t("dashboard.noLowStock")}
+              description="Stock data moved to Reports. Open the Stock summary report to view low-stock items."
+              action={
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/reports/stock"><Boxes className="mr-2 h-4 w-4" /> Open stock report</Link>
+                </Button>
+              }
+            />
           </CardContent>
         </Card>
         <Card>

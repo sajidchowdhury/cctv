@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState } from "@/components/layout/empty-state";
 import { DateRangePicker } from "@/components/layout/date-range-picker";
 import { DataTable } from "@/components/layout/data-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, ShoppingCart, Search } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatBDT, formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
@@ -21,10 +22,12 @@ export default function SalesReportPage() {
   const [to, setTo] = useState(now.toISOString().slice(0, 10));
   const [appliedFrom, setAppliedFrom] = useState(from);
   const [appliedTo, setAppliedTo] = useState(to);
+  const [hasGenerated, setHasGenerated] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-sales", appliedFrom, appliedTo],
     queryFn: async () => (await (await fetch(`/cctv/api/reports/sales?from=${appliedFrom}&to=${appliedTo}`)).json()),
+    enabled: hasGenerated,
   });
 
   const sales: Sale[] = data?.sales ?? [];
@@ -45,7 +48,20 @@ export default function SalesReportPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Sales report" description="Invoice list with totals + CSV export (doc §5.3)." action={<Button variant="outline" size="sm" onClick={() => exportToCSV(`sales-${appliedFrom}-to-${appliedTo}`, sales)} disabled={!sales.length}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>} />
-      <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAppliedFrom(from); setAppliedTo(to); }} />
+      <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAppliedFrom(from); setAppliedTo(to); setHasGenerated(true); }} />
+      {!hasGenerated ? (
+        <EmptyState
+          icon={ShoppingCart}
+          title="Sales report"
+          description="Set a date range and click Generate to load the report data."
+          action={
+            <Button onClick={() => { setAppliedFrom(from); setAppliedTo(to); setHasGenerated(true); }}>
+              <Search className="mr-2 h-4 w-4" /> Generate report
+            </Button>
+          }
+        />
+      ) : (
+        <>
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
@@ -57,6 +73,8 @@ export default function SalesReportPage() {
             <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Invoices</p><p className="text-xl font-bold tabular-nums">{summary?.count ?? 0}</p></CardContent></Card>
           </div>
           {sales.length === 0 ? <p className="text-sm text-muted-foreground py-8 text-center">No sales in this period.</p> : <DataTable columns={columns} data={sales} maxHeight="max-h-[32rem]" />}
+        </>
+      )}
         </>
       )}
     </div>

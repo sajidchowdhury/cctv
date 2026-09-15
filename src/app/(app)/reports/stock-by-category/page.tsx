@@ -4,19 +4,22 @@ import { useState, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState } from "@/components/layout/empty-state";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, Loader2, Printer, Layers, ChevronDown, ChevronRight } from "lucide-react";
+import { Download, Loader2, Printer, Layers, ChevronDown, ChevronRight, Search } from "lucide-react";
 import { formatBDT } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
 
 export default function StockByCategoryReportPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [hasGenerated, setHasGenerated] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-stock-by-category"],
     queryFn: async () => await (await fetch("/cctv/api/reports/stock-by-category")).json(),
+    enabled: hasGenerated,
   });
 
   const categories: any[] = data?.categories ?? [];
@@ -66,6 +69,19 @@ export default function StockByCategoryReportPage() {
         }
       />
 
+      {!hasGenerated ? (
+        <EmptyState
+          icon={Layers}
+          title="Stock by category"
+          description="Click Generate to load the report data."
+          action={
+            <Button onClick={() => setHasGenerated(true)}>
+              <Search className="mr-2 h-4 w-4" /> Generate report
+            </Button>
+          }
+        />
+      ) : (
+        <>
       <div className="hidden print:block">
         <h1 className="text-xl font-bold">Stock by Category</h1>
         <p className="text-sm">Snapshot as of {new Date().toLocaleDateString()}</p>
@@ -155,6 +171,8 @@ export default function StockByCategoryReportPage() {
               </li>
             ))}
           </ul>
+        </>
+      )}
         </>
       )}
     </div>

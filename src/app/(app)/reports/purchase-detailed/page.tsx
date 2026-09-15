@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState } from "@/components/layout/empty-state";
 import { DateRangePicker } from "@/components/layout/date-range-picker";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, Loader2, Printer, PackageSearch, ScanLine } from "lucide-react";
+import { Download, Loader2, Printer, PackageSearch, ScanLine, Search } from "lucide-react";
 import { formatBDT, formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
 
@@ -29,10 +30,12 @@ export default function PurchaseDetailedReportPage() {
   const [to, setTo] = useState(now.toISOString().slice(0, 10));
   const [appliedFrom, setAppliedFrom] = useState(from);
   const [appliedTo, setAppliedTo] = useState(to);
+  const [hasGenerated, setHasGenerated] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-purchase-detailed", appliedFrom, appliedTo],
     queryFn: async () => await (await fetch(`/cctv/api/reports/purchase-detailed?from=${appliedFrom}&to=${appliedTo}`)).json(),
+    enabled: hasGenerated,
   });
 
   const rows: Row[] = data?.rows ?? [];
@@ -62,9 +65,22 @@ export default function PurchaseDetailedReportPage() {
       />
 
       <div data-print-hidden>
-        <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAppliedFrom(from); setAppliedTo(to); }} />
+        <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAppliedFrom(from); setAppliedTo(to); setHasGenerated(true); }} />
       </div>
 
+      {!hasGenerated ? (
+        <EmptyState
+          icon={PackageSearch}
+          title="Purchase report (detailed)"
+          description="Set a date range and click Generate to load the report data."
+          action={
+            <Button onClick={() => { setAppliedFrom(from); setAppliedTo(to); setHasGenerated(true); }}>
+              <Search className="mr-2 h-4 w-4" /> Generate report
+            </Button>
+          }
+        />
+      ) : (
+        <>
       <div className="hidden print:block">
         <h1 className="text-xl font-bold">Purchase Report (Detailed)</h1>
         <p className="text-sm">Period: {appliedFrom} to {appliedTo}</p>
@@ -150,6 +166,8 @@ export default function PurchaseDetailedReportPage() {
               </li>
             ))}
           </ul>
+        </>
+      )}
         </>
       )}
     </div>

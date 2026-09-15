@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState } from "@/components/layout/empty-state";
 import { DataTable } from "@/components/layout/data-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Download, Loader2, Briefcase } from "lucide-react";
+import { Download, Loader2, Briefcase, Search } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatBDT, formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
@@ -18,9 +19,11 @@ type Record = { id: string; month: string; employeeName: string; employeeRole: s
 
 export default function SalarySheetReportPage() {
   const [month, setMonth] = useState("");
+  const [hasGenerated, setHasGenerated] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["report-salary-sheet", month],
     queryFn: async () => (await (await fetch(`/cctv/api/reports/salary-sheet${month ? `?month=${month}` : ""}`)).json()),
+    enabled: hasGenerated,
   });
 
   const records: Record[] = data?.records ?? [];
@@ -44,6 +47,19 @@ export default function SalarySheetReportPage() {
         <Label className="text-xs">Filter by month (YYYY-MM)</Label>
         <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} placeholder="All months" />
       </div>
+      {!hasGenerated ? (
+        <EmptyState
+          icon={Briefcase}
+          title="Employee salary sheet"
+          description="Optionally pick a month, then click Generate to load the report data."
+          action={
+            <Button onClick={() => setHasGenerated(true)}>
+              <Search className="mr-2 h-4 w-4" /> Generate report
+            </Button>
+          }
+        />
+      ) : (
+        <>
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
@@ -59,6 +75,8 @@ export default function SalarySheetReportPage() {
           ) : (
             <DataTable columns={columns} data={records} maxHeight="max-h-[32rem]" />
           )}
+        </>
+      )}
         </>
       )}
     </div>

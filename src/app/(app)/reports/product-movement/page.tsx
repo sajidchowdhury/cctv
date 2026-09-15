@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState } from "@/components/layout/empty-state";
 import { DateRangePicker } from "@/components/layout/date-range-picker";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Loader2, Printer, ArrowLeftRight, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
+import { Download, Loader2, Printer, ArrowLeftRight, ArrowDownCircle, ArrowUpCircle, Search } from "lucide-react";
 import { formatBDT, formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
 
@@ -23,6 +24,7 @@ export default function ProductMovementReportPage() {
   const [appliedTo, setAppliedTo] = useState(to);
   const [productId, setProductId] = useState("");
   const [appliedProductId, setAppliedProductId] = useState("");
+  const [hasGenerated, setHasGenerated] = useState(false);
 
   const { data: productsData } = useQuery({
     queryKey: ["products"],
@@ -36,6 +38,7 @@ export default function ProductMovementReportPage() {
       const url = `/cctv/api/reports/product-movement?from=${appliedFrom}&to=${appliedTo}${appliedProductId ? `&productId=${appliedProductId}` : ""}`;
       return await (await fetch(url)).json();
     },
+    enabled: hasGenerated,
   });
 
   const movements: any[] = data?.movements ?? [];
@@ -46,6 +49,7 @@ export default function ProductMovementReportPage() {
     setAppliedFrom(from);
     setAppliedTo(to);
     setAppliedProductId(productId);
+    setHasGenerated(true);
   }
 
   return (
@@ -95,6 +99,19 @@ export default function ProductMovementReportPage() {
         <p className="text-sm">Period: {appliedFrom} to {appliedTo}{appliedProductId ? ` · Product: ${products.find((p) => p.id === appliedProductId)?.name ?? "—"}` : " · All products"}</p>
       </div>
 
+      {!hasGenerated ? (
+        <EmptyState
+          icon={ArrowLeftRight}
+          title="Product movement"
+          description="Set filters and click Apply (or Generate) to load the report data."
+          action={
+            <Button onClick={applyFilters}>
+              <Search className="mr-2 h-4 w-4" /> Generate report
+            </Button>
+          }
+        />
+      ) : (
+        <>
       {isLoading || !data ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : movements.length === 0 ? (
@@ -234,6 +251,8 @@ export default function ProductMovementReportPage() {
               </li>
             ))}
           </ul>
+        </>
+      )}
         </>
       )}
     </div>

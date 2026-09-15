@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState } from "@/components/layout/empty-state";
 import { DateRangePicker } from "@/components/layout/date-range-picker";
 import { DataTable } from "@/components/layout/data-table";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, FileText, Search } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatBDT, formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
@@ -33,10 +34,12 @@ export default function QuotationRegisterReportPage() {
   const [af, setAf] = useState(from);
   const [at, setAt] = useState(to);
   const [status, setStatus] = useState("ALL");
+  const [hasGenerated, setHasGenerated] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-quote-register", af, at, status],
     queryFn: async () => (await (await fetch(`/cctv/api/reports/quotation-register?from=${af}&to=${at}${status !== "ALL" ? `&status=${status}` : ""}`)).json()),
+    enabled: hasGenerated,
   });
 
   const quotes: Quote[] = data?.quotes ?? [];
@@ -57,7 +60,7 @@ export default function QuotationRegisterReportPage() {
     <div className="space-y-6">
       <PageHeader title="Quotation register" description="All quotes by status + win/loss + conversion rate (doc §5.3)." action={<Button variant="outline" size="sm" onClick={() => exportToCSV(`quotation-register-${af}-to-${at}`, quotes)} disabled={!quotes.length}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>} />
       <div className="flex flex-col sm:flex-row gap-4">
-        <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAf(from); setAt(to); }} />
+        <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAf(from); setAt(to); setHasGenerated(true); }} />
         <div className="space-y-1">
           <Label className="text-xs">Status filter</Label>
           <Select value={status} onValueChange={setStatus}>
@@ -73,6 +76,19 @@ export default function QuotationRegisterReportPage() {
           </Select>
         </div>
       </div>
+      {!hasGenerated ? (
+        <EmptyState
+          icon={FileText}
+          title="Quotation register"
+          description="Set a date range (and optionally a status), then click Generate to load the report data."
+          action={
+            <Button onClick={() => { setAf(from); setAt(to); setHasGenerated(true); }}>
+              <Search className="mr-2 h-4 w-4" /> Generate report
+            </Button>
+          }
+        />
+      ) : (
+        <>
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
@@ -84,6 +100,8 @@ export default function QuotationRegisterReportPage() {
             <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Avg quote</p><p className="text-xl font-bold tabular-nums">{summary ? formatBDT(summary.avgQuoteValue) : "—"}</p></CardContent></Card>
           </div>
           {quotes.length === 0 ? <p className="text-sm text-muted-foreground py-8 text-center">No quotes in this period.</p> : <DataTable columns={columns} data={quotes} maxHeight="max-h-[32rem]" />}
+        </>
+      )}
         </>
       )}
     </div>

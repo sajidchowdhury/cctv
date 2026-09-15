@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState } from "@/components/layout/empty-state";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, Loader2, ShieldCheck, ShieldAlert } from "lucide-react";
+import { Download, Loader2, ShieldCheck, ShieldAlert, BookOpen, Search } from "lucide-react";
 import { formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
 
@@ -16,10 +17,12 @@ export default function WarrantyExpiryReportPage() {
   const now = new Date();
   const [from] = useState(now.toISOString().slice(0, 10));
   const [to] = useState(new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const [hasGenerated, setHasGenerated] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-warranty-expiry", from, to],
     queryFn: async () => (await (await fetch(`/cctv/api/reports/warranty-expiry?from=${from}&to=${to}`)).json()),
+    enabled: hasGenerated,
   });
 
   const units: Unit[] = data?.units ?? [];
@@ -27,6 +30,19 @@ export default function WarrantyExpiryReportPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Warranty expiry" description={`Upcoming warranty ends: ${from} to ${to} (doc §5.3).`} action={<Button variant="outline" size="sm" onClick={() => exportToCSV(`warranty-expiry-${from}-to-${to}`, units)} disabled={!units.length}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>} />
+      {!hasGenerated ? (
+        <EmptyState
+          icon={BookOpen}
+          title="Warranty expiry"
+          description="Click Generate to load the report data for the upcoming 90-day window."
+          action={
+            <Button onClick={() => setHasGenerated(true)}>
+              <Search className="mr-2 h-4 w-4" /> Generate report
+            </Button>
+          }
+        />
+      ) : (
+        <>
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
@@ -58,6 +74,8 @@ export default function WarrantyExpiryReportPage() {
               </table>
             </div>
           )}
+        </>
+      )}
         </>
       )}
     </div>
