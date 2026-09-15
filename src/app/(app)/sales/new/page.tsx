@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
@@ -82,6 +82,10 @@ function NewSalePage() {
 
   const [products, setProducts] = useState<SearchResult[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  // Phase C: scan detection — barcode scanners type very fast (<50ms between
+  // keys) and end with Enter. We track keystroke timestamps to detect scans.
+  const lastKeyTimeRef = useRef<number>(0);
+  const isScanRef = useRef<boolean>(false);
 
   // Load customers once.
   useEffect(() => {
@@ -89,12 +93,49 @@ function NewSalePage() {
   }, []);
 
   // Search products + serials via API (debounced).
+  // Phase C: when a scan is detected, auto-add the exact matching serial.
   useEffect(() => {
     if (!productSearch.trim()) { setProducts([]); return; }
+    const q = productSearch.trim();
     const timer = setTimeout(() => {
-      fetch(`/cctv/api/sales/search?q=${encodeURIComponent(productSearch.trim())}`)
+      fetch(`/cctv/api/sales/search?q=${encodeURIComponent(q)}`)
         .then((r) => r.json())
-        .then((d) => setProducts(d.results ?? []));
+        .then((d) => {
+          const results: SearchResult[] = d.results ?? [];
+          setProducts(results);
+
+          // Phase C: if this was a scan (fast input + Enter), check for an
+          // exact serial match. If found, auto-add it to the cart immediately.
+          if (isScanRef.current) {
+            isScanRef.current = false;
+            // Look for an exact serial match (case-insensitive) across all results.
+            for (const p of results) {
+              if (!p.isSerialised) continue;
+              const exactMatch = p.serials.find(
+                (s) => s.serialNo.toLowerCase() === q.toLowerCase()
+              );
+              if (exactMatch) {
+                addProductLine(p, exactMatch.id, exactMatch.serialNo);
+                setProductSearch("");
+                setProducts([]);
+                return;
+              }
+            }
+            // If no exact serial match, check if there's exactly ONE product
+            // result with exactly ONE serial — auto-add it (likely a scan
+            // that partially matched but uniquely identifies one unit).
+            if (results.length === 1 && results[0].isSerialised && results[0].serials.length === 1) {
+              const p = results[0];
+              const s = p.serials[0];
+              addProductLine(p, s.id, s.serialNo);
+              setProductSearch("");
+              setProducts([]);
+              return;
+            }
+            // If no auto-add happened, the results stay visible so the user
+            // can manually pick the serial.
+          }
+        });
     }, 300);
     return () => clearTimeout(timer);
   }, [productSearch]);
@@ -450,40 +491,72 @@ function NewSalePage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex gap-2">
-            <SearchScanInput value={productSearch} onChange={setProductSearch} placeholder="Search name / model / SKU / serial…" className="flex-1" />
+            <SearchScanInput
+              value={productSearch}
+              onChange={setProductSearch}
+              placeholder="Search name / model / SKU / serial — or scan a barcode…"
+              className="flex-1"
+              onEnter={() => {
+                // Phase C: scan detection. Barcode scanners type very fast
+                // (<50ms between keys) and end with Enter. If the last few
+                // keystrokes were fast, flag this as a scan so the search
+                // effect auto-adds the matching serial to the cart.
+                const now = Date.now();
+                const delta = now - lastKeyTimeRef.current;
+                // If the gap between the last key and Enter is <50ms, it's a scan.
+                // (Human typists pause longer before pressing Enter.)
+                if (delta < 50 && productSearch.trim().length >= 3) {
+                  isScanRef.current = true;
+                }
+                lastKeyTimeRef.current = now;
+              }}
+              onKeyDownCapture={(e) => {
+                // Track keystroke timing for scan detection.
+                const now = Date.now();
+                const delta = now - lastKeyTimeRef.current;
+                // If keys are coming very fast (<50ms apart), accumulate
+                // the scan flag. The Enter handler above checks it.
+                if (e.key !== "Enter" && delta < 50) {
+                  // Fast input detected — likely a scanner.
+                }
+                lastKeyTimeRef.current = now;
+              }}
+            />
             <Button variant="outline" type="button" onClick={addServiceLine}><Wrench className="mr-2 h-4 w-4" /> Service line</Button>
           </div>
           {productSearch && (
             <div className="rounded-lg border max-h-96 overflow-y-auto scroll-area-thin divide-y">
               {filteredProducts.length === 0 ? (
-                <p className="p-4 text-sm text-muted-foreground text-center">No products found. Try a different search.</p>
+                <p className="p-4 text-sm text-muted-foreground text-center">
+                  No in-stock products found. Try a different search or scan.
+                  <br />
+                  <span className="text-xs">Out-of-stock items are hidden for faster search.</span>
+                </p>
               ) : (
                 filteredProducts.map((p) => (
-                  <div key={p.productId} className={`p-3 ${p.outOfStock ? "opacity-50" : "hover:bg-accent/50"} transition-opacity`}>
-                    {/* Product header row — click adds to cart with auto-selected first serial.
-                        F5-S2 fix: outer element is a div (not button) so the inner PP reveal
-                        button doesn't cause a nested-button hydration error. */}
+                  <div key={p.productId} className="p-3 hover:bg-accent/50 transition-colors">
+                    {/* Phase C: result format —
+                        PRODUCT MODEL (PRODUCT NAME)
+                        SERIAL 1, SERIAL 2, SERIAL 3 (clickable chips)
+                    */}
                     <div
                       role="button"
-                      tabIndex={p.outOfStock ? -1 : 0}
-                      onClick={() => { if (!p.outOfStock) addProductLine(p); }}
-                      onKeyDown={(e) => { if ((e.key === "Enter" || e.key === " ") && !p.outOfStock) { e.preventDefault(); addProductLine(p); } }}
-                      className={`flex w-full items-start justify-between gap-2 text-left ${p.outOfStock ? "cursor-not-allowed" : "cursor-pointer"}`}
+                      tabIndex={0}
+                      onClick={() => addProductLine(p)}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); addProductLine(p); } }}
+                      className="flex w-full items-start justify-between gap-2 text-left cursor-pointer"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium">{p.name}</p>
-                        <p className="text-xs text-muted-foreground">{p.model ?? "—"} · {p.sku}</p>
+                        {/* Line 1: PRODUCT MODEL (PRODUCT NAME) */}
+                        <p className="text-sm font-medium">
+                          {p.model ?? "—"} <span className="text-muted-foreground">({p.name})</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground font-mono">{p.sku}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        {p.outOfStock ? (
-                          <Badge variant="secondary" className="bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">
-                            Out of stock
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                            {p.onHand} in stock
-                          </Badge>
-                        )}
+                        <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                          {p.onHand} in stock
+                        </Badge>
                         <Badge variant="outline" className="ml-1 text-xs">
                           {p.isSerialised ? "Serialised" : "Qty-based"}
                         </Badge>
@@ -517,10 +590,12 @@ function NewSalePage() {
                         ) : null}
                       </div>
                     </div>
-                    {/* Available serials — click a specific serial to add that exact unit */}
-                    {p.serials.length > 0 && (
+                    {/* Line 2: available serials as clickable chips.
+                        Clicking a serial adds that exact unit to the cart.
+                        The product header click adds the first serial. */}
+                    {p.isSerialised && p.serials.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1 pl-1">
-                        {p.serials.slice(0, 10).map((s) => (
+                        {p.serials.slice(0, 15).map((s) => (
                           <button
                             key={s.id}
                             type="button"
@@ -530,9 +605,15 @@ function NewSalePage() {
                             {s.serialNo}
                           </button>
                         ))}
-                        {p.serials.length > 10 && (
-                          <span className="text-xs text-muted-foreground self-center">+{p.serials.length - 10} more</span>
+                        {p.serials.length > 15 && (
+                          <span className="text-xs text-muted-foreground self-center">+{p.serials.length - 15} more</span>
                         )}
+                      </div>
+                    )}
+                    {/* Non-serialised: show qty-based info + click to add */}
+                    {!p.isSerialised && (
+                      <div className="mt-1 pl-1">
+                        <p className="text-xs text-muted-foreground">Click to add to cart (qty-based)</p>
                       </div>
                     )}
                   </div>

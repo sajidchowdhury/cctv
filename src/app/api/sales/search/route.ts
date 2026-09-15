@@ -3,18 +3,20 @@
  *
  * Searches by: product name, model, SKU, OR serial number.
  * Returns grouped results: each product card shows available IN_STOCK serials.
- * Out-of-stock products are included but flagged (so UI can disable them).
+ *
+ * Phase C: ONLY in-stock products are returned. Out-of-stock products are
+ * excluded entirely (not just flagged) so the UI stays fast and clean —
+ * users don't waste time scanning/browsing products they can't sell.
  *
  * F1-S2: each product carries `isSerialised`. Non-serialised products (cables/PSU)
  * return `serials: []` but compute onHand from PurchaseItem.qty − SaleItem.qty.
- * `outOfStock` is based on that qty-based onHand for non-serialised products.
  *
  * Response shape:
  *   [
  *     {
  *       productId, name, model, sku, defaultPrice, isSerialised,
  *       purchasePrice: number | null,  // F2-S3 — last purchase cost for margin display (role-gated on UI)
- *       onHand, outOfStock: boolean,
+ *       onHand, outOfStock: boolean,  // always false now (filtered)
  *       serials: [{ id, serialNo }]  // IN_STOCK serials (empty for non-serialised)
  *     }
  *   ]
@@ -157,6 +159,8 @@ export const GET = withTenant(async (user, req: Request) => {
   );
 
   // Build final results: sort by name, flag out-of-stock based on onHand.
+  // Phase C: filter OUT out-of-stock products entirely — only in-stock items
+  // are returned so the sales search stays fast and relevant.
   const results = Array.from(productMap.values())
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((p) => {
@@ -166,7 +170,8 @@ export const GET = withTenant(async (user, req: Request) => {
         onHand,
         outOfStock: onHand <= 0,
       };
-    });
+    })
+    .filter((p) => !p.outOfStock);  // Phase C: exclude out-of-stock
 
   return NextResponse.json({ results });
 });

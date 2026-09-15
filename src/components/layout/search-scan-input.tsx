@@ -18,6 +18,7 @@ export function SearchScanInput({
   className,
   autoFocus,
   onEnter,
+  onKeyDownCapture,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -25,6 +26,7 @@ export function SearchScanInput({
   className?: string;
   autoFocus?: boolean;
   onEnter?: () => void;
+  onKeyDownCapture?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }) {
   return (
     <div className={cn("relative", className)}>
@@ -39,6 +41,7 @@ export function SearchScanInput({
         onKeyDown={(e) => {
           if (e.key === "Enter" && onEnter) onEnter();
         }}
+        onKeyDownCapture={onKeyDownCapture}
         placeholder={placeholder}
         className="pl-9 pr-10 h-11"
         aria-label="Search or scan"
