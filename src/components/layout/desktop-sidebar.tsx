@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { visibleNavItems } from "@/lib/nav";
 import { appPath } from "@/lib/app-path";
-import { ShieldCheck, LogOut, Sun, Moon, Languages } from "lucide-react";
+import { ShieldCheck, LogOut, Sun, Moon, Languages, Settings } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/lib/lang-store";
@@ -14,6 +15,7 @@ import { useLanguage } from "@/lib/lang-store";
 /**
  * Desktop sidebar — full module list + brand + user + theme toggle (doc §6).
  * Hidden on mobile (bottom nav takes over).
+ * Phase F-S1: shows business name + logo from the business profile.
  */
 export function DesktopSidebar() {
   const pathname = usePathname();
@@ -23,19 +25,40 @@ export function DesktopSidebar() {
   const role = session?.user?.role;
   const items = visibleNavItems(role as any);
 
+  // Fetch business profile for business name + logo.
+  const { data: profile } = useQuery({
+    queryKey: ["business-profile"],
+    queryFn: async () => {
+      const r = await fetch("/cctv/api/business-profile");
+      if (!r.ok) return null;
+      const data = await r.json();
+      return data.profile;
+    },
+    enabled: !!session?.user?.tenantId,
+  });
+
+  const businessName = profile?.name ?? "CCTV Inventory";
+  const businessLogo = profile?.businessLogo ?? null;
+
   return (
     <aside className="hidden md:flex md:w-[var(--sidebar-width)] md:flex-col md:fixed md:inset-y-0 border-r bg-sidebar">
-      <div className="flex items-center gap-2 h-16 px-6 border-b">
-        <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
-          <ShieldCheck className="h-5 w-5" />
-        </div>
-        <div className="leading-tight">
-          <p className="font-semibold text-sm">CCTV Inventory</p>
-          <p className="text-[11px] text-muted-foreground">
+      <Link href="/settings" className="flex items-center gap-2 h-16 px-6 border-b hover:bg-sidebar-accent/50 transition-colors">
+        {businessLogo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={businessLogo} alt="Logo" className="h-9 w-9 rounded-xl object-contain" />
+        ) : (
+          <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
+            <ShieldCheck className="h-5 w-5" />
+          </div>
+        )}
+        <div className="leading-tight min-w-0 flex-1">
+          <p className="font-semibold text-sm truncate">{businessName}</p>
+          <p className="text-[11px] text-muted-foreground truncate">
             {session?.user?.name ?? "User"}
           </p>
         </div>
-      </div>
+        <Settings className="h-4 w-4 text-muted-foreground shrink-0" />
+      </Link>
 
       <nav aria-label="Modules" className="flex-1 overflow-y-auto scroll-area-thin px-3 py-4">
         <ul className="space-y-1">
@@ -106,14 +129,32 @@ export function DesktopSidebar() {
 export function MobileTopBar() {
   const { theme, setTheme } = useTheme();
   const { lang, toggle } = useLanguage();
+  const { data: session } = useSession();
+  const { data: profile } = useQuery({
+    queryKey: ["business-profile"],
+    queryFn: async () => {
+      const r = await fetch("/cctv/api/business-profile");
+      if (!r.ok) return null;
+      const data = await r.json();
+      return data.profile;
+    },
+    enabled: !!session?.user?.tenantId,
+  });
+  const businessName = profile?.name ?? "CCTV Inventory";
+  const businessLogo = profile?.businessLogo ?? null;
   return (
     <header className="md:hidden sticky top-0 z-30 flex h-14 items-center justify-between border-b bg-card px-4">
-      <div className="flex items-center gap-2">
-        <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <ShieldCheck className="h-4 w-4" />
-        </div>
-        <span className="font-semibold text-sm">CCTV Inventory</span>
-      </div>
+      <Link href="/settings" className="flex items-center gap-2">
+        {businessLogo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={businessLogo} alt="Logo" className="h-8 w-8 rounded-lg object-contain" />
+        ) : (
+          <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <ShieldCheck className="h-4 w-4" />
+          </div>
+        )}
+        <span className="font-semibold text-sm truncate max-w-[120px]">{businessName}</span>
+      </Link>
       <div className="flex items-center gap-1">
         <Button
           variant="ghost"

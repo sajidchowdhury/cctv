@@ -22,6 +22,7 @@ import {
   Wrench,
   Bell,
   ReceiptText,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 
@@ -126,6 +127,13 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ReceiptText,
     roles: ["OWNER", "MANAGER", "ACCOUNTANT"],
     phase: "S18",
+  },
+  {
+    href: "/settings",
+    label: "Settings",
+    labelBn: "সেটিংস",
+    icon: Settings,
+    phase: "F-S1",
   },
 ];
 

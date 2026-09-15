@@ -55,6 +55,13 @@ model Tenant {
   bankDetails   String? // multi-line free text (bank name + A/C no + branch)
   monthlyFee    Float   @default(500) // doc §3.2: BDT 500/month flat plan (configurable)
 
+  // Business Profile + Invoice Customization (Phase F-S1)
+  businessLogo         String? // URL to uploaded logo (shown in sidebar + invoice)
+  invoiceHeaderImage   String? // URL to custom invoice header image (null = default)
+  invoiceFooterImage   String? // URL to custom invoice footer image (null = default)
+  invoiceProductsPerPage Int  @default(10) // max products per invoice page before pagination
+  invoiceAccentColor   String? @default("#1A73E8") // accent color for invoice headings/borders
+
   // Relations
   users                 User[]
   subscription          Subscription?
