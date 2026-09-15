@@ -19,14 +19,17 @@ type Unit = {
   id: string;
   serialNo: string;
   status: string;
+  productId: string;
   productName: string;
   productModel: string | null;
   productSku: string;
+  purchaseId: string | null;
   purchaseInvoice: string | null;
   purchaseDate: string | null;
   purchaseSupplier: string | null;
   purchasePrice: number | null;
   warrantyMonths: number | null;
+  saleId: string | null;
   saleInvoice: string | null;
   saleDate: string | null;
   saleCustomer: string | null;
@@ -43,11 +46,15 @@ export default function WarrantyPage() {
   const [search, setSearch] = useState("");
   const [activeQuery, setActiveQuery] = useState("");
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["warranty-lookup", activeQuery],
     queryFn: async () => {
       const r = await fetch(`/cctv/api/warranty/lookup?q=${encodeURIComponent(activeQuery)}`);
-      return await r.json();
+      const data = await r.json();
+      if (!r.ok) {
+        throw new Error(data.error ?? `Search failed (HTTP ${r.status})`);
+      }
+      return data;
     },
     enabled: activeQuery.length > 0,
   });
@@ -100,6 +107,12 @@ export default function WarrantyPage() {
         />
       ) : isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : error ? (
+        <EmptyState
+          icon={ShieldAlert}
+          title="Search failed"
+          description={(error as Error).message ?? "Could not complete the search. Please try again."}
+        />
       ) : units.length === 0 ? (
         <EmptyState
           icon={ShieldAlert}
@@ -108,6 +121,15 @@ export default function WarrantyPage() {
         />
       ) : (
         <div className="space-y-4">
+          {/* Results count */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              {units.length} {units.length === 1 ? "result" : "results"} for &ldquo;{activeQuery}&rdquo;
+            </p>
+            <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setActiveQuery(""); }}>
+              Clear search
+            </Button>
+          </div>
           {units.map((u) => (
             <Card key={u.id}>
               <CardContent className="py-4 space-y-4">
@@ -225,12 +247,22 @@ export default function WarrantyPage() {
                   </div>
                 </div>
 
-                {/* Actions */}
-                {(u.saleInvoice || u.purchaseInvoice) && (
-                  <div className="flex gap-2 pt-2 border-t">
-                    {u.saleInvoice && (
+                {/* Actions — navigation links to related records */}
+                {(u.saleId || u.productId || u.purchaseId) && (
+                  <div className="flex gap-2 pt-2 border-t flex-wrap">
+                    {u.productId && (
                       <Button asChild variant="outline" size="sm">
-                        <Link href={`/sales/${u.id}`}>View sale invoice →</Link>
+                        <Link href={`/products/${u.productId}`}><PackagePlus className="mr-1 h-3 w-3" /> View product</Link>
+                      </Button>
+                    )}
+                    {u.saleId && (
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/sales/${u.saleId}`}>View sale invoice →</Link>
+                      </Button>
+                    )}
+                    {u.purchaseId && (
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/purchases/${u.purchaseId}`}>View purchase →</Link>
                       </Button>
                     )}
                   </div>
