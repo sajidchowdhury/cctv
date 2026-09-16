@@ -22,8 +22,8 @@ export function MobileBottomNav() {
       <ul className="grid grid-cols-5">
         {MOBILE_NAV_ITEMS.map((item) => {
           const active =
-            item.href === "/"
-              ? pathname === "/"
+            item.href === "/dashboard"
+              ? pathname === "/dashboard" || pathname === "/cctv/dashboard"
               : pathname.startsWith(item.href);
           const Icon = item.icon;
           return (

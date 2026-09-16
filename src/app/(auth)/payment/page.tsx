@@ -148,7 +148,7 @@ export default function PaymentPage() {
           </div>
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm">
-              <Link href="/"><ArrowLeft className="mr-2 h-4 w-4" /> Home</Link>
+              <Link href="/dashboard"><ArrowLeft className="mr-2 h-4 w-4" /> Home</Link>
             </Button>
             <Button variant="ghost" size="sm" onClick={async () => {
               await signOut({ redirect: false });
@@ -333,14 +333,14 @@ export default function PaymentPage() {
         {/* Bottom back-to-home button (always visible, not just when ACTIVE) */}
         <div className="text-center pt-2">
           <Button asChild variant="outline">
-            <Link href="/"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Home</Link>
+            <Link href="/dashboard"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Home</Link>
           </Button>
         </div>
 
         {subStatus === "ACTIVE" && (
           <div className="text-center">
             <Button asChild variant="outline">
-              <Link href="/">Back to dashboard <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <Link href="/dashboard">Back to dashboard <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
           </div>
         )}

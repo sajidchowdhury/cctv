@@ -38,7 +38,7 @@ export type NavItem = {
 
 export const NAV_ITEMS: NavItem[] = [
   {
-    href: "/",
+    href: "/dashboard",
     label: "Home",
     labelBn: "হোম",
     icon: LayoutDashboard,

@@ -65,8 +65,8 @@ export function DesktopSidebar() {
         <ul className="space-y-1">
           {items.map((item) => {
             const active =
-              item.href === "/"
-                ? pathname === "/"
+              item.href === "/dashboard"
+                ? pathname === "/dashboard" || pathname === "/cctv/dashboard"
                 : pathname.startsWith(item.href);
             const Icon = item.icon;
             return (
