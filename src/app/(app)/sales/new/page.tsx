@@ -410,12 +410,15 @@ function NewSalePage() {
 
       // Auto-open the saved invoice in a new browser tab so the salesman can
       // print / share it immediately without losing the sales list page.
+      // Routes to /sales/<id>/print which is a bare invoice page (no app shell,
+      // no nav) that auto-triggers window.print() on load — so the user gets
+      // the print dialog popping up in the new tab.
       // Only do this for non-held new sales — held sales don't have a printable
       // invoice yet, and edit mode already shows the invoice page.
       const newSaleId = data.id ?? data.sale?.id;
       if (!hold && !isEditMode && newSaleId) {
         try {
-          const url = appPath(`/sales/${newSaleId}`);
+          const url = appPath(`/sales/${newSaleId}/print`);
           window.open(url, "_blank", "noopener,noreferrer");
         } catch {
           // Popup blocker — fail silently, user can still navigate manually.

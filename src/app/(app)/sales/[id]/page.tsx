@@ -12,7 +12,7 @@ import { ArrowLeft, Loader2, Printer, Pause, Check, Link2, ShieldCheck, MessageS
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/layout/confirm-dialog";
 import { formatBDT, formatDate, formatDateTime } from "@/lib/format";
-import { assetUrl } from "@/lib/app-path";
+import { assetUrl, appPath } from "@/lib/app-path";
 
 export default function SaleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -176,8 +176,10 @@ export default function SaleDetailPage() {
             <Button asChild variant="outline" size="sm">
               <Link href="/sales"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => window.print()}>
-              <Printer className="mr-2 h-4 w-4" /> Print
+            <Button asChild variant="outline" size="sm">
+              <a href={appPath(`/sales/${id}/print`)} target="_blank" rel="noopener noreferrer">
+                <Printer className="mr-2 h-4 w-4" /> Print
+              </a>
             </Button>
             <Button asChild variant="outline" size="sm">
               <a href={`/cctv/api/sales/${id}/warranty-card.pdf`} target="_blank" rel="noopener noreferrer">
