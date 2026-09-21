@@ -240,33 +240,6 @@
   }
 }
 
-/* ── Bare print page (/sales/[id]/print) ────────────────────────────
-   This route renders ONLY the invoice + auto-triggers window.print().
-   The page is still inside the (app) route group (which adds the AppShell:
-   sidebar + mobile top bar + mobile bottom nav + footer). When the user
-   is on a /print path we hide all of that chrome on screen AND in print,
-   so the user sees a clean invoice page on screen before the print dialog
-   pops up. */
-body:has([data-bare-print="true"]) {
-  background: white !important;
-}
-body:has([data-bare-print="true"]) aside,
-body:has([data-bare-print="true"]) nav,
-body:has([data-bare-print="true"]) footer,
-body:has([data-bare-print="true"]) [data-slot="sidebar"],
-body:has([data-bare-print="true"]) [data-print-hidden] {
-  display: none !important;
-}
-body:has([data-bare-print="true"]) main {
-  padding-left: 0 !important;
-  padding-bottom: 0 !important;
-}
-body:has([data-bare-print="true"]) main > div {
-  max-width: none !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}
-
 
 /* ── Landing page grid pattern ── */
 .bg-grid-pattern {

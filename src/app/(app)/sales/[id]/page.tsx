@@ -177,7 +177,7 @@ export default function SaleDetailPage() {
               <Link href="/sales"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
             </Button>
             <Button asChild variant="outline" size="sm">
-              <a href={appPath(`/sales/${id}/print`)} target="_blank" rel="noopener noreferrer">
+              <a href={appPath(`/print/sales/${id}`)} target="_blank" rel="noopener noreferrer">
                 <Printer className="mr-2 h-4 w-4" /> Print
               </a>
             </Button>
