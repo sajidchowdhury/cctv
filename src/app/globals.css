@@ -180,6 +180,30 @@
 /* F5-S1: print styles — hide nav/sidebar/footer/banners, expand content to full width,
    force exact colors for backgrounds. Used by report print buttons. */
 @media print {
+  /* Force light-mode CSS variables regardless of .dark — prevents white-on-white
+     blank pages when user has dark mode enabled in the app. Without this,
+     text-foreground = white and bg-background = near-black; browsers that
+     don't print backgrounds end up rendering white text on white paper. */
+  .dark {
+    --background: oklch(1 0 0) !important;
+    --foreground: oklch(0.145 0 0) !important;
+    --card: oklch(1 0 0) !important;
+    --card-foreground: oklch(0.145 0 0) !important;
+    --popover: oklch(1 0 0) !important;
+    --popover-foreground: oklch(0.145 0 0) !important;
+    --primary: oklch(0.546 0.196 252.5) !important;
+    --primary-foreground: oklch(0.985 0 0) !important;
+    --secondary: oklch(0.97 0 0) !important;
+    --secondary-foreground: oklch(0.205 0 0) !important;
+    --muted: oklch(0.97 0 0) !important;
+    --muted-foreground: oklch(0.556 0 0) !important;
+    --accent: oklch(0.95 0.04 252.5) !important;
+    --accent-foreground: oklch(0.546 0.196 252.5) !important;
+    --border: oklch(0.922 0 0) !important;
+    --input: oklch(0.922 0 0) !important;
+    --sidebar: oklch(0.985 0 0) !important;
+    --sidebar-foreground: oklch(0.145 0 0) !important;
+  }
   /* Hide everything that's not printable */
   .md\:flex,
   .md\:hidden,
@@ -208,6 +232,7 @@
   }
   body {
     background: white !important;
+    color: #000 !important;
   }
   /* Page margins for print */
   @page {

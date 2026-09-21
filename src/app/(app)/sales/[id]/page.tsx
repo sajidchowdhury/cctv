@@ -268,7 +268,7 @@ export default function SaleDetailPage() {
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border overflow-hidden bg-white text-black print:shadow-none">
-            {/* Custom header image OR default header */}
+            {/* Custom header image OR default header (with logo + business name) */}
             {headerImg ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={assetUrl(headerImg) ?? ""} alt="Invoice header" className="w-full h-24 object-cover" />
@@ -293,24 +293,12 @@ export default function SaleDetailPage() {
               </div>
             )}
 
-            {/* If header image is set, show invoice no below it */}
-            {headerImg && (
-              <div className="flex justify-between items-start px-4 pt-3">
-                <div>
-                  {businessLogo && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={assetUrl(businessLogo) ?? ""} alt="Logo" className="h-8 w-8 rounded object-contain mb-1" />
-                  )}
-                  <p className="text-xs text-gray-500">{businessName}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-sm" style={{ color: accent }}>{sale.invoiceNo}</p>
-                  <p className="text-xs text-gray-500">{formatDateTime(sale.date)}</p>
-                </div>
-              </div>
-            )}
+            {/* When a custom header image is set, the logo + business name are already
+                part of that image — so we skip the separate logo block and go straight
+                to Bill-to. Invoice no + date show on the right of the Bill-to row so
+                they aren't lost. */}
 
-            {/* Customer + salesman */}
+            {/* Customer + salesman + (invoice no if header image is set) */}
             <div className="grid grid-cols-2 gap-4 px-4 py-3 text-sm">
               <div>
                 <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Bill to</p>
@@ -319,6 +307,12 @@ export default function SaleDetailPage() {
                 {sale.customer?.address && <p className="text-xs text-gray-500">{sale.customer.address}</p>}
               </div>
               <div className="text-right">
+                {headerImg && (
+                  <>
+                    <p className="font-bold text-sm" style={{ color: accent }}>{sale.invoiceNo}</p>
+                    <p className="text-xs text-gray-500">{formatDateTime(sale.date)}</p>
+                  </>
+                )}
                 {sale.salesman && <p className="text-xs text-gray-500">Salesman: {sale.salesman.name}</p>}
                 <p className="text-xs text-gray-500">Payment: {sale.mode}</p>
               </div>

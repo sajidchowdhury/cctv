@@ -12,11 +12,22 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Save, Loader2, ArrowLeft, Package, Wrench, RotateCcw, Eraser, Eye, EyeOff } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Plus, Trash2, Save, Loader2, ArrowLeft, Package, Wrench, RotateCcw, Eraser, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT } from "@/lib/format";
 import { useSession } from "next-auth/react";
 import { InlineEntityCreator } from "@/components/layout/inline-entity-creator";
+import { appPath } from "@/lib/app-path";
 
 type SearchResult = {
   productId: string;
@@ -71,6 +82,12 @@ function NewSalePage() {
   const [revealedLines, setRevealedLines] = useState<Set<string>>(new Set());
   const [revealedSearch, setRevealedSearch] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  // Zero-payment confirmation: when user clicks Save with paid=0, show a warning
+  // dialog so they explicitly confirm they intend to create an unpaid invoice.
+  // Hold mode skips this (held carts aren't real invoices yet).
+  const [showZeroPayConfirm, setShowZeroPayConfirm] = useState(false);
+  // Stash the pending hold flag so the confirm handler knows which mode to save in.
+  const pendingHoldRef = useRef(false);
   const [customerId, setCustomerId] = useState("");
   const [mode, setMode] = useState("CASH");
   const [paid, setPaid] = useState("");
@@ -307,9 +324,17 @@ function NewSalePage() {
   const paidNum = Number(paid) || 0;
   const due = Math.max(0, total - paidNum);
 
-  async function onSave(hold: boolean = false) {
+  async function onSave(hold: boolean = false, opts?: { forceZeroPayment?: boolean }) {
     if (lines.length === 0) {
       toast({ title: "Empty cart", description: "Add at least one item.", variant: "destructive" });
+      return;
+    }
+    // Zero-payment guard: if not holding, paid=0, and user hasn't explicitly
+    // confirmed, prompt them. This is a deliberate-attention check so the
+    // salesman consciously decides to release an unpaid invoice.
+    if (!hold && paidNum === 0 && !opts?.forceZeroPayment) {
+      pendingHoldRef.current = hold;
+      setShowZeroPayConfirm(true);
       return;
     }
     setSaving(true);
@@ -382,6 +407,21 @@ function NewSalePage() {
       localStorage.removeItem(DRAFT_KEY);
       const invoiceNo = data.invoiceNo ?? data.sale?.invoiceNo;
       toast({ title: isEditMode ? "Sale updated" : hold ? "Sale held" : "Sale saved", description: isEditMode ? (data.message ?? invoiceNo) : invoiceNo });
+
+      // Auto-open the saved invoice in a new browser tab so the salesman can
+      // print / share it immediately without losing the sales list page.
+      // Only do this for non-held new sales — held sales don't have a printable
+      // invoice yet, and edit mode already shows the invoice page.
+      const newSaleId = data.id ?? data.sale?.id;
+      if (!hold && !isEditMode && newSaleId) {
+        try {
+          const url = appPath(`/sales/${newSaleId}`);
+          window.open(url, "_blank", "noopener,noreferrer");
+        } catch {
+          // Popup blocker — fail silently, user can still navigate manually.
+        }
+      }
+
       router.push(hold ? "/sales?held=1" : "/sales");
     } finally {
       setSaving(false);
@@ -781,6 +821,46 @@ function NewSalePage() {
           {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {isEditMode ? "Update sale" : resumeId ? "Finalize sale" : "Save sale"}
         </Button>
       </div>
+
+      {/* Zero-payment confirmation dialog.
+          Triggered when user clicks "Save sale" with paid=0.
+          On confirm, forces save with paid=0. On cancel, returns to the form
+          so the user can enter a payment amount. */}
+      <AlertDialog
+        open={showZeroPayConfirm}
+        onOpenChange={(open) => {
+          // If user dismisses (Escape / click outside), just close — don't save.
+          if (!open) setShowZeroPayConfirm(false);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              No payment received
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to create an invoice with <strong>BDT 0</strong> received.
+              The full amount (<strong>{formatBDT(total)}</strong>) will be recorded as due
+              {customerId ? " against this customer" : ""}.
+              <br /><br />
+              If this is intentional (e.g. credit sale), confirm to proceed.
+              Otherwise, cancel and enter the amount you received.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel — enter payment</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowZeroPayConfirm(false);
+                onSave(pendingHoldRef.current, { forceZeroPayment: true });
+              }}
+            >
+              Confirm — save with 0 payment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
