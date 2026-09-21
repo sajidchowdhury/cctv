@@ -12,3 +12,5 @@ export type { CartLine } from "./cart-table";
 export { ConfirmDialog } from "./confirm-dialog";
 export { TableSkeleton, CardGridSkeleton } from "./skeletons";
 export { OnboardingBanner } from "./onboarding-banner";
+export { ImageCropDialog } from "./image-crop-dialog";
+export type { CropResult } from "./image-crop-dialog";

@@ -3,13 +3,14 @@
 import { useState, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
+import { ImageCropDialog, type CropResult } from "@/components/layout/image-crop-dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Save, Upload, Trash2, Building2, Palette, User, Lock, Image as ImageIcon, Eye, AlertCircle } from "lucide-react";
+import { Loader2, Save, Upload, Trash2, Building2, Palette, User, Lock, Image as ImageIcon, Eye, AlertCircle, Crop } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "next-auth/react";
 import { assetUrl } from "@/lib/app-path";
@@ -45,6 +46,12 @@ export default function SettingsPage() {
   const [changingPassword, setChangingPassword] = useState(false);
   const [savingName, setSavingName] = useState(false);
 
+  // Image crop dialog state. Only one dialog can be open at a time —
+  // `cropTarget` tells us which field the cropped result will be saved to.
+  // null = dialog closed. "invoiceHeaderImage" / "invoiceFooterImage" = open
+  // for that field. businessLogo doesn't use the cropper (it's square + tiny).
+  const [cropTarget, setCropTarget] = useState<"invoiceHeaderImage" | "invoiceFooterImage" | null>(null);
+
   const { data, isLoading } = useQuery({
     queryKey: ["business-profile"],
     queryFn: async () => (await (await fetch("/cctv/api/business-profile")).json()).profile,
@@ -70,6 +77,34 @@ export default function SettingsPage() {
         return;
       }
       // Update the form + save immediately
+      setForm((f) => ({ ...f, [field]: data.url }));
+      await saveProfile({ [field]: data.url });
+    } finally {
+      setUploading(null);
+    }
+  }
+
+  /**
+   * Upload a pre-cropped image blob (from ImageCropDialog) to a specific field.
+   * The blob is already at the correct aspect ratio + dimensions, so the server
+   * just stores it as-is. No further processing needed.
+   */
+  async function uploadCroppedImage(
+    result: CropResult,
+    field: "invoiceHeaderImage" | "invoiceFooterImage"
+  ) {
+    setUploading(field);
+    try {
+      const formData = new FormData();
+      // Give the blob a filename + type so the upload API's content-type check passes.
+      const file = new File([result.blob], `${field}.png`, { type: "image/png" });
+      formData.append("file", file);
+      const res = await fetch("/cctv/api/uploads", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Upload failed", description: data.error, variant: "destructive" });
+        return;
+      }
       setForm((f) => ({ ...f, [field]: data.url }));
       await saveProfile({ [field]: data.url });
     } finally {
@@ -285,26 +320,24 @@ export default function SettingsPage() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <label>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) uploadFile(f, "invoiceHeaderImage");
-                        }}
-                      />
-                      <Button type="button" variant="outline" size="sm" asChild>
-                        <span>{uploading === "invoiceHeaderImage" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />} Upload header</span>
-                      </Button>
-                    </label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCropTarget("invoiceHeaderImage")}
+                    >
+                      {uploading === "invoiceHeaderImage" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Crop className="mr-2 h-4 w-4" />}
+                      {form.invoiceHeaderImage ? "Replace header" : "Upload header"}
+                    </Button>
                     {form.invoiceHeaderImage && (
                       <Button type="button" variant="ghost" size="sm" onClick={() => removeImage("invoiceHeaderImage")}>
                         <Trash2 className="mr-2 h-4 w-4" /> Remove
                       </Button>
                     )}
-                    <p className="text-xs text-muted-foreground">Wide banner image. Shown at the top of each invoice page.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Wide banner image. Renders at <strong>800×96px</strong> at the top of each invoice page.
+                      You'll be able to crop & preview before upload.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -325,26 +358,24 @@ export default function SettingsPage() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <label>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) uploadFile(f, "invoiceFooterImage");
-                        }}
-                      />
-                      <Button type="button" variant="outline" size="sm" asChild>
-                        <span>{uploading === "invoiceFooterImage" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />} Upload footer</span>
-                      </Button>
-                    </label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCropTarget("invoiceFooterImage")}
+                    >
+                      {uploading === "invoiceFooterImage" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Crop className="mr-2 h-4 w-4" />}
+                      {form.invoiceFooterImage ? "Replace footer" : "Upload footer"}
+                    </Button>
                     {form.invoiceFooterImage && (
                       <Button type="button" variant="ghost" size="sm" onClick={() => removeImage("invoiceFooterImage")}>
                         <Trash2 className="mr-2 h-4 w-4" /> Remove
                       </Button>
                     )}
-                    <p className="text-xs text-muted-foreground">Shown at the bottom of each invoice page.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Shown at the bottom of each invoice page. Renders at <strong>800×64px</strong>.
+                      You'll be able to crop & preview before upload.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -492,6 +523,29 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* ── Image crop dialogs (header + footer) ─────────────────────────
+          Each renders at the exact aspect ratio used on the invoice, so the
+          user can preview + reposition before uploading. Output is a PNG
+          blob at the target dimensions — the upload API just stores it. */}
+      <ImageCropDialog
+        open={cropTarget === "invoiceHeaderImage"}
+        onOpenChange={(o) => setCropTarget(o ? "invoiceHeaderImage" : null)}
+        title="Crop invoice header"
+        description="Drag to reposition. This is exactly how the header will appear at the top of each invoice page (800×96px)."
+        aspect={800 / 96}
+        outputWidth={800}
+        onConfirm={(result) => uploadCroppedImage(result, "invoiceHeaderImage")}
+      />
+      <ImageCropDialog
+        open={cropTarget === "invoiceFooterImage"}
+        onOpenChange={(o) => setCropTarget(o ? "invoiceFooterImage" : null)}
+        title="Crop invoice footer"
+        description="Drag to reposition. This is exactly how the footer will appear at the bottom of each invoice page (800×64px)."
+        aspect={800 / 64}
+        outputWidth={800}
+        onConfirm={(result) => uploadCroppedImage(result, "invoiceFooterImage")}
+      />
     </div>
   );
 }
