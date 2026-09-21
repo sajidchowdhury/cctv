@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Save, Upload, Trash2, Building2, Palette, User, Lock, Image as ImageIcon, Eye, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "next-auth/react";
+import { assetUrl } from "@/lib/app-path";
 
 type Profile = {
   id: string;
@@ -204,7 +205,7 @@ export default function SettingsPage() {
                   <div className="h-20 w-20 rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden bg-muted/30">
                     {form.businessLogo ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={form.businessLogo} alt="Logo" className="h-full w-full object-contain" />
+                      <img src={assetUrl(form.businessLogo) ?? ""} alt="Logo" className="h-full w-full object-contain" />
                     ) : (
                       <ImageIcon className="h-8 w-8 text-muted-foreground" />
                     )}
@@ -275,7 +276,7 @@ export default function SettingsPage() {
                   <div className="h-24 w-full max-w-xs rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden bg-muted/30">
                     {form.invoiceHeaderImage ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={form.invoiceHeaderImage} alt="Header" className="h-full w-full object-cover" />
+                      <img src={assetUrl(form.invoiceHeaderImage) ?? ""} alt="Header" className="h-full w-full object-cover" />
                     ) : (
                       <div className="text-center text-xs text-muted-foreground p-2">
                         <ImageIcon className="h-6 w-6 mx-auto mb-1" />
@@ -315,7 +316,7 @@ export default function SettingsPage() {
                   <div className="h-24 w-full max-w-xs rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden bg-muted/30">
                     {form.invoiceFooterImage ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={form.invoiceFooterImage} alt="Footer" className="h-full w-full object-cover" />
+                      <img src={assetUrl(form.invoiceFooterImage) ?? ""} alt="Footer" className="h-full w-full object-cover" />
                     ) : (
                       <div className="text-center text-xs text-muted-foreground p-2">
                         <ImageIcon className="h-6 w-6 mx-auto mb-1" />
@@ -402,7 +403,7 @@ export default function SettingsPage() {
               <div className="rounded-lg border bg-white text-black overflow-hidden">
                 {form.invoiceHeaderImage ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={form.invoiceHeaderImage} alt="Header preview" className="w-full h-24 object-cover" />
+                  <img src={assetUrl(form.invoiceHeaderImage) ?? ""} alt="Header preview" className="w-full h-24 object-cover" />
                 ) : (
                   <div className="h-16 flex items-center justify-center border-b" style={{ borderColor: form.invoiceAccentColor ?? "#1A73E8" }}>
                     <p className="text-sm font-bold" style={{ color: form.invoiceAccentColor ?? "#1A73E8" }}>
@@ -418,7 +419,7 @@ export default function SettingsPage() {
                 </div>
                 {form.invoiceFooterImage ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={form.invoiceFooterImage} alt="Footer preview" className="w-full h-16 object-cover" />
+                  <img src={assetUrl(form.invoiceFooterImage) ?? ""} alt="Footer preview" className="w-full h-16 object-cover" />
                 ) : (
                   <div className="h-12 flex items-center justify-center border-t bg-gray-50">
                     <p className="text-xs text-gray-400">Thank you for your business!</p>

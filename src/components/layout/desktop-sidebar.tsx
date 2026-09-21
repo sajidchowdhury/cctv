@@ -6,7 +6,7 @@ import { signOut, useSession } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { visibleNavItems } from "@/lib/nav";
-import { appPath } from "@/lib/app-path";
+import { appPath, assetUrl } from "@/lib/app-path";
 import { ShieldCheck, LogOut, Sun, Moon, Languages, Settings } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -46,7 +46,7 @@ export function DesktopSidebar() {
       <Link href="/settings" className="flex items-center gap-2 h-16 px-6 border-b hover:bg-sidebar-accent/50 transition-colors">
         {businessLogo ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={businessLogo} alt="Logo" className="h-9 w-9 rounded-xl object-contain" />
+          <img src={assetUrl(businessLogo) ?? ""} alt="Logo" className="h-9 w-9 rounded-xl object-contain" />
         ) : (
           <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
             <ShieldCheck className="h-5 w-5" />
@@ -154,7 +154,7 @@ export function MobileTopBar() {
       <Link href="/settings" className="flex items-center gap-2">
         {businessLogo ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={businessLogo} alt="Logo" className="h-8 w-8 rounded-lg object-contain" />
+          <img src={assetUrl(businessLogo) ?? ""} alt="Logo" className="h-8 w-8 rounded-lg object-contain" />
         ) : (
           <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <ShieldCheck className="h-4 w-4" />

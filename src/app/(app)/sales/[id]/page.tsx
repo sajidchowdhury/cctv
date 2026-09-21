@@ -12,6 +12,7 @@ import { ArrowLeft, Loader2, Printer, Pause, Check, Link2, ShieldCheck, MessageS
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/layout/confirm-dialog";
 import { formatBDT, formatDate, formatDateTime } from "@/lib/format";
+import { assetUrl } from "@/lib/app-path";
 
 export default function SaleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -270,13 +271,13 @@ export default function SaleDetailPage() {
             {/* Custom header image OR default header */}
             {headerImg ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={headerImg} alt="Invoice header" className="w-full h-24 object-cover" />
+              <img src={assetUrl(headerImg) ?? ""} alt="Invoice header" className="w-full h-24 object-cover" />
             ) : (
               <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: accent, backgroundColor: `${accent}08` }}>
                 <div className="flex items-center gap-2">
                   {businessLogo && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={businessLogo} alt="Logo" className="h-10 w-10 rounded object-contain" />
+                    <img src={assetUrl(businessLogo) ?? ""} alt="Logo" className="h-10 w-10 rounded object-contain" />
                   )}
                   <div>
                     <h2 className="text-lg font-bold" style={{ color: accent }}>{businessName}</h2>
@@ -298,7 +299,7 @@ export default function SaleDetailPage() {
                 <div>
                   {businessLogo && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={businessLogo} alt="Logo" className="h-8 w-8 rounded object-contain mb-1" />
+                    <img src={assetUrl(businessLogo) ?? ""} alt="Logo" className="h-8 w-8 rounded object-contain mb-1" />
                   )}
                   <p className="text-xs text-gray-500">{businessName}</p>
                 </div>
@@ -398,7 +399,7 @@ export default function SaleDetailPage() {
             {/* Custom footer image OR default footer */}
             {footerImg ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={footerImg} alt="Invoice footer" className="w-full h-16 object-cover" />
+              <img src={assetUrl(footerImg) ?? ""} alt="Invoice footer" className="w-full h-16 object-cover" />
             ) : (
               <div className="h-12 flex items-center justify-center border-t bg-gray-50">
                 <p className="text-xs text-gray-400">Thank you for your business!</p>

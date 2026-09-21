@@ -63,7 +63,10 @@ export class LocalStorageDriver implements IStorage {
   }
 
   getUrl(key: string): string {
-    return `/uploads/${key}`;
+    // Route through the /api/uploads/[...path] handler (src/app/api/uploads/[...path]/route.ts)
+    // — Next.js does NOT auto-serve files outside public/, so we serve them via a route
+    // handler. The /cctv basePath is prepended at render time via assetUrl().
+    return `/api/uploads/${key}`;
   }
 }
 
