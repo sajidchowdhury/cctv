@@ -58,7 +58,7 @@ const PatchSchema = z.object({
   safetyStock: z.number().int().min(0).optional(),
   defaultPrice: z.number().min(0).optional().nullable(),
   isSerialised: z.boolean().optional(), // F1-S2
-  imageUrl: z.string().url().optional().nullable(),
+  imageUrl: z.string().regex(/^(https?:\/\/|\/).+/, "Must be a URL or root-relative path").optional().nullable(),
 });
 
 export const PATCH = withTenant(async (user, req: Request, ctx: any) => {

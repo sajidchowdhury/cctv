@@ -23,7 +23,7 @@ const CreateSchema = z.object({
   safetyStock: z.number().int().min(0).default(0),
   defaultPrice: z.number().min(0).optional().nullable(),
   isSerialised: z.boolean().default(true), // F1-S2
-  imageUrl: z.string().url().optional().nullable(),
+  imageUrl: z.string().regex(/^(https?:\/\/|\/).+/, "Must be a URL or root-relative path").optional().nullable(),
   sku: z.string().max(40).optional(), // optional override; auto-generated if absent
 });
 

@@ -17,7 +17,7 @@ const CreateSchema = z.object({
   mode: z.enum(["CASH", "BANK", "BKASH", "NAGAD", "CHEQUE"]).default("CASH"),
   date: z.string().optional(),
   narration: z.string().max(500).optional().nullable(),
-  attachmentUrl: z.string().url().optional().nullable(),
+  attachmentUrl: z.string().regex(/^(https?:\/\/|\/).+/, "Must be a URL or root-relative path").optional().nullable(),
 });
 
 export const GET = withTenant(async (user, req: Request) => {

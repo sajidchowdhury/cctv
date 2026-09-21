@@ -34,13 +34,21 @@ export const GET = withTenant(async (user) => {
   return NextResponse.json({ profile: tenant });
 });
 
+// Accepts absolute URLs (https://...) and root-relative paths (/uploads/...).
+// The LocalStorageDriver returns root-relative URLs, so .url() alone breaks uploads.
+const urlString = z
+  .string()
+  .regex(/^(https?:\/\/|\/).+/, "Must be a URL or root-relative path like /uploads/...")
+  .nullable()
+  .optional();
+
 const PatchSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   phone: z.string().max(20).nullable().optional(),
   address: z.string().max(500).nullable().optional(),
-  businessLogo: z.string().url().nullable().optional(),
-  invoiceHeaderImage: z.string().url().nullable().optional(),
-  invoiceFooterImage: z.string().url().nullable().optional(),
+  businessLogo: urlString,
+  invoiceHeaderImage: urlString,
+  invoiceFooterImage: urlString,
   invoiceProductsPerPage: z.number().int().min(1).max(50).optional(),
   invoiceAccentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
 });
