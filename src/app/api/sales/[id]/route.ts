@@ -22,7 +22,8 @@ export const GET = withTenant(async (user, _req: Request, ctx: any) => {
       salesman: { select: { id: true, name: true } },
       items: {
         include: {
-          product: { select: { id: true, name: true, model: true, sku: true } },
+          // Phase 2: include unit relation so the invoice can render a UoM column.
+          product: { select: { id: true, name: true, model: true, sku: true, unit: { select: { name: true } } } },
           inventoryUnit: { select: { id: true, serialNo: true, status: true, warrantyEnd: true } },
         },
       },

@@ -47,8 +47,10 @@ export function InvoiceDocument({
   printMode?: boolean;
 }) {
   // ── Shared derived state ─────────────────────────────────────────
+  // Phase 2: pass sale.date so groupInvoiceItems can compute warranty
+  // duration from inventoryUnit.warrantyEnd.
   const groupedItems = useMemo(
-    () => groupInvoiceItems(sale?.items ?? []),
+    () => groupInvoiceItems(sale?.items ?? [], sale?.date),
     [sale]
   );
   const productsPerPage = profile?.invoiceProductsPerPage ?? 10;
@@ -176,59 +178,75 @@ function ScreenInvoice({
         </div>
       </div>
 
-      {/* Items table (grouped by product — MODEL NAME (PRODUCT NAME) + serial list) */}
+      {/* Items table — Phase 2 layout per reference invoice BMDINV2026017730.pdf
+          Columns: SL | Product Description | Warranty | Qty | UoM | Unit Price | Amount
+          - SL: serial index (1, 2, 3...)
+          - Product Description: stacked — product name (bold) + model (gray) + S/N lines
+          - Warranty: "1 YEAR", "3 YEARS", "—"
+          - No separate Serials column (S/N is shown inline under product description)
+          - No per-item Disc % column (invoice-level discount at bottom remains) */}
       <div className="overflow-x-auto px-4 pb-4">
         <table className="w-full text-sm">
           <thead className="border-b" style={{ borderColor: accent }}>
             <tr>
-              <th className="text-left font-medium py-2 pr-2" style={{ color: accent }}>Item</th>
-              <th className="text-left font-medium py-2 px-2" style={{ color: accent }}>Serials</th>
+              <th className="text-left font-medium py-2 pr-1 w-8" style={{ color: accent }}>SL</th>
+              <th className="text-left font-medium py-2 px-2" style={{ color: accent }}>Product Description</th>
+              <th className="text-left font-medium py-2 px-2" style={{ color: accent }}>Warranty</th>
               <th className="text-right font-medium py-2 px-2" style={{ color: accent }}>Qty</th>
-              <th className="text-right font-medium py-2 px-2" style={{ color: accent }}>Unit</th>
-              <th className="text-right font-medium py-2 px-2" style={{ color: accent }}>Disc %</th>
-              <th className="text-right font-medium py-2 pl-2" style={{ color: accent }}>Total</th>
+              <th className="text-left font-medium py-2 px-2 w-12" style={{ color: accent }}>UoM</th>
+              <th className="text-right font-medium py-2 px-2" style={{ color: accent }}>Unit Price</th>
+              <th className="text-right font-medium py-2 pl-2" style={{ color: accent }}>Amount</th>
             </tr>
           </thead>
           <tbody>
-            {groupedItems.map((item) => (
-              <tr key={item.key} className="border-b border-gray-100">
-                <td className="py-2 pr-2 align-top">
+            {groupedItems.map((item, idx) => (
+              <tr key={item.key} className="border-b border-gray-100 align-top">
+                {/* SL — serial index */}
+                <td className="py-2 pr-1">{idx + 1}</td>
+                {/* Product Description — stacked: name (bold) + model (gray) + S/N lines */}
+                <td className="py-2 px-2">
                   {item.lineType === "SERVICE" ? (
                     <p className="font-medium italic">{item.productName}</p>
                   ) : (
                     <>
+                      <p className="font-medium">{item.productName}</p>
                       {item.model && (
-                        <p className="font-medium">{item.model}</p>
+                        <p className="text-xs text-gray-500">{item.model}</p>
                       )}
-                      <p className="text-xs text-gray-500">
-                        {item.model ? `(${item.productName})` : item.productName}
-                      </p>
+                      {item.serials.length > 0 && (
+                        <div className="mt-0.5">
+                          {item.serials.map((s, i) => (
+                            <p key={i} className="text-xs font-mono text-gray-600">
+                              S/N: {s}
+                            </p>
+                          ))}
+                        </div>
+                      )}
                     </>
                   )}
                 </td>
-                <td className="py-2 px-2 align-top">
-                  {item.serials.length > 0 ? (
-                    <p className="text-xs font-mono text-gray-600">{item.serials.join(", ")}</p>
-                  ) : (
-                    <span className="text-xs text-gray-400">—</span>
-                  )}
-                </td>
-                <td className="py-2 px-2 text-right tabular-nums align-top">{item.totalQty}</td>
-                <td className="py-2 px-2 text-right tabular-nums align-top">{formatBDT(item.unitPrice)}</td>
-                <td className="py-2 px-2 text-right tabular-nums align-top">{item.discount || 0}%</td>
-                <td className="py-2 pl-2 text-right tabular-nums font-medium align-top">{formatBDT(item.lineTotal)}</td>
+                {/* Warranty */}
+                <td className="py-2 px-2 text-xs">{item.warrantyLabel}</td>
+                {/* Qty */}
+                <td className="py-2 px-2 text-right tabular-nums">{item.totalQty}</td>
+                {/* UoM */}
+                <td className="py-2 px-2 text-xs text-gray-600">{item.unitName ?? "—"}</td>
+                {/* Unit Price */}
+                <td className="py-2 px-2 text-right tabular-nums">{formatBDT(item.unitPrice)}</td>
+                {/* Amount (line total — no per-line discount) */}
+                <td className="py-2 pl-2 text-right tabular-nums font-medium">{formatBDT(item.lineTotal)}</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
-            <tr><td colSpan={5} className="text-right py-2 text-gray-600">Subtotal</td><td className="text-right tabular-nums py-2">{formatBDT(sale.total + sale.discount)}</td></tr>
-            {sale.discount > 0 && <tr><td colSpan={5} className="text-right py-2 text-gray-600">Discount</td><td className="text-right tabular-nums py-2">-{formatBDT(sale.discount)}</td></tr>}
+            <tr><td colSpan={6} className="text-right py-2 text-gray-600">Subtotal</td><td className="text-right tabular-nums py-2">{formatBDT(sale.total + sale.discount)}</td></tr>
+            {sale.discount > 0 && <tr><td colSpan={6} className="text-right py-2 text-gray-600">Discount</td><td className="text-right tabular-nums py-2">-{formatBDT(sale.discount)}</td></tr>}
             <tr>
-              <td colSpan={5} className="text-right py-2 font-bold border-t" style={{ color: accent }}>Total</td>
+              <td colSpan={6} className="text-right py-2 font-bold border-t" style={{ color: accent }}>Total</td>
               <td className="text-right tabular-nums py-2 font-bold" style={{ color: accent }}>{formatBDT(sale.total)}</td>
             </tr>
-            <tr><td colSpan={5} className="text-right py-2 text-gray-600">Paid</td><td className="text-right tabular-nums py-2">{formatBDT(sale.paid)}</td></tr>
-            {sale.due > 0 && <tr><td colSpan={5} className="text-right py-2 font-bold text-amber-700">Due</td><td className="text-right tabular-nums py-2 font-bold text-amber-700">{formatBDT(sale.due)}</td></tr>}
+            <tr><td colSpan={6} className="text-right py-2 text-gray-600">Paid</td><td className="text-right tabular-nums py-2">{formatBDT(sale.paid)}</td></tr>
+            {sale.due > 0 && <tr><td colSpan={6} className="text-right py-2 font-bold text-amber-700">Due</td><td className="text-right tabular-nums py-2 font-bold text-amber-700">{formatBDT(sale.due)}</td></tr>}
           </tfoot>
         </table>
       </div>
@@ -346,57 +364,71 @@ function PrintInvoice({
         </div>
       </div>
 
-      {/* Items table */}
+      {/* Items table — Phase 2 layout per reference invoice BMDINV2026017730.pdf
+          Columns: SL | Product Description | Warranty | Qty | UoM | Unit Price | Amount
+          Inline styles for print reliability (highest CSS specificity). */}
       <div style={{ padding: "0 16px 16px", overflowX: "auto" }}>
         <table style={{ width: "100%", fontSize: "14px", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: `2px solid ${accent}` }}>
-              <th style={{ textAlign: "left", fontWeight: 500, padding: "8px 8px 8px 0", color: accent }}>Item</th>
-              <th style={{ textAlign: "left", fontWeight: 500, padding: "8px", color: accent }}>Serials</th>
+              <th style={{ textAlign: "left", fontWeight: 500, padding: "8px 4px 8px 0", color: accent, width: "24px" }}>SL</th>
+              <th style={{ textAlign: "left", fontWeight: 500, padding: "8px", color: accent }}>Product Description</th>
+              <th style={{ textAlign: "left", fontWeight: 500, padding: "8px", color: accent }}>Warranty</th>
               <th style={{ textAlign: "right", fontWeight: 500, padding: "8px", color: accent }}>Qty</th>
-              <th style={{ textAlign: "right", fontWeight: 500, padding: "8px", color: accent }}>Unit</th>
-              <th style={{ textAlign: "right", fontWeight: 500, padding: "8px", color: accent }}>Disc %</th>
-              <th style={{ textAlign: "right", fontWeight: 500, padding: "8px 0 8px 8px", color: accent }}>Total</th>
+              <th style={{ textAlign: "left", fontWeight: 500, padding: "8px", color: accent, width: "48px" }}>UoM</th>
+              <th style={{ textAlign: "right", fontWeight: 500, padding: "8px", color: accent }}>Unit Price</th>
+              <th style={{ textAlign: "right", fontWeight: 500, padding: "8px 0 8px 8px", color: accent }}>Amount</th>
             </tr>
           </thead>
           <tbody>
-            {groupedItems.map((item) => (
-              <tr key={item.key} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                <td style={{ padding: "8px 8px 8px 0", verticalAlign: "top" }}>
+            {groupedItems.map((item, idx) => (
+              <tr key={item.key} style={{ borderBottom: "1px solid #f3f4f6", verticalAlign: "top" }}>
+                {/* SL */}
+                <td style={{ padding: "8px 4px 8px 0" }}>{idx + 1}</td>
+                {/* Product Description — stacked */}
+                <td style={{ padding: "8px" }}>
                   {item.lineType === "SERVICE" ? (
                     <p style={{ fontWeight: 500, fontStyle: "italic", margin: 0 }}>{item.productName}</p>
                   ) : (
                     <>
-                      {item.model && <p style={{ fontWeight: 500, margin: 0 }}>{item.model}</p>}
-                      <p style={{ fontSize: "12px", color: "#6b7280", margin: 0 }}>
-                        {item.model ? `(${item.productName})` : item.productName}
-                      </p>
+                      <p style={{ fontWeight: 500, margin: 0 }}>{item.productName}</p>
+                      {item.model && (
+                        <p style={{ fontSize: "12px", color: "#6b7280", margin: 0 }}>{item.model}</p>
+                      )}
+                      {item.serials.length > 0 && (
+                        <div style={{ marginTop: "2px" }}>
+                          {item.serials.map((s, i) => (
+                            <p key={i} style={{ fontSize: "12px", fontFamily: "monospace", color: "#4b5563", margin: 0 }}>
+                              S/N: {s}
+                            </p>
+                          ))}
+                        </div>
+                      )}
                     </>
                   )}
                 </td>
-                <td style={{ padding: "8px", verticalAlign: "top" }}>
-                  {item.serials.length > 0 ? (
-                    <p style={{ fontSize: "12px", fontFamily: "monospace", color: "#4b5563", margin: 0 }}>{item.serials.join(", ")}</p>
-                  ) : (
-                    <span style={{ fontSize: "12px", color: "#9ca3af" }}>—</span>
-                  )}
-                </td>
-                <td style={{ padding: "8px", textAlign: "right", fontVariantNumeric: "tabular-nums", verticalAlign: "top" }}>{item.totalQty}</td>
-                <td style={{ padding: "8px", textAlign: "right", fontVariantNumeric: "tabular-nums", verticalAlign: "top" }}>{formatBDT(item.unitPrice)}</td>
-                <td style={{ padding: "8px", textAlign: "right", fontVariantNumeric: "tabular-nums", verticalAlign: "top" }}>{item.discount || 0}%</td>
-                <td style={{ padding: "8px 0 8px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 500, verticalAlign: "top" }}>{formatBDT(item.lineTotal)}</td>
+                {/* Warranty */}
+                <td style={{ padding: "8px", fontSize: "12px" }}>{item.warrantyLabel}</td>
+                {/* Qty */}
+                <td style={{ padding: "8px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{item.totalQty}</td>
+                {/* UoM */}
+                <td style={{ padding: "8px", fontSize: "12px", color: "#4b5563" }}>{item.unitName ?? "—"}</td>
+                {/* Unit Price */}
+                <td style={{ padding: "8px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{formatBDT(item.unitPrice)}</td>
+                {/* Amount */}
+                <td style={{ padding: "8px 0 8px 8px", textAlign: "right", fontVariantNumeric: "tabular-nums", fontWeight: 500 }}>{formatBDT(item.lineTotal)}</td>
               </tr>
             ))}
           </tbody>
           <tfoot>
-            <tr><td colSpan={5} style={{ textAlign: "right", padding: "8px", color: "#4b5563" }}>Subtotal</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums" }}>{formatBDT(sale.total + sale.discount)}</td></tr>
-            {sale.discount > 0 && <tr><td colSpan={5} style={{ textAlign: "right", padding: "8px", color: "#4b5563" }}>Discount</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums" }}>-{formatBDT(sale.discount)}</td></tr>}
+            <tr><td colSpan={6} style={{ textAlign: "right", padding: "8px", color: "#4b5563" }}>Subtotal</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums" }}>{formatBDT(sale.total + sale.discount)}</td></tr>
+            {sale.discount > 0 && <tr><td colSpan={6} style={{ textAlign: "right", padding: "8px", color: "#4b5563" }}>Discount</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums" }}>-{formatBDT(sale.discount)}</td></tr>}
             <tr style={{ borderTop: `2px solid ${accent}` }}>
-              <td colSpan={5} style={{ textAlign: "right", padding: "8px", fontWeight: 700, color: accent }}>Total</td>
+              <td colSpan={6} style={{ textAlign: "right", padding: "8px", fontWeight: 700, color: accent }}>Total</td>
               <td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: accent }}>{formatBDT(sale.total)}</td>
             </tr>
-            <tr><td colSpan={5} style={{ textAlign: "right", padding: "8px", color: "#4b5563" }}>Paid</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums" }}>{formatBDT(sale.paid)}</td></tr>
-            {sale.due > 0 && <tr><td colSpan={5} style={{ textAlign: "right", padding: "8px", fontWeight: 700, color: "#b45309" }}>Due</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: "#b45309" }}>{formatBDT(sale.due)}</td></tr>}
+            <tr><td colSpan={6} style={{ textAlign: "right", padding: "8px", color: "#4b5563" }}>Paid</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums" }}>{formatBDT(sale.paid)}</td></tr>
+            {sale.due > 0 && <tr><td colSpan={6} style={{ textAlign: "right", padding: "8px", fontWeight: 700, color: "#b45309" }}>Due</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: "#b45309" }}>{formatBDT(sale.due)}</td></tr>}
           </tfoot>
         </table>
       </div>
