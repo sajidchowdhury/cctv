@@ -17,9 +17,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Save, Loader2, ArrowLeft, ScanLine, Search, X, AlertTriangle, UserPlus, Package } from "lucide-react";
+import { Plus, Trash2, Save, Loader2, ArrowLeft, ScanLine, Search, X, AlertTriangle, UserPlus, Package, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT, formatDate } from "@/lib/format";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type Product = {
   id: string;
@@ -89,6 +99,12 @@ function NewPurchaseForm() {
   const [newSupplier, setNewSupplier] = useState({
     name: "", phone: "", company: "", address: "", openingBalance: "",
   });
+  // Serial deficit confirmation: if any serialised line has fewer serials
+  // than qty, we open this dialog before saving. The user can either cancel
+  // (to go back + add the missing serials) or confirm (to save as-is, which
+  // means the missing units will be created without serial numbers — they'll
+  // show up as 'no serial' in stock + won't be individually trackable).
+  const [showSerialDeficitConfirm, setShowSerialDeficitConfirm] = useState(false);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -285,7 +301,7 @@ function NewPurchaseForm() {
     }
   }
 
-  async function onSave() {
+  async function onSave(opts?: { forceSerialDeficit?: boolean }) {
     if (lines.length === 0) {
       toast({ title: "Empty cart", description: "Add at least one product.", variant: "destructive" });
       return;
@@ -294,6 +310,23 @@ function NewPurchaseForm() {
       const qty = Number(line.qty) || 0;
       if (line.serials.length > qty) {
         toast({ title: "Serial count exceeds qty", description: `${line.productName}: ${line.serials.length} serials but qty is ${qty}.`, variant: "destructive" });
+        return;
+      }
+    }
+    // Serial deficit check: for serialised products, if the user entered
+    // fewer serials than qty, warn them before saving. They can either:
+    //   - Cancel → go back + add the missing serials
+    //   - Confirm → save as-is (missing units get created without serials)
+    // This catches the common mistake of entering qty=5 but only scanning 1
+    // serial, then hitting save without realising the other 4 are untracked.
+    if (!opts?.forceSerialDeficit) {
+      const deficitLines = lines.filter((l) => {
+        if (!l.isSerialised) return false;
+        const qty = Number(l.qty) || 0;
+        return l.serials.length < qty;
+      });
+      if (deficitLines.length > 0) {
+        setShowSerialDeficitConfirm(true);
         return;
       }
     }
@@ -727,6 +760,68 @@ function NewPurchaseForm() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Serial deficit confirmation: if any serialised line has fewer
+          serials than qty, this dialog opens before saving. The user can
+          either cancel (to go back + add the missing serials) or confirm
+          (to save as-is — the missing units will be created without serial
+          numbers, which means they won't be individually trackable). */}
+      <AlertDialog
+        open={showSerialDeficitConfirm}
+        onOpenChange={(open) => {
+          if (!open) setShowSerialDeficitConfirm(false);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Missing serial numbers
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You have serialised products where the quantity is higher than
+              the number of serials entered. The missing units will be created
+              without serial numbers — they will show as &quot;no serial&quot; in
+              stock and will not be individually trackable for warranty / RMA.
+              <br /><br />
+              <strong>Products with missing serials:</strong>
+              <ul className="mt-1 ml-4 list-disc text-xs">
+                {lines
+                  .filter((l) => {
+                    if (!l.isSerialised) return false;
+                    const qty = Number(l.qty) || 0;
+                    return l.serials.length < qty;
+                  })
+                  .map((l) => {
+                    const qty = Number(l.qty) || 0;
+                    const missing = qty - l.serials.length;
+                    return (
+                      <li key={l.key}>
+                        {l.productName}: {l.serials.length}/{qty} serials — {missing} missing
+                      </li>
+                    );
+                  })}
+              </ul>
+              <br />
+              If this is intentional (e.g. you only have 1 serial and the
+              rest will be added later), confirm to proceed. Otherwise, cancel
+              and add the missing serials before saving.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel — add serials</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowSerialDeficitConfirm(false);
+                onSave({ forceSerialDeficit: true });
+              }}
+            >
+              <Info className="h-4 w-4 mr-2" />
+              Save anyway (create without serials)
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
