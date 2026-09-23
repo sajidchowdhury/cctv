@@ -39,7 +39,7 @@ const PatchSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   phone: z.string().max(20).optional().nullable(),
   address: z.string().max(300).optional().nullable(),
-  type: z.enum(["RETAIL", "INSTALLER"]).optional(),
+  type: z.enum(["RETAIL", "INSTALLER", "WALK_IN"]).optional(),
   openingBalance: z.number().optional(),
 });
 

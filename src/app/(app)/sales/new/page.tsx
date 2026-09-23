@@ -13,6 +13,10 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -22,11 +26,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Trash2, Save, Loader2, ArrowLeft, Package, Wrench, RotateCcw, Eraser, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Save, Loader2, ArrowLeft, Package, Wrench, RotateCcw, Eraser, Eye, EyeOff, AlertTriangle, User, Search, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT } from "@/lib/format";
 import { useSession } from "next-auth/react";
-import { InlineEntityCreator } from "@/components/layout/inline-entity-creator";
 import { appPath } from "@/lib/app-path";
 
 type SearchResult = {
@@ -41,7 +44,7 @@ type SearchResult = {
   outOfStock: boolean;
   serials: { id: string; serialNo: string }[];
 };
-type Customer = { id: string; name: string; phone: string | null };
+type Customer = { id: string; name: string; phone: string | null; type: string | null };
 type CartLine = {
   key: string;
   productId: string;
@@ -99,15 +102,79 @@ function NewSalePage() {
 
   const [products, setProducts] = useState<SearchResult[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
+  // Phase 6 / Feature #4: customer picker is now a debounced search (was a
+  // one-shot fetch of ALL customers on mount, which was slow for shops with
+  // thousands of customers).
+  const [customerSearch, setCustomerSearch] = useState("");
+  // The selected customer — null = walk-in (no customer selected).
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  // Phase 6 / Feature #10: customer creation dialog state.
+  // When true, a Dialog opens with a walk-in vs regular toggle.
+  const [showCreateCustomer, setShowCreateCustomer] = useState(false);
+  const [newCustomerType, setNewCustomerType] = useState<"REGULAR" | "WALK_IN">("REGULAR");
+  const [newCustomerName, setNewCustomerName] = useState("");
+  const [newCustomerPhone, setNewCustomerPhone] = useState("");
+  const [newCustomerAddress, setNewCustomerAddress] = useState("");
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
   // Phase C: scan detection — barcode scanners type very fast (<50ms between
   // keys) and end with Enter. We track keystroke timestamps to detect scans.
   const lastKeyTimeRef = useRef<number>(0);
   const isScanRef = useRef<boolean>(false);
 
-  // Load customers once.
+  // Phase 6 / Feature #4: debounced customer search — 300ms after the user
+  // stops typing, fetch customers matching the search term.
   useEffect(() => {
-    fetch("/cctv/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers ?? []));
-  }, []);
+    const q = customerSearch.trim();
+    if (!q) { setCustomers([]); return; }
+    const timer = setTimeout(() => {
+      fetch(`/cctv/api/customers?q=${encodeURIComponent(q)}`)
+        .then((r) => r.json())
+        .then((d) => setCustomers(d.customers ?? []));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [customerSearch]);
+
+  // Phase 6 / Feature #10: create a new customer (walk-in or regular).
+  async function createNewCustomer() {
+    if (!newCustomerName.trim()) {
+      toast({ title: "Name required", variant: "destructive" });
+      return;
+    }
+    setCreatingCustomer(true);
+    try {
+      const res = await fetch("/cctv/api/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newCustomerName.trim(),
+          phone: newCustomerPhone.trim() || null,
+          address: newCustomerType === "WALK_IN" ? null : (newCustomerAddress.trim() || null),
+          type: newCustomerType === "WALK_IN" ? "WALK_IN" : "RETAIL",
+          openingBalance: 0,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Failed", description: data.error ?? "Could not create customer.", variant: "destructive" });
+        return;
+      }
+      // Auto-select the newly created customer.
+      const c: Customer = { id: data.id, name: data.name, phone: newCustomerPhone.trim() || null, type: newCustomerType === "WALK_IN" ? "WALK_IN" : "RETAIL" };
+      setSelectedCustomer(c);
+      setCustomerId(c.id);
+      setCustomerSearch(c.name);
+      setCustomers([]);
+      // Reset form state + close dialog.
+      setNewCustomerName("");
+      setNewCustomerPhone("");
+      setNewCustomerAddress("");
+      setNewCustomerType("REGULAR");
+      setShowCreateCustomer(false);
+      toast({ title: "Customer created", description: `${c.name} (${newCustomerType === "WALK_IN" ? "Walk-in" : "Regular"})` });
+    } finally {
+      setCreatingCustomer(false);
+    }
+  }
 
   // Search products + serials via API (debounced).
   // Phase C: when a scan is detected, auto-add the exact matching serial.
@@ -166,6 +233,19 @@ function NewSalePage() {
         const sale = data.sale;
         if (!sale) return;
         setCustomerId(sale.customerId ?? "");
+        // Phase 6: sync selectedCustomer + customerSearch when resuming.
+        if (sale.customer) {
+          setSelectedCustomer({
+            id: sale.customer.id,
+            name: sale.customer.name,
+            phone: sale.customer.phone ?? null,
+            type: sale.customer.type ?? null,
+          });
+          setCustomerSearch(sale.customer.name);
+        } else {
+          setSelectedCustomer(null);
+          setCustomerSearch("");
+        }
         setMode(sale.mode);
         setPaid(String(sale.paid));
         setDiscount(String(sale.discount));
@@ -211,6 +291,11 @@ function NewSalePage() {
           setDiscount(draft.discount ?? "");
           setNotes(draft.notes ?? "");
           setLines(draft.lines ?? []);
+          // Phase 6: restore selectedCustomer + customerSearch from draft.
+          if (draft.selectedCustomer) {
+            setSelectedCustomer(draft.selectedCustomer);
+            setCustomerSearch(draft.selectedCustomer.name ?? "");
+          }
         }
       } catch {}
       setHydrated(true);
@@ -220,9 +305,9 @@ function NewSalePage() {
   // Auto-save to localStorage whenever cart changes (after hydration).
   useEffect(() => {
     if (!hydrated || resumeId) return;
-    const draft = { customerId, mode, paid, discount, notes, lines };
+    const draft = { customerId, mode, paid, discount, notes, lines, selectedCustomer };
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-  }, [customerId, mode, paid, discount, notes, lines, hydrated, resumeId]);
+  }, [customerId, mode, paid, discount, notes, lines, selectedCustomer, hydrated, resumeId]);
 
   const filteredProducts = products; // already filtered by API
 
@@ -471,32 +556,100 @@ function NewSalePage() {
             <div className="space-y-2">
               <Label>Customer</Label>
               <div className="flex gap-2">
-                <Select value={customerId} onValueChange={setCustomerId}>
-                  <SelectTrigger className="flex-1"><SelectValue placeholder="Walk-in…" /></SelectTrigger>
-                  <SelectContent>
-                    {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                {/* F7-S1: inline customer creation */}
-                <InlineEntityCreator
-                  label="Customer"
-                  endpoint="/cctv/api/customers"
-                  bodyBuilder={(name, extra) => ({
-                    name,
-                    phone: extra.phone || null,
-                    type: "RETAIL",
-                    openingBalance: 0,
-                  })}
-                  extraFields={[
-                    { key: "phone", label: "Phone", placeholder: "01XXXXXXXXX" },
-                  ]}
-                  namePlaceholder="Customer name"
-                  onCreated={(c) => {
-                    setCustomers((cs) => [...cs, { id: c.id, name: c.name, phone: null }]);
-                    setCustomerId(c.id);
-                  }}
-                />
+                {/* Phase 6 / Feature #4: searchable customer picker (was a plain
+                    Select that loaded ALL customers on mount). Now debounced
+                    search by name or phone. */}
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={customerSearch}
+                    onChange={(e) => {
+                      setCustomerSearch(e.target.value);
+                      // Clear selection if the user is editing the search.
+                      if (selectedCustomer && e.target.value !== selectedCustomer.name) {
+                        setSelectedCustomer(null);
+                        setCustomerId("");
+                      }
+                    }}
+                    placeholder="Search name or phone…"
+                    className="pl-9"
+                  />
+                  {customerSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomerSearch("");
+                        setSelectedCustomer(null);
+                        setCustomerId("");
+                        setCustomers([]);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  {/* Search results dropdown — only show when searching AND
+                      no customer is selected yet. */}
+                  {customerSearch && !selectedCustomer && customers.length > 0 && (
+                    <div className="absolute z-30 left-0 right-0 mt-1 rounded-lg border bg-background shadow-lg max-h-60 overflow-y-auto scroll-area-thin">
+                      {customers.slice(0, 10).map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCustomer(c);
+                            setCustomerId(c.id);
+                            setCustomerSearch(c.name);
+                            setCustomers([]);
+                          }}
+                          className="flex w-full items-center justify-between border-b last:border-0 px-3 py-2 text-left hover:bg-accent"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{c.name}</p>
+                            {c.phone && <p className="text-xs text-muted-foreground">{c.phone}</p>}
+                          </div>
+                          {c.type === "WALK_IN" && (
+                            <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 border-amber-200 dark:border-amber-900">
+                              Walk-in
+                            </Badge>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {/* No-results hint */}
+                  {customerSearch && !selectedCustomer && customers.length === 0 && customerSearch.length >= 2 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      No match. Click <strong>+ New</strong> to create one.
+                    </p>
+                  )}
+                </div>
+                {/* Phase 6 / Feature #10: create customer button — opens a dialog
+                    with a walk-in vs regular toggle. */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShowCreateCustomer(true)}
+                  title="Create new customer"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
               </div>
+              {/* Selected customer badge — shows when a customer is picked */}
+              {selectedCustomer && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    <User className="h-3 w-3 mr-1" />
+                    {selectedCustomer.name}
+                  </Badge>
+                  {selectedCustomer.type === "WALK_IN" && (
+                    <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 border-amber-200 dark:border-amber-900">
+                      Walk-in
+                    </Badge>
+                  )}
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Payment mode</Label>
@@ -864,6 +1017,83 @@ function NewSalePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Phase 6 / Feature #10: Customer creation dialog with walk-in vs regular toggle. */}
+      <Dialog open={showCreateCustomer} onOpenChange={setShowCreateCustomer}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New customer</DialogTitle>
+            <DialogDescription>
+              Pick the customer type, then enter their details. Walk-in customers show up in a separate ledger filter.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Walk-in vs Regular toggle */}
+            <div className="space-y-2">
+              <Label>Customer type</Label>
+              <ToggleGroup
+                type="single"
+                value={newCustomerType}
+                onValueChange={(v) => v && setNewCustomerType(v as "REGULAR" | "WALK_IN")}
+                className="justify-stretch"
+              >
+                <ToggleGroupItem value="REGULAR" className="flex-1">
+                  <User className="h-4 w-4 mr-2" /> Regular customer
+                </ToggleGroupItem>
+                <ToggleGroupItem value="WALK_IN" className="flex-1">
+                  <User className="h-4 w-4 mr-2" /> Walk-in customer
+                </ToggleGroupItem>
+              </ToggleGroup>
+              <p className="text-xs text-muted-foreground">
+                {newCustomerType === "WALK_IN"
+                  ? "Walk-in: no address needed. Will appear in the 'Walk-in customers' ledger filter."
+                  : "Regular: full customer record with address. Appears in the 'Regular customers' ledger filter."}
+              </p>
+            </div>
+            {/* Name */}
+            <div className="space-y-2">
+              <Label htmlFor="newCustName">Name *</Label>
+              <Input
+                id="newCustName"
+                value={newCustomerName}
+                onChange={(e) => setNewCustomerName(e.target.value)}
+                placeholder="Customer name"
+              />
+            </div>
+            {/* Phone */}
+            <div className="space-y-2">
+              <Label htmlFor="newCustPhone">Phone</Label>
+              <Input
+                id="newCustPhone"
+                value={newCustomerPhone}
+                onChange={(e) => setNewCustomerPhone(e.target.value)}
+                placeholder="01XXXXXXXXX"
+              />
+            </div>
+            {/* Address — only for regular customers */}
+            {newCustomerType === "REGULAR" && (
+              <div className="space-y-2">
+                <Label htmlFor="newCustAddr">Address</Label>
+                <Input
+                  id="newCustAddr"
+                  value={newCustomerAddress}
+                  onChange={(e) => setNewCustomerAddress(e.target.value)}
+                  placeholder="Shop / home address (optional)"
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateCustomer(false)}>
+              Cancel
+            </Button>
+            <Button onClick={createNewCustomer} disabled={creatingCustomer || !newCustomerName.trim()}>
+              {creatingCustomer ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+              Create {newCustomerType === "WALK_IN" ? "walk-in" : "regular"} customer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

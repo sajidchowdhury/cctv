@@ -14,8 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Download, Loader2, Printer, Users, Search } from "lucide-react";
 import { formatBDT, formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
-type Customer = { id: string; name: string; phone: string | null; currentBalance: number };
+type Customer = { id: string; name: string; phone: string | null; type: string | null; currentBalance: number };
 
 export default function CustomerLedgerReportPage() {
   const now = new Date();
@@ -29,6 +30,10 @@ export default function CustomerLedgerReportPage() {
   const [pageSize, setPageSize] = useState(50);
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
+  // Phase 6 / Feature #10: customer type filter — All / Regular / Walk-in.
+  // Filters the customer <Select> list client-side so the user can pick
+  // from only walk-in or only regular customers when needed.
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "REGULAR" | "WALK_IN">("ALL");
 
   // Debounce search input — 300ms after the user stops typing.
   useEffect(() => {
@@ -45,6 +50,16 @@ export default function CustomerLedgerReportPage() {
     queryFn: async () => (await (await fetch("/cctv/api/customers")).json()).customers as Customer[],
   });
   const customers = customersData ?? [];
+
+  // Phase 6 / Feature #10: filter the customer <Select> list by the type
+  // filter. Walk-in customers have type === "WALK_IN"; regular customers
+  // include RETAIL + INSTALLER (anything that's not WALK_IN).
+  const filteredCustomers = customers.filter((c) => {
+    if (typeFilter === "ALL") return true;
+    if (typeFilter === "WALK_IN") return c.type === "WALK_IN";
+    // REGULAR = anything that's not WALK_IN (RETAIL, INSTALLER, or null).
+    return c.type !== "WALK_IN";
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-customer-ledger", appliedCustomerId, appliedFrom, appliedTo, page, pageSize, appliedSearch],
@@ -89,19 +104,43 @@ export default function CustomerLedgerReportPage() {
       {/* Filters: party picker + date range — hidden in print */}
       <Card data-print-hidden>
         <CardContent className="py-4 space-y-3">
+          {/* Phase 6 / Feature #10: customer type filter — All / Regular / Walk-in */}
+          <div className="space-y-2">
+            <Label>Customer type</Label>
+            <ToggleGroup
+              type="single"
+              value={typeFilter}
+              onValueChange={(v) => v && setTypeFilter(v as "ALL" | "REGULAR" | "WALK_IN")}
+              className="justify-stretch"
+            >
+              <ToggleGroupItem value="ALL" className="flex-1 text-xs">All customers</ToggleGroupItem>
+              <ToggleGroupItem value="REGULAR" className="flex-1 text-xs">Regular only</ToggleGroupItem>
+              <ToggleGroupItem value="WALK_IN" className="flex-1 text-xs">Walk-in only</ToggleGroupItem>
+            </ToggleGroup>
+          </div>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Customer *</Label>
               <Select value={customerId} onValueChange={(v) => { setCustomerId(v); setPage(1); }}>
                 <SelectTrigger><SelectValue placeholder="Select customer…" /></SelectTrigger>
                 <SelectContent>
-                  {customers.map((c) => (
+                  {filteredCustomers.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name} {c.phone ? `· ${c.phone}` : ""} · Bal {formatBDT(c.currentBalance)}
+                      {c.type === "WALK_IN" ? " (Walk-in)" : ""}
                     </SelectItem>
                   ))}
+                  {filteredCustomers.length === 0 && (
+                    <SelectItem value="_none" disabled>
+                      No {typeFilter === "WALK_IN" ? "walk-in" : "regular"} customers found
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Showing {filteredCustomers.length} of {customers.length} customers
+                {typeFilter !== "ALL" && ` (${typeFilter === "WALK_IN" ? "walk-in only" : "regular only"})`}.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Date range</Label>

@@ -14,7 +14,7 @@ const CreateSchema = z.object({
   name: z.string().min(2).max(100),
   phone: z.string().max(20).optional().nullable(),
   address: z.string().max(300).optional().nullable(),
-  type: z.enum(["RETAIL", "INSTALLER"]).default("RETAIL"),
+  type: z.enum(["RETAIL", "INSTALLER", "WALK_IN"]).default("RETAIL"),
   openingBalance: z.number().default(0),
 });
 

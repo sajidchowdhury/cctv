@@ -322,7 +322,7 @@ model Customer {
   name            String
   phone           String?
   address         String?
-  type            String   @default("RETAIL") // RETAIL | INSTALLER
+  type            String   @default("RETAIL") // RETAIL | INSTALLER | WALK_IN (Phase 6)
   openingBalance  Float    @default(0) // receivable (+) or advance (−)
   currentBalance  Float    @default(0) // running, updated by sale/receipt
   createdAt       DateTime @default(now())
