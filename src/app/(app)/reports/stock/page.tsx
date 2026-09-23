@@ -76,9 +76,7 @@ export default function StockReportPage() {
         header: "Product",
         accessorKey: "name",
         cell: ({ row }) => (
-          <Link href={`/products/${row.original.id}`} className="font-medium hover:underline">
-            {row.original.name}
-          </Link>
+          <span className="font-medium">{row.original.name}</span>
         ),
       },
       { header: "SKU", accessorKey: "sku", cell: ({ row }) => <code className="text-xs">{row.original.sku}</code> },

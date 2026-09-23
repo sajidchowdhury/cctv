@@ -2,12 +2,12 @@
 
 import { useState, Fragment, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Download, Loader2, Printer, Layers, ChevronDown, ChevronRight, Search, Filter, X } from "lucide-react";
 import { formatBDT } from "@/lib/format";
@@ -20,6 +20,9 @@ export default function StockByCategoryReportPage() {
   // Empty set = show all categories. Non-empty = show only selected.
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [filterOpen, setFilterOpen] = useState(false);
+  // Phase 5 / Feature #2: search input for the category filter panel so the
+  // user can find a category by name when the list is long.
+  const [categorySearch, setCategorySearch] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-stock-by-category"],
@@ -28,6 +31,15 @@ export default function StockByCategoryReportPage() {
   });
 
   const allCategories: any[] = data?.categories ?? [];
+
+  // Phase 5 / Feature #2: filter the category list shown in the Filter panel
+  // by the search term. Empty search = show all categories. Non-empty = filter
+  // by name (case-insensitive).
+  const filteredCategoryList = useMemo(() => {
+    if (!categorySearch.trim()) return allCategories;
+    const q = categorySearch.toLowerCase();
+    return allCategories.filter((c) => c.name.toLowerCase().includes(q));
+  }, [allCategories, categorySearch]);
 
   // Phase E: filter categories based on selection.
   const categories = useMemo(() => {
@@ -151,9 +163,33 @@ export default function StockByCategoryReportPage() {
                 ? "Showing all categories. Click categories below to filter."
                 : `Showing ${selectedCategories.size} of ${allCategories.length} categories.`}
             </p>
+            {/* Phase 5 / Feature #2: search input at the top of the filter panel
+                so the user can find a category by name when the list is long. */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={categorySearch}
+                onChange={(e) => setCategorySearch(e.target.value)}
+                placeholder="Search category name…"
+                className="pl-9 h-9"
+              />
+              {categorySearch && (
+                <button
+                  type="button"
+                  onClick={() => setCategorySearch("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
             <ScrollArea className="h-48 rounded-md border p-2">
               <div className="space-y-1">
-                {allCategories.map((cat) => (
+                {filteredCategoryList.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">
+                    No categories match &quot;{categorySearch}&quot;.
+                  </p>
+                ) : filteredCategoryList.map((cat) => (
                   <label
                     key={cat.name}
                     className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer text-sm"
@@ -227,7 +263,8 @@ export default function StockByCategoryReportPage() {
                       <tr key={p.id} className="border-t bg-muted/20">
                         <td className="px-4 py-2"></td>
                         <td className="px-4 py-2 pl-8">
-                          <Link href={`/products/${p.id}`} className="hover:underline">{p.name}</Link>
+                          {/* Phase 5 / Feature #3: plain text, no link to /products/[id] */}
+                          <span className="font-medium">{p.name}</span>
                           <span className="text-xs text-muted-foreground ml-2">· {p.sku}</span>
                           {!p.isSerialised && <Badge variant="outline" className="ml-2 text-xs">Qty-based</Badge>}
                           {p.lowStock && <Badge variant="outline" className="ml-2 text-xs bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 border-amber-200 dark:border-amber-900">Low</Badge>}
@@ -258,7 +295,8 @@ export default function StockByCategoryReportPage() {
                   <ul className="space-y-1 pt-2 border-t">
                     {cat.products.map((p: any) => (
                       <li key={p.id} className="flex justify-between text-xs">
-                        <Link href={`/products/${p.id}`} className="hover:underline">{p.name}</Link>
+                        {/* Phase 5 / Feature #3: plain text, no link to /products/[id] */}
+                        <span className="font-medium">{p.name}</span>
                         <span className="tabular-nums">{p.onHand} · {p.stockValueDisplay}</span>
                       </li>
                     ))}
