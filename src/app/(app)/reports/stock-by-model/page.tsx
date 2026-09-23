@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/layout/empty-state";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Download, Loader2, Printer, ListTree, ChevronDown, ChevronRight, ArrowLeft, Search, Filter, X } from "lucide-react";
 import { formatBDT } from "@/lib/format";
@@ -20,6 +21,10 @@ export default function StockByModelReportPage() {
   // Empty set = show all models. Non-empty = show only selected.
   const [selectedModels, setSelectedModels] = useState<Set<string>>(new Set());
   const [filterOpen, setFilterOpen] = useState(false);
+  // Phase 5+/Feature #2: search input for the model filter panel so the
+  // user can find a model by name when the list is long (same pattern as
+  // stock-by-category's categorySearch).
+  const [modelSearch, setModelSearch] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-stock-by-model"],
@@ -38,6 +43,15 @@ export default function StockByModelReportPage() {
   });
 
   const allModels: any[] = data?.models ?? [];
+
+  // Phase 5+/Feature #2: filter the model list shown in the Filter panel
+  // by the search term. Empty search = show all models. Non-empty = filter
+  // by name (case-insensitive contains).
+  const filteredModelList = useMemo(() => {
+    if (!modelSearch.trim()) return allModels;
+    const q = modelSearch.toLowerCase();
+    return allModels.filter((m) => (m.name ?? "").toLowerCase().includes(q));
+  }, [allModels, modelSearch]);
 
   // Phase E: filter models based on selection.
   const models = useMemo(() => {
@@ -173,9 +187,33 @@ export default function StockByModelReportPage() {
                 ? "Showing all models. Click models below to filter."
                 : `Showing ${selectedModels.size} of ${allModels.length} models.`}
             </p>
+            {/* Phase 5+/Feature #2: search input at the top of the filter panel
+                so the user can find a model by name when the list is long. */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={modelSearch}
+                onChange={(e) => setModelSearch(e.target.value)}
+                placeholder="Search model name…"
+                className="pl-9 h-9"
+              />
+              {modelSearch && (
+                <button
+                  type="button"
+                  onClick={() => setModelSearch("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
             <ScrollArea className="h-48 rounded-md border p-2">
               <div className="space-y-1">
-                {allModels.map((m) => (
+                {filteredModelList.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">
+                    No models match &quot;{modelSearch}&quot;.
+                  </p>
+                ) : filteredModelList.map((m) => (
                   <label
                     key={m.name}
                     className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer text-sm"
