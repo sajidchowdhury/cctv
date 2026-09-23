@@ -170,7 +170,11 @@ export function groupInvoiceItems(items: any[], saleDate?: Date | string): Group
       if (it.inventoryUnit?.serialNo) {
         existing.serials.push(it.inventoryUnit.serialNo);
       }
-      existing.totalQty += 1; // each serialised SaleItem is qty=1
+      // Use it.qty instead of hardcoded 1 — the sales form allows the user
+      // to set qty > 1 for a serialised line (e.g. qty=5 with 1 serial).
+      // The SaleItem's lineTotal is computed as qty × unitPrice, so totalQty
+      // must use the same qty to stay consistent with lineTotal.
+      existing.totalQty += it.qty;
       existing.lineTotal += it.lineTotal;
     } else {
       const warrantyMonths = computeWarrantyMonths(it, sd);
@@ -183,7 +187,7 @@ export function groupInvoiceItems(items: any[], saleDate?: Date | string): Group
         lineType: "PRODUCT",
         description: it.description ?? "",
         serials: it.inventoryUnit?.serialNo ? [it.inventoryUnit.serialNo] : [],
-        totalQty: 1,
+        totalQty: it.qty,
         unitPrice: it.unitPrice,
         discount: it.discount,
         lineTotal: it.lineTotal,
