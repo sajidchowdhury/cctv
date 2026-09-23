@@ -124,7 +124,8 @@ function NewSalePage() {
   // Phase 6 / Feature #4: debounced customer search — 300ms after the user
   // stops typing, fetch customers matching the search term.
   useEffect(() => {
-    const q = customerSearch.trim();
+    // Guard against undefined/null (defensive — state should always be a string).
+    const q = (customerSearch ?? "").trim();
     if (!q) { setCustomers([]); return; }
     const timer = setTimeout(() => {
       fetch(`/cctv/api/customers?q=${encodeURIComponent(q)}`)
@@ -158,11 +159,18 @@ function NewSalePage() {
         toast({ title: "Failed", description: data.error ?? "Could not create customer.", variant: "destructive" });
         return;
       }
+      // The API returns { customer: { id, name, phone } } — unwrap the nested object.
+      const created = data.customer ?? data;
       // Auto-select the newly created customer.
-      const c: Customer = { id: data.id, name: data.name, phone: newCustomerPhone.trim() || null, type: newCustomerType === "WALK_IN" ? "WALK_IN" : "RETAIL" };
+      const c: Customer = {
+        id: created.id,
+        name: created.name ?? "",
+        phone: newCustomerPhone.trim() || null,
+        type: newCustomerType === "WALK_IN" ? "WALK_IN" : "RETAIL",
+      };
       setSelectedCustomer(c);
       setCustomerId(c.id);
-      setCustomerSearch(c.name);
+      setCustomerSearch(c.name ?? "");
       setCustomers([]);
       // Reset form state + close dialog.
       setNewCustomerName("");
@@ -292,9 +300,17 @@ function NewSalePage() {
           setNotes(draft.notes ?? "");
           setLines(draft.lines ?? []);
           // Phase 6: restore selectedCustomer + customerSearch from draft.
-          if (draft.selectedCustomer) {
+          // Guard against corrupted drafts (e.g. from the bug where
+          // selectedCustomer.name was undefined — fixed now, but old drafts
+          // may still be in localStorage on the user's browser).
+          if (draft.selectedCustomer && typeof draft.selectedCustomer.name === "string") {
             setSelectedCustomer(draft.selectedCustomer);
-            setCustomerSearch(draft.selectedCustomer.name ?? "");
+            setCustomerSearch(draft.selectedCustomer.name);
+          } else if (draft.selectedCustomer) {
+            // Corrupted draft — clear it so it doesn't crash the page.
+            console.warn("Clearing corrupted customer draft from localStorage");
+            const cleanDraft = { ...draft, selectedCustomer: null };
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(cleanDraft));
           }
         }
       } catch {}
