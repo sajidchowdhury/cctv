@@ -198,6 +198,32 @@ export function groupInvoiceItems(items: any[], saleDate?: Date | string): Group
 }
 
 /**
+ * Split an array of serials into groups of `size` (default 5) for compact
+ * display on the invoice.
+ *
+ * Each chunk is joined with commas. The calling component renders each chunk
+ * on its own line, with "S/N: " prefix only on the first chunk.
+ *
+ * Example:
+ *   chunkSerials(["a", "b", "c", "d", "e", "f", "g"], 5)
+ *   → ["a,b,c,d,e", "f,g"]
+ *
+ *   chunkSerials(["a", "b"], 5)
+ *   → ["a,b"]
+ *
+ *   chunkSerials([], 5)
+ *   → []
+ */
+export function chunkSerials(serials: string[], size = 5): string[] {
+  if (serials.length === 0) return [];
+  const chunks: string[] = [];
+  for (let i = 0; i < serials.length; i += size) {
+    chunks.push(serials.slice(i, i + size).join(","));
+  }
+  return chunks;
+}
+
+/**
  * Split grouped items into pages for print pagination.
  *
  * If items.length <= perPage, returns a single page.

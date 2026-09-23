@@ -24,7 +24,7 @@
 import { useMemo } from "react";
 import { formatBDT, formatDateTime } from "@/lib/format";
 import { assetUrl } from "@/lib/app-path";
-import { groupInvoiceItems, paginateItems } from "@/lib/invoice-grouping";
+import { groupInvoiceItems, paginateItems, chunkSerials } from "@/lib/invoice-grouping";
 
 export type InvoiceProfile = {
   name?: string | null;
@@ -215,9 +215,9 @@ function ScreenInvoice({
                       )}
                       {item.serials.length > 0 && (
                         <div className="mt-0.5">
-                          {item.serials.map((s, i) => (
-                            <p key={i} className="text-xs font-mono text-gray-600">
-                              S/N: {s}
+                          {chunkSerials(item.serials, 5).map((chunk, ci) => (
+                            <p key={ci} className="text-xs font-mono text-gray-600">
+                              {ci === 0 ? `S/N: ${chunk}` : chunk}
                             </p>
                           ))}
                         </div>
@@ -397,9 +397,9 @@ function PrintInvoice({
                       )}
                       {item.serials.length > 0 && (
                         <div style={{ marginTop: "2px" }}>
-                          {item.serials.map((s, i) => (
-                            <p key={i} style={{ fontSize: "12px", fontFamily: "monospace", color: "#4b5563", margin: 0 }}>
-                              S/N: {s}
+                          {chunkSerials(item.serials, 5).map((chunk, ci) => (
+                            <p key={ci} style={{ fontSize: "12px", fontFamily: "monospace", color: "#4b5563", margin: 0 }}>
+                              {ci === 0 ? `S/N: ${chunk}` : chunk}
                             </p>
                           ))}
                         </div>
