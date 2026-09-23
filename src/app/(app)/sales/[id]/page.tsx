@@ -8,9 +8,18 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, Printer, Pause, Link2, ShieldCheck, MessageSquare, RotateCcw, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Loader2, Printer, Pause, Link2, ShieldCheck, MessageSquare, RotateCcw, Pencil, Trash2, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/layout/confirm-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { formatBDT, formatDate } from "@/lib/format";
 import { appPath } from "@/lib/app-path";
 import { InvoiceDocument } from "@/components/invoice/invoice-document";
@@ -20,8 +29,10 @@ export default function SaleDetailPage() {
   const router = useRouter();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [smsBusy, setSmsBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Warranty SMS feature is not active yet — show a "coming soon" modal instead
+  // of calling the SMS API. Set to true to show the modal.
+  const [showSmsComingSoon, setShowSmsComingSoon] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: ["sale", id],
     queryFn: async () => (await (await fetch(`/cctv/api/sales/${id}`)).json()).sale,
@@ -72,23 +83,9 @@ export default function SaleDetailPage() {
             <Button
               variant="outline"
               size="sm"
-              disabled={smsBusy}
-              onClick={async () => {
-                setSmsBusy(true);
-                try {
-                  const res = await fetch(`/cctv/api/sales/${id}/send-warranty-sms`, { method: "POST" });
-                  const data = await res.json();
-                  if (!res.ok) {
-                    toast({ title: "Failed", description: data.error ?? "SMS not sent.", variant: "destructive" });
-                  } else {
-                    toast({ title: "SMS sent", description: data.message });
-                  }
-                } finally {
-                  setSmsBusy(false);
-                }
-              }}
+              onClick={() => setShowSmsComingSoon(true)}
             >
-              {smsBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+              <MessageSquare className="mr-2 h-4 w-4" />
               Warranty SMS
             </Button>
             {!sale.isHeld && (
@@ -159,6 +156,30 @@ export default function SaleDetailPage() {
           <InvoiceDocument sale={sale} profile={profile} />
         </CardContent>
       </Card>
+
+      {/* Warranty SMS — feature is not active yet. Modal informs the user
+          that it will be enabled on demand. */}
+      <AlertDialog open={showSmsComingSoon} onOpenChange={setShowSmsComingSoon}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Info className="h-5 w-5 text-sky-500" />
+              Warranty SMS — coming soon
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This feature will be enabled on demand. It is not active yet.
+              <br /><br />
+              When enabled, the Warranty SMS button will send a text message
+              to the customer with their warranty details + invoice reference.
+              For now, please use the <strong>Warranty card</strong> button
+              to download a printable PDF.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction>Got it</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
