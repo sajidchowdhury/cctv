@@ -11,8 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Loader2, Printer, ArrowLeftRight, ArrowDownCircle, ArrowUpCircle, Search } from "lucide-react";
+import { Download, Loader2, Printer, ArrowLeftRight, ArrowDownCircle, ArrowUpCircle, Search, X, Package } from "lucide-react";
 import { formatBDT, formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
 
@@ -32,6 +31,13 @@ export default function ProductMovementReportPage() {
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
 
+  // Phase 6+: product picker is now a debounced search (was a one-shot fetch
+  // of ALL products on mount, which was slow + bad UX for shops with 100+
+  // products). Products only appear when the user types.
+  const [productSearch, setProductSearch] = useState("");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
   // Debounce search input — 300ms after the user stops typing.
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -41,11 +47,19 @@ export default function ProductMovementReportPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const { data: productsData } = useQuery({
-    queryKey: ["products"],
-    queryFn: async () => (await (await fetch("/cctv/api/products")).json()).products as Product[],
-  });
-  const products = productsData ?? [];
+  // Debounced product search — 300ms after the user stops typing, fetch
+  // products matching the search term. Only fires when productSearch is
+  // non-empty, so no products are loaded until the user types.
+  useEffect(() => {
+    const q = (productSearch ?? "").trim();
+    if (!q) { setProducts([]); return; }
+    const timer = setTimeout(() => {
+      fetch(`/cctv/api/products?q=${encodeURIComponent(q)}`)
+        .then((r) => r.json())
+        .then((d) => setProducts(d.products ?? []));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [productSearch]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-product-movement", appliedProductId, appliedFrom, appliedTo, page, pageSize, appliedSearch],
@@ -92,16 +106,96 @@ export default function ProductMovementReportPage() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Product (optional — leave blank for all)</Label>
-              <Select value={productId} onValueChange={(v) => { setProductId(v); setPage(1); }}>
-                <SelectTrigger><SelectValue placeholder="All products…" /></SelectTrigger>
-                <SelectContent>
-                  {products.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name} · {p.sku} · Stock {p.onHand}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Phase 6+: searchable product picker (was a plain Select that
+                  loaded ALL products on mount). Now products only appear when
+                  the user types — same pattern as the customer picker in
+                  sales/new. */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={productSearch}
+                  onChange={(e) => {
+                    setProductSearch(e.target.value);
+                    // Clear selection if the user is editing the search.
+                    if (selectedProduct && e.target.value !== selectedProduct.name) {
+                      setSelectedProduct(null);
+                      setProductId("");
+                    }
+                  }}
+                  placeholder="Search product to filter… (leave blank for all)"
+                  className="pl-9"
+                />
+                {productSearch && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProductSearch("");
+                      setSelectedProduct(null);
+                      setProductId("");
+                      setProducts([]);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                {/* Search results dropdown — only show when searching AND
+                    no product is selected yet. */}
+                {productSearch && !selectedProduct && products.length > 0 && (
+                  <div className="absolute z-30 left-0 right-0 mt-1 rounded-lg border bg-background shadow-lg max-h-60 overflow-y-auto scroll-area-thin">
+                    {products.slice(0, 10).map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedProduct(p);
+                          setProductId(p.id);
+                          setProductSearch(p.name);
+                          setProducts([]);
+                          setPage(1);
+                        }}
+                        className="flex w-full items-center justify-between border-b last:border-0 px-3 py-2 text-left hover:bg-accent"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">{p.name}</p>
+                          <p className="text-xs text-muted-foreground">{p.sku} · Stock {p.onHand}</p>
+                        </div>
+                        {p.isSerialised ? (
+                          <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300 border-blue-200 dark:border-blue-900">Serialised</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 border-amber-200 dark:border-amber-900">Qty-based</Badge>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {/* No-results hint */}
+                {productSearch && !selectedProduct && products.length === 0 && productSearch.length >= 2 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    No products match &quot;{productSearch}&quot;.
+                  </p>
+                )}
+              </div>
+              {/* Selected product badge — shows when a product is picked */}
+              {selectedProduct && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    <Package className="h-3 w-3 mr-1" />
+                    {selectedProduct.name}
+                  </Badge>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedProduct(null);
+                      setProductId("");
+                      setProductSearch("");
+                    }}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Clear (all products)
+                  </button>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Date range</Label>
