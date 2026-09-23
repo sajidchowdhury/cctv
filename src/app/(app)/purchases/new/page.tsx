@@ -19,9 +19,22 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Trash2, Save, Loader2, ArrowLeft, ScanLine, Search, X, AlertTriangle, UserPlus, Package } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { formatBDT } from "@/lib/format";
+import { formatBDT, formatDate } from "@/lib/format";
 
-type Product = { id: string; name: string; model: string | null; sku: string; defaultPrice: number | null; unitName: string | null; isSerialised: boolean };
+type Product = {
+  id: string;
+  name: string;
+  model: string | null;
+  sku: string;
+  defaultPrice: number | null;
+  unitName: string | null;
+  isSerialised: boolean;
+  // Phase 3 / Feature #9: last purchase rate (per-unit price from the most
+  // recent PurchaseItem for this product) + the date it was purchased.
+  // Used to show a hint below the Unit price input in the cart.
+  lastPurchaseRate: number | null;
+  lastPurchaseDate: string | null;
+};
 type Supplier = { id: string; name: string; company: string | null };
 type CartLine = {
   key: string;
@@ -450,6 +463,12 @@ function NewPurchaseForm() {
                     <div>
                       <p className="text-sm font-medium">{p.name}</p>
                       <p className="text-xs text-muted-foreground">{p.model ?? "—"} · {p.sku}</p>
+                      {p.lastPurchaseRate !== null && (
+                        <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                          Last purchase: {formatBDT(p.lastPurchaseRate)}
+                          {p.lastPurchaseDate && <span className="text-muted-foreground ml-1">on {formatDate(p.lastPurchaseDate)}</span>}
+                        </p>
+                      )}
                     </div>
                     {p.defaultPrice && <span className="text-xs text-muted-foreground">{formatBDT(p.defaultPrice)}</span>}
                   </button>
@@ -526,6 +545,34 @@ function NewPurchaseForm() {
                       <Label className="text-xs">Unit price</Label>
                       <Input type="number" step="0.01" min="0" value={line.unitPrice}
                         onChange={(e) => updateLine(line.key, "unitPrice", e.target.value)} placeholder="0" />
+                      {/* Phase 3 / Feature #9: last purchase rate hint.
+                          Looks up the product from the products array (loaded at mount)
+                          so the hint shows even when resuming an edited purchase.
+                          - If the product has been purchased before: show "Last: BDT X,XXX on DD-MM-YYYY".
+                          - Color hint: amber if entered price differs >10% from last, emerald if matches.
+                          - If never purchased: show "First purchase" muted text. */}
+                      {(() => {
+                        const p = products.find((pr) => pr.id === line.productId);
+                        const lastRate = p?.lastPurchaseRate ?? null;
+                        const lastDate = p?.lastPurchaseDate ?? null;
+                        const entered = Number(line.unitPrice) || 0;
+                        if (lastRate === null) {
+                          return (
+                            <p className="text-[10px] text-muted-foreground italic">First purchase of this product</p>
+                          );
+                        }
+                        const diff = entered > 0 ? Math.abs(entered - lastRate) / lastRate : 0;
+                        const colorClass =
+                          entered === 0 ? "text-muted-foreground" :
+                          diff <= 0.10 ? "text-emerald-600 dark:text-emerald-400" :
+                          "text-amber-600 dark:text-amber-400";
+                        return (
+                          <p className={`text-[10px] ${colorClass}`}>
+                            Last: {formatBDT(lastRate)}
+                            {lastDate && <span className="text-muted-foreground ml-1">on {formatDate(lastDate)}</span>}
+                          </p>
+                        );
+                      })()}
                     </div>
                     <div className="space-y-1">
                       <Label className="text-xs">Sales price</Label>

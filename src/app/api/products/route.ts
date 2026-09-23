@@ -53,6 +53,16 @@ export const GET = withTenant(async (user, req: Request) => {
       createdAt: true,
       category: { select: { name: true } },
       unit: { select: { name: true } },
+      // Phase 3 / Feature #9: include the most recent PurchaseItem for this
+      // product so the purchase cart can show "Last purchase: BDT X,XXX on
+      // DD-MM-YYYY" below the unit price input. Filters out soft-deleted
+      // purchases so a deleted purchase doesn't surface as the "last" rate.
+      purchaseItems: {
+        where: { purchase: { deletedAt: null } },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { unitPrice: true, createdAt: true },
+      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -66,6 +76,9 @@ export const GET = withTenant(async (user, req: Request) => {
 
   let rows = products.map((p) => {
     const onHand = onHandMap.get(p.id) ?? 0;
+    // Last purchase rate: per-unit price from the most recent PurchaseItem.
+    // null if the product has never been purchased.
+    const lastPurchase = p.purchaseItems[0] ?? null;
     return {
       id: p.id,
       name: p.name,
@@ -82,6 +95,9 @@ export const GET = withTenant(async (user, req: Request) => {
       onHand,
       lowStock: onHand <= p.safetyStock,
       createdAt: p.createdAt,
+      // Phase 3 / Feature #9: last purchase rate + date for the purchase cart hint.
+      lastPurchaseRate: lastPurchase?.unitPrice ?? null,
+      lastPurchaseDate: lastPurchase?.createdAt ?? null,
     };
   });
 
