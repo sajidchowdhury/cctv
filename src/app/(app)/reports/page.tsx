@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Boxes, ShoppingCart, PackagePlus, TrendingUp, BookOpen, Users, Truck,
   Wallet, ArrowDownCircle, ArrowUpCircle, ReceiptText, Briefcase, ArrowLeftRight,
-  Layers, ListTree, Receipt, PackageSearch, Coins,
+  Layers, ListTree, Receipt, PackageSearch, Coins, History,
 } from "lucide-react";
 
 const REPORTS = [
@@ -27,12 +27,15 @@ const REPORTS = [
   { href: "/reports/income-expense", title: "Income / Expense", desc: "Account-head-wise summary (monthly)", icon: ReceiptText, phase: "S18" },
   { href: "/reports/salary-sheet", title: "Employee Salary Sheet", desc: "Monthly payroll summary", icon: Briefcase, phase: "S19" },
   { href: "/reports/warranty", title: "Warranty Expiry", desc: "Upcoming warranty ends by date window", icon: BookOpen, phase: "S19" },
+  // Phase 5 / Feature #8: new report — pick a customer + product + date range
+  // and see the date-wise sale history (invoice no, qty, unit price, total).
+  { href: "/reports/customer-product-history", title: "Customer Product History", desc: "How many times a product was sold to a customer, at what price + qty", icon: History, phase: "F6-S1" },
 ];
 
 export default function ReportsPage() {
   return (
     <div className="space-y-6">
-      <PageHeader title="Reports" description="All 16 reports, printable + CSV export, date-range filters (doc §5.3)." />
+      <PageHeader title="Reports" description="All 17 reports, printable + CSV export, date-range filters (doc §5.3)." />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {REPORTS.map((r) => {
           const Icon = r.icon;
