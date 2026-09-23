@@ -10,8 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Loader2, Printer, Truck, Search } from "lucide-react";
+import { Download, Loader2, Printer, Truck, Search, X, User } from "lucide-react";
 import { formatBDT, formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
 
@@ -29,6 +28,12 @@ export default function SupplierLedgerReportPage() {
   const [pageSize, setPageSize] = useState(50);
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
+  // Phase 6+: searchable supplier picker (was a one-shot fetch of ALL
+  // suppliers on mount, bad UX for shops with 100+ suppliers).
+  // Suppliers only appear when the user types.
+  const [supplierSearch, setSupplierSearch] = useState("");
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
 
   // Debounce search input — 300ms after the user stops typing.
   useEffect(() => {
@@ -39,11 +44,19 @@ export default function SupplierLedgerReportPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const { data: suppliersData } = useQuery({
-    queryKey: ["suppliers"],
-    queryFn: async () => (await (await fetch("/cctv/api/suppliers")).json()).suppliers as Supplier[],
-  });
-  const suppliers = suppliersData ?? [];
+  // Phase 6+: debounced supplier search — 300ms after the user stops typing,
+  // fetch suppliers matching the search term. Only fires when supplierSearch
+  // is non-empty, so no suppliers are loaded until the user types.
+  useEffect(() => {
+    const q = (supplierSearch ?? "").trim();
+    if (!q) { setSuppliers([]); return; }
+    const timer = setTimeout(() => {
+      fetch(`/cctv/api/suppliers?q=${encodeURIComponent(q)}`)
+        .then((r) => r.json())
+        .then((d) => setSuppliers(d.suppliers ?? []));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [supplierSearch]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-supplier-ledger", appliedSupplierId, appliedFrom, appliedTo, page, pageSize, appliedSearch],
@@ -90,16 +103,80 @@ export default function SupplierLedgerReportPage() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Supplier *</Label>
-              <Select value={supplierId} onValueChange={(v) => { setSupplierId(v); setPage(1); }}>
-                <SelectTrigger><SelectValue placeholder="Select supplier…" /></SelectTrigger>
-                <SelectContent>
-                  {suppliers.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name} {s.company ? `· ${s.company}` : ""} · Bal {formatBDT(s.currentBalance)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Phase 6+: searchable supplier picker (was a plain Select that
+                  loaded ALL suppliers on mount). Now suppliers only appear when
+                  the user types — same pattern as customer-ledger +
+                  product-movement. */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={supplierSearch}
+                  onChange={(e) => {
+                    setSupplierSearch(e.target.value);
+                    // Clear selection if the user is editing the search.
+                    if (selectedSupplier && e.target.value !== selectedSupplier.name) {
+                      setSelectedSupplier(null);
+                      setSupplierId("");
+                    }
+                  }}
+                  placeholder="Search supplier name / company / phone…"
+                  className="pl-9"
+                />
+                {supplierSearch && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSupplierSearch("");
+                      setSelectedSupplier(null);
+                      setSupplierId("");
+                      setSuppliers([]);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                {/* Search results dropdown — only show when searching AND
+                    no supplier is selected yet. */}
+                {supplierSearch && !selectedSupplier && suppliers.length > 0 && (
+                  <div className="absolute z-30 left-0 right-0 mt-1 rounded-lg border bg-background shadow-lg max-h-60 overflow-y-auto scroll-area-thin">
+                    {suppliers.slice(0, 10).map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedSupplier(s);
+                          setSupplierId(s.id);
+                          setSupplierSearch(s.name);
+                          setSuppliers([]);
+                          setPage(1);
+                        }}
+                        className="flex w-full items-center justify-between border-b last:border-0 px-3 py-2 text-left hover:bg-accent"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">{s.name}</p>
+                          {s.company && <p className="text-xs text-muted-foreground">{s.company} · Bal {formatBDT(s.currentBalance)}</p>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {/* No-results hint */}
+                {supplierSearch && !selectedSupplier && suppliers.length === 0 && supplierSearch.length >= 2 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    No suppliers match &quot;{supplierSearch}&quot;.
+                  </p>
+                )}
+              </div>
+              {/* Selected supplier badge — shows when a supplier is picked */}
+              {selectedSupplier && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    <User className="h-3 w-3 mr-1" />
+                    {selectedSupplier.name}
+                  </Badge>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Date range</Label>

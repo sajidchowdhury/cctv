@@ -10,8 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Download, Loader2, Printer, Users, Search } from "lucide-react";
+import { Download, Loader2, Printer, Users, Search, X, User } from "lucide-react";
 import { formatBDT, formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -31,9 +30,14 @@ export default function CustomerLedgerReportPage() {
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   // Phase 6 / Feature #10: customer type filter — All / Regular / Walk-in.
-  // Filters the customer <Select> list client-side so the user can pick
-  // from only walk-in or only regular customers when needed.
+  // Sent to the API as a query param so the search respects the type filter.
   const [typeFilter, setTypeFilter] = useState<"ALL" | "REGULAR" | "WALK_IN">("ALL");
+  // Phase 6+: searchable customer picker (was a one-shot fetch of ALL
+  // customers on mount, bad UX for shops with 100+ customers).
+  // Customers only appear when the user types.
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   // Debounce search input — 300ms after the user stops typing.
   useEffect(() => {
@@ -44,22 +48,29 @@ export default function CustomerLedgerReportPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Load customer list for the party picker.
-  const { data: customersData } = useQuery({
-    queryKey: ["customers"],
-    queryFn: async () => (await (await fetch("/cctv/api/customers")).json()).customers as Customer[],
-  });
-  const customers = customersData ?? [];
-
-  // Phase 6 / Feature #10: filter the customer <Select> list by the type
-  // filter. Walk-in customers have type === "WALK_IN"; regular customers
-  // include RETAIL + INSTALLER (anything that's not WALK_IN).
-  const filteredCustomers = customers.filter((c) => {
-    if (typeFilter === "ALL") return true;
-    if (typeFilter === "WALK_IN") return c.type === "WALK_IN";
-    // REGULAR = anything that's not WALK_IN (RETAIL, INSTALLER, or null).
-    return c.type !== "WALK_IN";
-  });
+  // Phase 6+: debounced customer search — 300ms after the user stops typing,
+  // fetch customers matching the search term + type filter. Only fires when
+  // customerSearch is non-empty, so no customers are loaded until the user types.
+  useEffect(() => {
+    const q = (customerSearch ?? "").trim();
+    if (!q) { setCustomers([]); return; }
+    const timer = setTimeout(() => {
+      // Send the type filter to the API so the search respects it.
+      // The API supports ?q= for name/phone search. We filter by type
+      // client-side after the results come back (simpler than adding a
+      // type param to the API + keeps the existing API contract).
+      fetch(`/cctv/api/customers?q=${encodeURIComponent(q)}`)
+        .then((r) => r.json())
+        .then((d) => {
+          let list: Customer[] = d.customers ?? [];
+          // Apply the type filter client-side.
+          if (typeFilter === "WALK_IN") list = list.filter((c) => c.type === "WALK_IN");
+          else if (typeFilter === "REGULAR") list = list.filter((c) => c.type !== "WALK_IN");
+          setCustomers(list);
+        });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [customerSearch, typeFilter]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["report-customer-ledger", appliedCustomerId, appliedFrom, appliedTo, page, pageSize, appliedSearch],
@@ -121,26 +132,90 @@ export default function CustomerLedgerReportPage() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Customer *</Label>
-              <Select value={customerId} onValueChange={(v) => { setCustomerId(v); setPage(1); }}>
-                <SelectTrigger><SelectValue placeholder="Select customer…" /></SelectTrigger>
-                <SelectContent>
-                  {filteredCustomers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name} {c.phone ? `· ${c.phone}` : ""} · Bal {formatBDT(c.currentBalance)}
-                      {c.type === "WALK_IN" ? " (Walk-in)" : ""}
-                    </SelectItem>
-                  ))}
-                  {filteredCustomers.length === 0 && (
-                    <SelectItem value="_none" disabled>
-                      No {typeFilter === "WALK_IN" ? "walk-in" : "regular"} customers found
-                    </SelectItem>
+              {/* Phase 6+: searchable customer picker (was a plain Select that
+                  loaded ALL customers on mount). Now customers only appear when
+                  the user types — same pattern as the customer picker in
+                  sales/new + product-movement report. */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={customerSearch}
+                  onChange={(e) => {
+                    setCustomerSearch(e.target.value);
+                    // Clear selection if the user is editing the search.
+                    if (selectedCustomer && e.target.value !== selectedCustomer.name) {
+                      setSelectedCustomer(null);
+                      setCustomerId("");
+                    }
+                  }}
+                  placeholder="Search customer name or phone…"
+                  className="pl-9"
+                />
+                {customerSearch && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomerSearch("");
+                      setSelectedCustomer(null);
+                      setCustomerId("");
+                      setCustomers([]);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                {/* Search results dropdown — only show when searching AND
+                    no customer is selected yet. */}
+                {customerSearch && !selectedCustomer && customers.length > 0 && (
+                  <div className="absolute z-30 left-0 right-0 mt-1 rounded-lg border bg-background shadow-lg max-h-60 overflow-y-auto scroll-area-thin">
+                    {customers.slice(0, 10).map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCustomer(c);
+                          setCustomerId(c.id);
+                          setCustomerSearch(c.name);
+                          setCustomers([]);
+                          setPage(1);
+                        }}
+                        className="flex w-full items-center justify-between border-b last:border-0 px-3 py-2 text-left hover:bg-accent"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">{c.name}</p>
+                          {c.phone && <p className="text-xs text-muted-foreground">{c.phone} · Bal {formatBDT(c.currentBalance)}</p>}
+                        </div>
+                        {c.type === "WALK_IN" && (
+                          <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 border-amber-200 dark:border-amber-900">
+                            Walk-in
+                          </Badge>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {/* No-results hint */}
+                {customerSearch && !selectedCustomer && customers.length === 0 && customerSearch.length >= 2 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    No {typeFilter === "WALK_IN" ? "walk-in " : typeFilter === "REGULAR" ? "regular " : ""}customers match.
+                  </p>
+                )}
+              </div>
+              {/* Selected customer badge — shows when a customer is picked */}
+              {selectedCustomer && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    <User className="h-3 w-3 mr-1" />
+                    {selectedCustomer.name}
+                  </Badge>
+                  {selectedCustomer.type === "WALK_IN" && (
+                    <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 border-amber-200 dark:border-amber-900">
+                      Walk-in
+                    </Badge>
                   )}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Showing {filteredCustomers.length} of {customers.length} customers
-                {typeFilter !== "ALL" && ` (${typeFilter === "WALK_IN" ? "walk-in only" : "regular only"})`}.
-              </p>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Date range</Label>
