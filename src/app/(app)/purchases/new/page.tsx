@@ -697,13 +697,13 @@ function NewPurchaseForm() {
       )}
 
       <StickyActionBar>
-        <Button onClick={onSave} disabled={saving || lines.length === 0 || hasSaveErrors()} className="flex-1">
+        <Button onClick={() => onSave()} disabled={saving || lines.length === 0 || hasSaveErrors()} className="flex-1">
           {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
           {isEditMode ? "Update purchase" : "Save purchase"}
         </Button>
       </StickyActionBar>
       <div className="hidden md:flex md:justify-end">
-        <Button onClick={onSave} disabled={saving || lines.length === 0 || hasSaveErrors()}>
+        <Button onClick={() => onSave()} disabled={saving || lines.length === 0 || hasSaveErrors()}>
           {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
           {isEditMode ? "Update purchase" : "Save purchase"}
         </Button>
