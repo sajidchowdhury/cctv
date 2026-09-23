@@ -54,10 +54,12 @@ export const GET = withTenant(async (user, req: Request) => {
           },
         },
       },
-      // Phase 4: include purchaseItem → purchase → supplier for the RMA auto-fill.
-      // purchaseItem is optional (PurchaseItem?) so we use `where` to filter out
-      // purchaseItems whose purchase is soft-deleted. Inside, `purchase` is a
-      // required relation (Purchase), so we use `select` only.
+      // Phase 4: include BOTH purchaseItem → purchase → supplier AND the direct
+      // purchase → supplier relation as a fallback. Some InventoryUnit rows may
+      // have purchaseId set but purchaseItemId null (e.g. older data, manual DB
+      // edits, or stock imported without going through the normal purchase flow).
+      // We prefer purchaseItem (has unitPrice + warrantyMonths) but fall back
+      // to purchase if purchaseItem is missing.
       purchaseItem: {
         where: { purchase: { deletedAt: null } },
         include: {
@@ -70,6 +72,19 @@ export const GET = withTenant(async (user, req: Request) => {
               supplier: { select: { id: true, name: true, phone: true } },
             },
           },
+        },
+      },
+      // Direct purchase relation — used as fallback when purchaseItem is null
+      // but purchaseId is set. This catches the edge case where the unit was
+      // linked to a purchase but not to a specific line item.
+      purchase: {
+        where: { deletedAt: null },
+        select: {
+          id: true,
+          invoiceNo: true,
+          date: true,
+          supplierId: true,
+          supplier: { select: { id: true, name: true, phone: true } },
         },
       },
     },
@@ -93,8 +108,12 @@ export const GET = withTenant(async (user, req: Request) => {
           }
         : null;
 
-      // Purchase info: only present if purchaseItem exists + its purchase is not deleted.
-      const purchase = u.purchaseItem?.purchase;
+      // Purchase info: prefer purchaseItem (has unitPrice + warrantyMonths),
+      // but fall back to the direct purchase relation if purchaseItem is null
+      // (e.g. older data, manual DB edits, stock imported without a line-item link).
+      const purchaseItemPurchase = u.purchaseItem?.purchase;
+      const directPurchase = u.purchase;
+      const purchase = purchaseItemPurchase ?? directPurchase ?? null;
       const purchaseInfo = purchase
         ? {
             purchaseId: purchase.id,
@@ -103,6 +122,8 @@ export const GET = withTenant(async (user, req: Request) => {
             supplierId: purchase.supplierId,
             supplierName: purchase.supplier?.name ?? null,
             supplierPhone: purchase.supplier?.phone ?? null,
+            // unitPrice only available from purchaseItem (the line-item price).
+            // null if we fell back to the direct purchase relation.
             unitPrice: u.purchaseItem?.unitPrice ?? null,
           }
         : null;
