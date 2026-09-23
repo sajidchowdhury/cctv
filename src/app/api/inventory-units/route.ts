@@ -37,10 +37,13 @@ export const GET = withTenant(async (user, req: Request) => {
     include: {
       product: { select: { id: true, name: true, model: true, sku: true } },
       // Phase 4: include saleItem → sale → customer for the RMA auto-fill.
+      // saleItem is optional (SaleItem?) so we can use `where` to filter out
+      // saleItems whose sale is soft-deleted. Inside, `sale` is a required
+      // relation (Sale), so we use `select` only — no `where` allowed by Prisma.
       saleItem: {
+        where: { sale: { deletedAt: null } },
         include: {
           sale: {
-            where: { deletedAt: null },
             select: {
               id: true,
               invoiceNo: true,
@@ -52,10 +55,13 @@ export const GET = withTenant(async (user, req: Request) => {
         },
       },
       // Phase 4: include purchaseItem → purchase → supplier for the RMA auto-fill.
+      // purchaseItem is optional (PurchaseItem?) so we use `where` to filter out
+      // purchaseItems whose purchase is soft-deleted. Inside, `purchase` is a
+      // required relation (Purchase), so we use `select` only.
       purchaseItem: {
+        where: { purchase: { deletedAt: null } },
         include: {
           purchase: {
-            where: { deletedAt: null },
             select: {
               id: true,
               invoiceNo: true,
