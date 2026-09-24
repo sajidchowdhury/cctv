@@ -419,7 +419,7 @@ function NewSalePage() {
     localStorage.removeItem(DRAFT_KEY);
   }
 
-  const subtotal = lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0) * (1 - (Number(l.discount) || 0) / 100), 0);
+  const subtotal = lines.reduce((s, l) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0), 0);
   const discountNum = Number(discount) || 0;
   const total = Math.max(0, subtotal - discountNum);
   const paidNum = Number(paid) || 0;
@@ -848,7 +848,7 @@ function NewSalePage() {
             </p>
           ) : (
             lines.map((line) => {
-              const lt = (Number(line.qty) || 0) * (Number(line.unitPrice) || 0) * (1 - (Number(line.discount) || 0) / 100);
+              const lt = (Number(line.qty) || 0) * (Number(line.unitPrice) || 0);
               return (
                 <div key={line.key} className="rounded-lg border p-3 space-y-3">
                   {/* ── Header: product name + remove ── */}
@@ -884,22 +884,24 @@ function NewSalePage() {
                     </Button>
                   </div>
 
-                  {/* ── Inputs: Qty / Unit price / Disc % / PP ──
-                      2-col on mobile, 4-col on sm+. PP is a compact toggle
-                      button (icon + text) instead of a full-width complex
-                      element. */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {/* ── Inputs: Qty / Unit price / PP ──
+                      2-col on mobile, 3-col on sm+ (removed Disc %).
+                      For serialised items, Qty is locked to 1 (1 serial = 1 unit).
+                      For non-serialised, Qty is editable. */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     <div className="space-y-0.5">
-                      <Label className="text-[10px] text-muted-foreground">Qty</Label>
-                      <Input type="number" step="0.01" min="0" value={line.qty} onChange={(e) => updateLine(line.key, "qty", e.target.value)} className="h-8 text-sm" />
+                      <Label className="text-[10px] text-muted-foreground">Qty {line.isSerialised && <span className="italic">(locked)</span>}</Label>
+                      <Input
+                        type="number" step="0.01" min="0"
+                        value={line.qty}
+                        onChange={(e) => updateLine(line.key, "qty", e.target.value)}
+                        className="h-8 text-sm"
+                        disabled={line.isSerialised}
+                      />
                     </div>
                     <div className="space-y-0.5">
                       <Label className="text-[10px] text-muted-foreground">Unit price</Label>
                       <Input type="number" step="0.01" min="0" value={line.unitPrice} onChange={(e) => updateLine(line.key, "unitPrice", e.target.value)} placeholder="0" className="h-8 text-sm" />
-                    </div>
-                    <div className="space-y-0.5">
-                      <Label className="text-[10px] text-muted-foreground">Disc %</Label>
-                      <Input type="number" value={line.discount} onChange={(e) => updateLine(line.key, "discount", e.target.value)} className="h-8 text-sm" />
                     </div>
                     {/* PP: compact toggle — icon button + value, not full-width */}
                     <div className="space-y-0.5">
@@ -947,8 +949,7 @@ function NewSalePage() {
                   {line.lineType === "PRODUCT" && line.purchasePrice !== null && canViewCost && revealedLines.has(line.key) && (() => {
                     const unitPriceNum = Number(line.unitPrice) || 0;
                     const qtyNum = Number(line.qty) || 0;
-                    const discountNum = Number(line.discount) || 0;
-                    const revenue = unitPriceNum * qtyNum * (1 - discountNum / 100);
+                    const revenue = unitPriceNum * qtyNum;
                     const cost = (line.purchasePrice ?? 0) * qtyNum;
                     const profit = revenue - cost;
                     const marginPct = revenue > 0 ? (profit / revenue) * 100 : 0;
