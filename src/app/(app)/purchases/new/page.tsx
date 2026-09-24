@@ -20,6 +20,7 @@ import {
 import { Plus, Trash2, Save, Loader2, ArrowLeft, ScanLine, Search, X, AlertTriangle, UserPlus, Package, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT, formatDate } from "@/lib/format";
+import { appPath } from "@/lib/app-path";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -404,6 +405,16 @@ function NewPurchaseForm() {
       }
       // Invalidate the purchases query so the list refetches on navigation.
       qc.invalidateQueries({ queryKey: ["purchases"] });
+      // Auto-open the purchase invoice in a new tab for printing (same
+      // pattern as sales — the print page auto-triggers window.print()).
+      const newId = data.id;
+      if (!isEditMode && newId) {
+        try {
+          window.open(appPath(`/print/purchases/${newId}`), "_blank", "noopener,noreferrer");
+        } catch {
+          // Popup blocker — fail silently.
+        }
+      }
       router.push("/dashboard");
     } finally {
       setSaving(false);

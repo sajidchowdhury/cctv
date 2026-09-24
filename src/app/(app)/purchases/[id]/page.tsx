@@ -8,10 +8,11 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Loader2, Pencil, Trash2, Printer } from "lucide-react";
 import { formatBDT, formatDate } from "@/lib/format";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/layout/confirm-dialog";
+import { appPath } from "@/lib/app-path";
 
 export default function PurchaseDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -40,6 +41,11 @@ export default function PurchaseDetailPage() {
           <div className="flex gap-2 flex-wrap">
             <Button asChild variant="outline" size="sm">
               <Link href="/dashboard"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <a href={appPath(`/print/purchases/${id}`)} target="_blank" rel="noopener noreferrer">
+                <Printer className="mr-2 h-4 w-4" /> Print
+              </a>
             </Button>
             <Button asChild variant="outline" size="sm" disabled={isLocked}>
               <Link
