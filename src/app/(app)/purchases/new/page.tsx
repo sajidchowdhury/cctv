@@ -44,6 +44,9 @@ type Product = {
   // Used to show a hint below the Unit price input in the cart.
   lastPurchaseRate: number | null;
   lastPurchaseDate: string | null;
+  // Auto-fill: last purchase warranty months — pre-fills the Warranty field
+  // in the cart so the user doesn't have to re-enter it.
+  lastPurchaseWarranty: number | null;
 };
 type Supplier = { id: string; name: string; company: string | null };
 type CartLine = {
@@ -197,9 +200,11 @@ function NewPurchaseForm() {
         productModel: p.model,
         isSerialised: p.isSerialised,
         qty: "1",
-        unitPrice: "",
+        // Auto-fill unit price from last purchase rate (if available).
+        unitPrice: p.lastPurchaseRate != null ? String(p.lastPurchaseRate) : "",
         salesPrice: p.defaultPrice ? String(p.defaultPrice) : "",
-        warrantyMonths: "0",
+        // Auto-fill warranty from last purchase (if available).
+        warrantyMonths: p.lastPurchaseWarranty != null ? String(p.lastPurchaseWarranty) : "0",
         serialInput: "",
         serials: [],
       },

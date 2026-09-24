@@ -70,7 +70,7 @@ export const GET = withTenant(async (user, req: Request) => {
         where: { purchase: { deletedAt: null } },
         orderBy: { createdAt: "desc" },
         take: 1,
-        select: { unitPrice: true, createdAt: true },
+        select: { unitPrice: true, warrantyMonths: true, createdAt: true },
       },
     },
     orderBy: { createdAt: "desc" },
@@ -107,6 +107,7 @@ export const GET = withTenant(async (user, req: Request) => {
       // Phase 3 / Feature #9: last purchase rate + date for the purchase cart hint.
       lastPurchaseRate: lastPurchase?.unitPrice ?? null,
       lastPurchaseDate: lastPurchase?.createdAt ?? null,
+      lastPurchaseWarranty: lastPurchase?.warrantyMonths ?? null,
     };
   });
 
