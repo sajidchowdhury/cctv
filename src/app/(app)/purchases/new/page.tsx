@@ -192,7 +192,6 @@ function NewPurchaseForm() {
   function addProductToCart(p: Product) {
     const key = `${p.id}-${Date.now()}`;
     setLines((l) => [
-      ...l,
       {
         key,
         productId: p.id,
@@ -208,6 +207,7 @@ function NewPurchaseForm() {
         serialInput: "",
         serials: [],
       },
+      ...l,
     ]);
     setProductSearch("");
     setShowProductPicker(false);
