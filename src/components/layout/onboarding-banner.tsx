@@ -8,7 +8,7 @@ import { CheckCircle2, Circle, Store, Package, Truck, ShoppingCart, ArrowRight }
 
 const STEPS = [
   { key: "profile", label: "Business profile", href: "/settings", icon: Store, desc: "Set your business name, logo, phone, address" },
-  { key: "products", label: "Add products", href: "/products/new", icon: Package, desc: "Create your first CCTV product" },
+  { key: "products", label: "Add products", href: "/products", icon: Package, desc: "Create your first CCTV product" },
   { key: "suppliers", label: "Add suppliers", href: "/suppliers/new", icon: Truck, desc: "Add vendors you purchase from" },
   { key: "firstSale", label: "First sale", href: "/sales/new", icon: ShoppingCart, desc: "Record your first invoice" },
 ];
