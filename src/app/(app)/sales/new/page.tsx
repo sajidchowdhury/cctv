@@ -26,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Trash2, Save, Loader2, ArrowLeft, Package, Wrench, RotateCcw, Eraser, Eye, EyeOff, AlertTriangle, User, Search, X } from "lucide-react";
+import { Plus, Trash2, Save, Loader2, ArrowLeft, Package, Wrench, RotateCcw, Eraser, Eye, EyeOff, AlertTriangle, User, Search, X, Pause } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT } from "@/lib/format";
 import { useSession } from "next-auth/react";
@@ -547,6 +547,9 @@ function NewSalePage() {
             <Button asChild variant="outline" size="sm">
               <Link href="/dashboard"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
             </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/sales?held=1"><Pause className="mr-2 h-4 w-4" /> Hold List</Link>
+            </Button>
           </div>
         }
       />
@@ -847,45 +850,61 @@ function NewSalePage() {
             lines.map((line) => {
               const lt = (Number(line.qty) || 0) * (Number(line.unitPrice) || 0) * (1 - (Number(line.discount) || 0) / 100);
               return (
-                <div key={line.key} className="rounded-lg border p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="outline" className={line.lineType === "PRODUCT" ? "border-blue-300 text-blue-700" : "border-emerald-300 text-emerald-700"}>
-                      {line.lineType}
-                    </Badge>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => removeLine(line.key)}>
+                <div key={line.key} className="rounded-lg border p-3 space-y-3">
+                  {/* ── Header: product name + remove ── */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      {line.lineType === "PRODUCT" ? (
+                        <div className="flex items-center gap-1.5">
+                          <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="text-sm font-medium truncate">{line.productName}</span>
+                        </div>
+                      ) : (
+                        <Input placeholder="Service description (e.g. Installation charge)" value={line.description} onChange={(e) => updateLine(line.key, "description", e.target.value)} className="h-8" />
+                      )}
+                      {/* Meta: model + serial + type badges — compact single line */}
+                      {line.lineType === "PRODUCT" && (
+                        <div className="flex flex-wrap items-center gap-1 mt-1">
+                          {line.productModel && <span className="text-xs text-muted-foreground">{line.productModel}</span>}
+                          {line.isSerialised ? (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300 border-blue-200 dark:border-blue-900">Serial</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 border-amber-200 dark:border-amber-900">Qty</Badge>
+                          )}
+                          {line.serialNo && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 font-mono border-blue-200 text-blue-700 dark:border-blue-900 dark:text-blue-300">
+                              {line.serialNo}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0" onClick={() => removeLine(line.key)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                  {line.lineType === "PRODUCT" ? (
-                    <div className="flex items-center gap-2">
-                      <Package className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">{line.productName}</span>
-                      {line.productModel && <span className="text-xs text-muted-foreground">{line.productModel}</span>}
-                      {line.isSerialised ? (
-                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300 border-blue-200 dark:border-blue-900">Serialised</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 border-amber-200 dark:border-amber-900">Qty-based</Badge>
-                      )}
-                    </div>
-                  ) : (
-                    <Input placeholder="Service description (e.g. Installation charge)" value={line.description} onChange={(e) => updateLine(line.key, "description", e.target.value)} />
-                  )}
-                  {line.lineType === "PRODUCT" && line.serialNo && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Serial:</span>
-                      <Badge variant="outline" className="font-mono text-xs border-blue-200 text-blue-700 dark:border-blue-900 dark:text-blue-300">
-                        {line.serialNo}
-                      </Badge>
-                    </div>
-                  )}
+
+                  {/* ── Inputs: Qty / Unit price / Disc % / PP ──
+                      2-col on mobile, 4-col on sm+. PP is a compact toggle
+                      button (icon + text) instead of a full-width complex
+                      element. */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <div><Label className="text-xs">Qty</Label><Input type="number" step="0.01" min="0" value={line.qty} onChange={(e) => updateLine(line.key, "qty", e.target.value)} /></div>
-                    <div><Label className="text-xs">Unit price</Label><Input type="number" step="0.01" min="0" value={line.unitPrice} onChange={(e) => updateLine(line.key, "unitPrice", e.target.value)} placeholder="0" /></div>
-                    <div><Label className="text-xs">Disc %</Label><Input type="number" value={line.discount} onChange={(e) => updateLine(line.key, "discount", e.target.value)} /></div>
-                    {/* F2-S3: PP field — *** by default, click to reveal (OWNER/MANAGER only). */}
-                    <div>
-                      <Label className="text-xs">
-                        PP {line.purchasePrice === null && <span className="text-muted-foreground italic">(N/A)</span>}
+                    <div className="space-y-0.5">
+                      <Label className="text-[10px] text-muted-foreground">Qty</Label>
+                      <Input type="number" step="0.01" min="0" value={line.qty} onChange={(e) => updateLine(line.key, "qty", e.target.value)} className="h-8 text-sm" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <Label className="text-[10px] text-muted-foreground">Unit price</Label>
+                      <Input type="number" step="0.01" min="0" value={line.unitPrice} onChange={(e) => updateLine(line.key, "unitPrice", e.target.value)} placeholder="0" className="h-8 text-sm" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <Label className="text-[10px] text-muted-foreground">Disc %</Label>
+                      <Input type="number" value={line.discount} onChange={(e) => updateLine(line.key, "discount", e.target.value)} className="h-8 text-sm" />
+                    </div>
+                    {/* PP: compact toggle — icon button + value, not full-width */}
+                    <div className="space-y-0.5">
+                      <Label className="text-[10px] text-muted-foreground">
+                        PP {line.purchasePrice === null && <span className="italic">(N/A)</span>}
                       </Label>
                       {line.purchasePrice !== null ? (
                         <button
@@ -900,7 +919,7 @@ function NewSalePage() {
                               return next;
                             });
                           }}
-                          className={`flex h-9 w-full items-center justify-between rounded-md border px-3 text-sm transition-colors ${
+                          className={`flex h-8 w-full items-center justify-center gap-1 rounded-md border text-xs transition-colors ${
                             canViewCost
                               ? "cursor-pointer hover:bg-accent"
                               : "cursor-not-allowed opacity-60"
@@ -917,13 +936,14 @@ function NewSalePage() {
                           )}
                         </button>
                       ) : (
-                        <div className="flex h-9 items-center px-3 rounded-md border bg-muted/20 text-xs text-muted-foreground italic">
-                          No cost data
+                        <div className="flex h-8 items-center justify-center rounded-md border bg-muted/20 text-[10px] text-muted-foreground italic">
+                          No cost
                         </div>
                       )}
                     </div>
                   </div>
-                  {/* F2-S3: margin display when PP is revealed + role allows */}
+
+                  {/* ── Margin (compact single-line, only when PP revealed) ── */}
                   {line.lineType === "PRODUCT" && line.purchasePrice !== null && canViewCost && revealedLines.has(line.key) && (() => {
                     const unitPriceNum = Number(line.unitPrice) || 0;
                     const qtyNum = Number(line.qty) || 0;
@@ -934,22 +954,27 @@ function NewSalePage() {
                     const marginPct = revenue > 0 ? (profit / revenue) * 100 : 0;
                     const profitable = profit >= 0;
                     return (
-                      <div className={`rounded-md border px-3 py-2 text-xs flex items-center justify-between ${
+                      <div className={`rounded-md border px-2 py-1 text-[11px] flex items-center justify-between ${
                         profitable
                           ? "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-950/30 dark:border-emerald-900 dark:text-emerald-300"
                           : "bg-red-50 border-red-200 text-red-700 dark:bg-red-950/30 dark:border-red-900 dark:text-red-300"
                       }`}>
                         <span>
                           Margin: <span className="font-bold">{formatBDT(profit)}</span>
-                          <span className="ml-1">({marginPct.toFixed(1)}%)</span>
+                          <span className="ml-0.5">({marginPct.toFixed(0)}%)</span>
                         </span>
-                        <span className="text-muted-foreground">
-                          Revenue {formatBDT(revenue)} − Cost {formatBDT(cost)}
+                        <span className="text-muted-foreground text-[10px] hidden sm:inline">
+                          Rev {formatBDT(revenue)} − Cost {formatBDT(cost)}
                         </span>
                       </div>
                     );
                   })()}
-                  <p className="text-right text-sm"><span className="text-muted-foreground">Line total: </span><span className="font-medium">{formatBDT(lt)}</span></p>
+
+                  {/* ── Line total — right-aligned, slightly highlighted ── */}
+                  <div className="flex justify-end items-baseline gap-1 pt-1 border-t">
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Line total</span>
+                    <span className="text-sm font-bold tabular-nums">{formatBDT(lt)}</span>
+                  </div>
                 </div>
               );
             })
