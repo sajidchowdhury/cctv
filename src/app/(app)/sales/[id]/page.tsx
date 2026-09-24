@@ -68,7 +68,7 @@ export default function SaleDetailPage() {
               </Button>
             )}
             <Button asChild variant="outline" size="sm">
-              <Link href="/sales"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
+              <Link href="/dashboard"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
             </Button>
             <Button asChild variant="outline" size="sm">
               <a href={appPath(`/print/sales/${id}`)} target="_blank" rel="noopener noreferrer">
@@ -116,7 +116,7 @@ export default function SaleDetailPage() {
                   } else {
                     toast({ title: "Sale deleted", description: data.message });
                     qc.invalidateQueries({ queryKey: ["sales"] });
-                    router.push("/sales");
+                    router.push("/dashboard");
                   }
                 } finally {
                   setDeleting(false);

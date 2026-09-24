@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
 import { DateRangePicker } from "@/components/layout/date-range-picker";
@@ -58,7 +59,15 @@ export default function SalesReportPage() {
   const summary = data?.summary;
 
   const columns: ColumnDef<Sale>[] = [
-    { header: "Invoice", accessorKey: "invoiceNo" },
+    {
+      header: "Invoice",
+      accessorKey: "invoiceNo",
+      cell: ({ row }) => (
+        <Link href={`/sales/${row.original.id}`} className="font-medium hover:underline">
+          {row.original.invoiceNo}
+        </Link>
+      ),
+    },
     { header: "Date", accessorKey: "date", cell: ({ row }) => formatDate(row.original.date) },
     { header: "Customer", accessorKey: "customerName" },
     { header: "Salesman", accessorKey: "salesman" },

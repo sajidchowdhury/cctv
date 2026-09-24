@@ -526,7 +526,7 @@ function NewSalePage() {
         }
       }
 
-      router.push(hold ? "/sales?held=1" : "/sales");
+      router.push(hold ? "/sales?held=1" : "/dashboard");
     } finally {
       setSaving(false);
     }
@@ -545,7 +545,7 @@ function NewSalePage() {
               </Button>
             )}
             <Button asChild variant="outline" size="sm">
-              <Link href="/sales"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
+              <Link href="/dashboard"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
             </Button>
           </div>
         }
