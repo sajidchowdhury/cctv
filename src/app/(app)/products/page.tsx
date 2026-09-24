@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { DataTable } from "@/components/layout/data-table";
 import { EntityPicker } from "@/components/layout/entity-picker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Boxes, Plus, AlertTriangle, Loader2, ScanLine, Package, Save } from "lucide-react";
+import { Boxes, Plus, AlertTriangle, Loader2, ScanLine, Package, Save, Pencil, X } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatBDT } from "@/lib/format";
 import { TableSkeleton } from "@/components/layout/skeletons";
@@ -45,6 +45,9 @@ export default function ProductsPage() {
   const [lowOnly, setLowOnly] = useState(false);
 
   // ── Product setup form state (merged from products/new) ──
+  // editingId is null when creating a new product. When set, the form is in
+  // edit mode — submit calls PATCH /api/products/[id] instead of POST.
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [saving, setSaving] = useState(false);
@@ -75,31 +78,91 @@ export default function ProductsPage() {
     setForm((f) => ({ ...f, categoryId, isSerialised: suggested }));
   }
 
-  async function onCreateProduct(e: React.FormEvent) {
+  // Load a product into the form for editing. Fetches the full product
+  // detail (including categoryId + unitId which the list API doesn't return).
+  async function onEditProduct(product: Product) {
+    setEditingId(product.id);
+    setForm({
+      name: product.name,
+      categoryId: "",
+      model: product.model ?? "",
+      unitId: "",
+      safetyStock: product.safetyStock,
+      isSerialised: product.isSerialised,
+    });
+    // Fetch the full product to get categoryId + unitId (not in the list response).
+    try {
+      const res = await fetch(`/cctv/api/products/${product.id}`);
+      const data = await res.json();
+      if (data.product) {
+        setForm({
+          name: data.product.name,
+          categoryId: data.product.categoryId ?? "",
+          model: data.product.model ?? "",
+          unitId: data.product.unitId ?? "",
+          safetyStock: data.product.safetyStock,
+          isSerialised: data.product.isSerialised,
+        });
+      }
+    } catch {}
+    // Scroll to the form so the user sees it.
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function onCancelEdit() {
+    setEditingId(null);
+    setForm({ name: "", categoryId: "", model: "", unitId: "", safetyStock: 0, isSerialised: true });
+  }
+
+  async function onSubmitProduct(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch("/cctv/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name,
-          categoryId: form.categoryId || null,
-          model: form.model || null,
-          unitId: form.unitId || null,
-          safetyStock: Number(form.safetyStock),
-          isSerialised: form.isSerialised,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast({ title: "Failed", description: data.error ?? "Could not create product.", variant: "destructive" });
-        setSaving(false);
-        return;
+      if (editingId) {
+        // Edit mode: PATCH the existing product.
+        const res = await fetch(`/cctv/api/products/${editingId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: form.name,
+            categoryId: form.categoryId || null,
+            model: form.model || null,
+            unitId: form.unitId || null,
+            safetyStock: Number(form.safetyStock),
+            isSerialised: form.isSerialised,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast({ title: "Failed", description: data.error ?? "Could not update product.", variant: "destructive" });
+          setSaving(false);
+          return;
+        }
+        toast({ title: "Product updated", description: `${data.product.name} — SKU ${data.product.sku}` });
+      } else {
+        // Create mode: POST a new product.
+        const res = await fetch("/cctv/api/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: form.name,
+            categoryId: form.categoryId || null,
+            model: form.model || null,
+            unitId: form.unitId || null,
+            safetyStock: Number(form.safetyStock),
+            isSerialised: form.isSerialised,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast({ title: "Failed", description: data.error ?? "Could not create product.", variant: "destructive" });
+          setSaving(false);
+          return;
+        }
+        toast({ title: "Product created", description: `${data.name} — SKU ${data.sku}` });
       }
-      toast({ title: "Product created", description: `${data.name} — SKU ${data.sku}` });
       // Reset form + refetch products list.
-      setForm({ name: "", categoryId: "", model: "", unitId: "", safetyStock: 0, isSerialised: true });
+      onCancelEdit();
       qc.invalidateQueries({ queryKey: ["products"] });
     } finally {
       setSaving(false);
@@ -153,6 +216,21 @@ export default function ProductsPage() {
             <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">OK</Badge>
           ),
       },
+      {
+        header: "",
+        id: "actions",
+        cell: ({ row }) => (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7"
+            onClick={() => onEditProduct(row.original)}
+            title="Edit product"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+        ),
+      },
     ],
     []
   );
@@ -164,11 +242,21 @@ export default function ProductsPage() {
       {/* ── Product setup form (merged from products/new) ── */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Add new product</CardTitle>
-          <CardDescription>SKU auto-generated from category + model. All fields except name are optional.</CardDescription>
+          <CardTitle className="text-base flex items-center gap-2">
+            {editingId ? (
+              <><Pencil className="h-4 w-4" /> Edit product</>
+            ) : (
+              <><Plus className="h-4 w-4" /> Add new product</>
+            )}
+          </CardTitle>
+          <CardDescription>
+            {editingId
+              ? "Edit the fields below and click Update. SKU cannot be changed."
+              : "SKU auto-generated from category + model. All fields except name are optional."}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={onCreateProduct} className="space-y-4">
+          <form onSubmit={onSubmitProduct} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Product name *</Label>
               <Input id="name" required value={form.name}
@@ -271,8 +359,13 @@ export default function ProductsPage() {
             <div className="flex gap-2 pt-2">
               <Button type="submit" disabled={saving || !form.name}>
                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Save product
+                {editingId ? "Update product" : "Save product"}
               </Button>
+              {editingId && (
+                <Button type="button" variant="outline" onClick={onCancelEdit}>
+                  <X className="mr-2 h-4 w-4" /> Cancel edit
+                </Button>
+              )}
             </div>
           </form>
         </CardContent>
