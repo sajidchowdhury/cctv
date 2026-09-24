@@ -11,11 +11,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Search, X, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT } from "@/lib/format";
 
-type Supplier = { id: string; name: string; currentBalance: number };
+type Supplier = { id: string; name: string; company?: string | null; currentBalance: number };
 type Invoice = { id: string; ref: string; date: string; total: number; paid: number; due: number };
 
 export default function NewPaymentPage() {
@@ -29,11 +29,20 @@ export default function NewPaymentPage() {
   const [narration, setNarration] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierSearch, setSupplierSearch] = useState("");
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
 
   useEffect(() => {
-    fetch("/cctv/api/suppliers").then((r) => r.json()).then((d) => setSuppliers(d.suppliers ?? []));
-  }, []);
+    const q = (supplierSearch ?? "").trim();
+    if (!q) { setSuppliers([]); return; }
+    const timer = setTimeout(() => {
+      fetch(`/cctv/api/suppliers?q=${encodeURIComponent(q)}`)
+        .then((r) => r.json())
+        .then((d) => setSuppliers(d.suppliers ?? []));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [supplierSearch]);
 
   useEffect(() => {
     if (!supplierId) { setInvoices([]); return; }
@@ -86,12 +95,67 @@ export default function NewPaymentPage() {
           <form onSubmit={onSubmit} className="space-y-4 max-w-lg">
             <div className="space-y-2">
               <Label>Supplier *</Label>
-              <Select value={supplierId} onValueChange={setSupplierId}>
-                <SelectTrigger><SelectValue placeholder="Select supplier…" /></SelectTrigger>
-                <SelectContent>
-                  {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name} ({formatBDT(s.currentBalance)})</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={supplierSearch}
+                  onChange={(e) => {
+                    setSupplierSearch(e.target.value);
+                    if (selectedSupplier && e.target.value !== selectedSupplier.name) {
+                      setSelectedSupplier(null);
+                      setSupplierId("");
+                    }
+                  }}
+                  placeholder="Search supplier name or company…"
+                  className="pl-9"
+                />
+                {supplierSearch && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSupplierSearch("");
+                      setSelectedSupplier(null);
+                      setSupplierId("");
+                      setSuppliers([]);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                {supplierSearch && !selectedSupplier && suppliers.length > 0 && (
+                  <div className="absolute z-30 left-0 right-0 mt-1 rounded-lg border bg-background shadow-lg max-h-60 overflow-y-auto scroll-area-thin">
+                    {suppliers.slice(0, 10).map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedSupplier(s);
+                          setSupplierId(s.id);
+                          setSupplierSearch(s.name);
+                          setSuppliers([]);
+                        }}
+                        className="flex w-full items-center justify-between border-b last:border-0 px-3 py-2 text-left hover:bg-accent"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">{s.name}</p>
+                          {s.company && <p className="text-xs text-muted-foreground">{s.company}</p>}
+                          <p className="text-xs text-muted-foreground">Bal {formatBDT(s.currentBalance)}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {supplierSearch && !selectedSupplier && suppliers.length === 0 && supplierSearch.length >= 2 && (
+                  <p className="text-xs text-muted-foreground mt-1">No suppliers match "{supplierSearch}".</p>
+                )}
+              </div>
+              {selectedSupplier && (
+                <Badge variant="secondary" className="text-xs w-fit">
+                  <User className="h-3 w-3 mr-1" />
+                  {selectedSupplier.name}{selectedSupplier.company ? ` · ${selectedSupplier.company}` : ""} · Bal {formatBDT(selectedSupplier.currentBalance)}
+                </Badge>
+              )}
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">

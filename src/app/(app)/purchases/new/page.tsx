@@ -108,11 +108,25 @@ function NewPurchaseForm() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  // Searchable supplier picker state (replaces one-shot fetch of ALL suppliers).
+  const [supplierSearch, setSupplierSearch] = useState("");
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
 
   useEffect(() => {
     fetch("/cctv/api/products").then((r) => r.json()).then((d) => setProducts(d.products ?? []));
-    fetch("/cctv/api/suppliers").then((r) => r.json()).then((d) => setSuppliers(d.suppliers ?? []));
   }, []);
+
+  // Debounced supplier search — 300ms after the user stops typing.
+  useEffect(() => {
+    const q = (supplierSearch ?? "").trim();
+    if (!q) { setSuppliers([]); return; }
+    const timer = setTimeout(() => {
+      fetch(`/cctv/api/suppliers?q=${encodeURIComponent(q)}`)
+        .then((r) => r.json())
+        .then((d) => setSuppliers(d.suppliers ?? []));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [supplierSearch]);
 
   // Pre-fill from existing purchase when ?resume=ID&edit=1.
   useEffect(() => {
@@ -128,6 +142,16 @@ function NewPurchaseForm() {
           return;
         }
         setSupplierId(purchase.supplierId ?? "");
+        // Sync searchable supplier picker when resuming/editing.
+        if (purchase.supplierName || purchase.supplier) {
+          const s: Supplier = {
+            id: purchase.supplierId ?? "",
+            name: purchase.supplierName ?? purchase.supplier?.name ?? "",
+            company: purchase.supplier?.company ?? null,
+          };
+          setSelectedSupplier(s);
+          setSupplierSearch(s.name);
+        }
         setMode(purchase.mode);
         setPaid(String(purchase.paid || ""));
         setNotes(purchase.notes ?? "");
@@ -404,12 +428,70 @@ function NewPurchaseForm() {
             <div className="space-y-2">
               <Label>Supplier</Label>
               <div className="flex gap-2">
-                <Select value={supplierId} onValueChange={setSupplierId}>
-                  <SelectTrigger className="flex-1"><SelectValue placeholder="Walk-in / select…" /></SelectTrigger>
-                  <SelectContent>
-                    {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}{s.company ? ` · ${s.company}` : ""}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                {/* Searchable supplier picker (was a plain Select that loaded
+                    ALL suppliers on mount). Now suppliers only appear when the
+                    user types — same pattern as the customer picker in
+                    sales/new + reports. */}
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={supplierSearch}
+                    onChange={(e) => {
+                      setSupplierSearch(e.target.value);
+                      // Clear selection if the user is editing the search.
+                      if (selectedSupplier && e.target.value !== selectedSupplier.name) {
+                        setSelectedSupplier(null);
+                        setSupplierId("");
+                      }
+                    }}
+                    placeholder="Search supplier name / company / phone…"
+                    className="pl-9"
+                  />
+                  {supplierSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSupplierSearch("");
+                        setSelectedSupplier(null);
+                        setSupplierId("");
+                        setSuppliers([]);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  {/* Search results dropdown — only show when searching AND
+                      no supplier is selected yet. */}
+                  {supplierSearch && !selectedSupplier && suppliers.length > 0 && (
+                    <div className="absolute z-30 left-0 right-0 mt-1 rounded-lg border bg-background shadow-lg max-h-60 overflow-y-auto scroll-area-thin">
+                      {suppliers.slice(0, 10).map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedSupplier(s);
+                            setSupplierId(s.id);
+                            setSupplierSearch(s.name);
+                            setSuppliers([]);
+                          }}
+                          className="flex w-full items-center justify-between border-b last:border-0 px-3 py-2 text-left hover:bg-accent"
+                        >
+                          <div>
+                            <p className="text-sm font-medium">{s.name}</p>
+                            {s.company && <p className="text-xs text-muted-foreground">{s.company}</p>}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {/* No-results hint */}
+                  {supplierSearch && !selectedSupplier && suppliers.length === 0 && supplierSearch.length >= 2 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      No suppliers match &quot;{supplierSearch}&quot;.
+                    </p>
+                  )}
+                </div>
                 <Button
                   type="button"
                   variant="outline"
@@ -420,6 +502,13 @@ function NewPurchaseForm() {
                   <UserPlus className="h-4 w-4" />
                 </Button>
               </div>
+              {/* Selected supplier badge — shows when a supplier is picked */}
+              {selectedSupplier && (
+                <Badge variant="secondary" className="text-xs w-fit">
+                  {selectedSupplier.name}
+                  {selectedSupplier.company && <span className="ml-1 text-muted-foreground">· {selectedSupplier.company}</span>}
+                </Badge>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="invoiceNo">Invoice no.</Label>

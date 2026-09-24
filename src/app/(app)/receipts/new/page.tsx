@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, Loader2, Receipt } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Receipt, Search, X, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatBDT } from "@/lib/format";
 
@@ -29,18 +29,25 @@ export default function NewReceiptPage() {
   const [narration, setNarration] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
 
   useEffect(() => {
-    fetch("/cctv/api/customers").then((r) => r.json()).then((d) => setCustomers(d.customers ?? []));
-  }, []);
+    const q = (customerSearch ?? "").trim();
+    if (!q) { setCustomers([]); return; }
+    const timer = setTimeout(() => {
+      fetch(`/cctv/api/customers?q=${encodeURIComponent(q)}`)
+        .then((r) => r.json())
+        .then((d) => setCustomers(d.customers ?? []));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [customerSearch]);
 
   useEffect(() => {
     if (!customerId) { setInvoices([]); return; }
     fetch(`/cctv/api/invoices/open?type=customer&partyId=${customerId}`).then((r) => r.json()).then((d) => setInvoices(d.invoices ?? []));
   }, [customerId]);
-
-  const selectedCustomer = customers.find((c) => c.id === customerId);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -88,12 +95,66 @@ export default function NewReceiptPage() {
           <form onSubmit={onSubmit} className="space-y-4 max-w-lg">
             <div className="space-y-2">
               <Label>Customer *</Label>
-              <Select value={customerId} onValueChange={setCustomerId}>
-                <SelectTrigger><SelectValue placeholder="Select customer…" /></SelectTrigger>
-                <SelectContent>
-                  {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name} ({formatBDT(c.currentBalance)})</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={customerSearch}
+                  onChange={(e) => {
+                    setCustomerSearch(e.target.value);
+                    if (selectedCustomer && e.target.value !== selectedCustomer.name) {
+                      setSelectedCustomer(null);
+                      setCustomerId("");
+                    }
+                  }}
+                  placeholder="Search customer name or phone…"
+                  className="pl-9"
+                />
+                {customerSearch && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomerSearch("");
+                      setSelectedCustomer(null);
+                      setCustomerId("");
+                      setCustomers([]);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+                {customerSearch && !selectedCustomer && customers.length > 0 && (
+                  <div className="absolute z-30 left-0 right-0 mt-1 rounded-lg border bg-background shadow-lg max-h-60 overflow-y-auto scroll-area-thin">
+                    {customers.slice(0, 10).map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCustomer(c);
+                          setCustomerId(c.id);
+                          setCustomerSearch(c.name);
+                          setCustomers([]);
+                        }}
+                        className="flex w-full items-center justify-between border-b last:border-0 px-3 py-2 text-left hover:bg-accent"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">{c.name}</p>
+                          <p className="text-xs text-muted-foreground">Bal {formatBDT(c.currentBalance)}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {customerSearch && !selectedCustomer && customers.length === 0 && customerSearch.length >= 2 && (
+                  <p className="text-xs text-muted-foreground mt-1">No customers match "{customerSearch}".</p>
+                )}
+              </div>
+              {selectedCustomer && (
+                <Badge variant="secondary" className="text-xs w-fit">
+                  <User className="h-3 w-3 mr-1" />
+                  {selectedCustomer.name} · Bal {formatBDT(selectedCustomer.currentBalance)}
+                </Badge>
+              )}
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
