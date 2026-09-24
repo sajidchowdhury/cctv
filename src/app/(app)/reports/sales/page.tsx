@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Download, Loader2, ShoppingCart, Search } from "lucide-react";
+import { Download, Loader2, ShoppingCart, Search, TrendingUp, Wallet, AlertCircle, FileText } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatBDT, formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
@@ -80,19 +80,33 @@ export default function SalesReportPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Sales report" description="Invoice list with totals + CSV export (doc §5.3)." action={<Button variant="outline" size="sm" onClick={() => exportToCSV(`sales-${appliedFrom}-to-${appliedTo}`, sales)} disabled={!sales.length}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>} />
-      <div className="flex flex-col sm:flex-row gap-3">
-        <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAppliedFrom(from); setAppliedTo(to); setHasGenerated(true); setPage(1); }} />
-        <div className="relative flex-1 min-w-[12rem]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search invoice / customer / salesman…"
-            className="pl-9"
-          />
-        </div>
-      </div>
+      <PageHeader
+        title="Sales report"
+        description="Invoice list with totals + CSV export (doc §5.3)."
+        action={
+          <Button variant="outline" size="sm" onClick={() => exportToCSV(`sales-${appliedFrom}-to-${appliedTo}`, sales)} disabled={!sales.length}>
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </Button>
+        }
+      />
+
+      {/* ── Filters inside a Card (cleaner container than floating inputs) ──
+          Stacks to single column on mobile; horizontal on sm+. */}
+      <Card data-print-hidden>
+        <CardContent className="py-4 space-y-3">
+          <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAppliedFrom(from); setAppliedTo(to); setHasGenerated(true); setPage(1); }} />
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search invoice / customer / salesman…"
+              className="pl-9"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       {!hasGenerated ? (
         <EmptyState
           icon={ShoppingCart}
@@ -106,27 +120,73 @@ export default function SalesReportPage() {
         />
       ) : (
         <>
-      {isLoading ? (
-        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-      ) : (
-        <>
-          <div className="grid gap-4 sm:grid-cols-4">
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Total sales</p><p className="text-xl font-bold tabular-nums">{summary?.totalSalesDisplay ?? "—"} </p></CardContent></Card>
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Total paid</p><p className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{summary?.totalPaidDisplay ?? "—"}</p></CardContent></Card>
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Total due</p><p className="text-xl font-bold tabular-nums text-amber-600 dark:text-amber-400">{summary?.totalDueDisplay ?? "—"}</p></CardContent></Card>
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Invoices</p><p className="text-xl font-bold tabular-nums">{summary?.count ?? 0}</p></CardContent></Card>
-          </div>
-          {sales.length === 0 ? <p className="text-sm text-muted-foreground py-8 text-center">No sales in this period.</p> : <>
-            <DataTable columns={columns} data={sales} maxHeight="max-h-[32rem]" />
-            <ReportPagination
-              page={data?.page ?? 1}
-              pageSize={data?.pageSize ?? pageSize}
-              total={data?.total ?? 0}
-              onChange={({ page: p, pageSize: ps }: PaginationState) => { setPage(p); setPageSize(ps); }}
-            />
-          </>}
-        </>
-      )}
+          {isLoading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <>
+              {/* ── Summary cards — 2-col on mobile, 4-col on sm+. Compact with icons. ── */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 print:grid-cols-4">
+                <Card>
+                  <CardContent className="py-3 px-4 flex items-center gap-3">
+                    <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Invoices</p>
+                      <p className="text-lg font-bold tabular-nums leading-tight">{summary?.count ?? 0}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="py-3 px-4 flex items-center gap-3">
+                    <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                      <TrendingUp className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Total sales</p>
+                      <p className="text-lg font-bold tabular-nums leading-tight">{summary?.totalSalesDisplay ?? "—"}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="py-3 px-4 flex items-center gap-3">
+                    <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+                      <Wallet className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Paid</p>
+                      <p className="text-lg font-bold tabular-nums leading-tight text-emerald-600 dark:text-emerald-400">{summary?.totalPaidDisplay ?? "—"}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="py-3 px-4 flex items-center gap-3">
+                    <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
+                      <AlertCircle className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Due</p>
+                      <p className="text-lg font-bold tabular-nums leading-tight text-amber-600 dark:text-amber-400">{summary?.totalDueDisplay ?? "—"}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {sales.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">No sales in this period.</p>
+              ) : (
+                <>
+                  <DataTable columns={columns} data={sales} maxHeight="max-h-[32rem]" />
+                  <ReportPagination
+                    page={data?.page ?? 1}
+                    pageSize={data?.pageSize ?? pageSize}
+                    total={data?.total ?? 0}
+                    onChange={({ page: p, pageSize: ps }: PaginationState) => { setPage(p); setPageSize(ps); }}
+                  />
+                </>
+              )}
+            </>
+          )}
         </>
       )}
     </div>
