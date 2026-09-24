@@ -242,11 +242,13 @@ function ScreenInvoice({
             <tr><td colSpan={6} className="text-right py-2 text-gray-600">Subtotal</td><td className="text-right tabular-nums py-2">{formatBDT(sale.total + sale.discount)}</td></tr>
             {sale.discount > 0 && <tr><td colSpan={6} className="text-right py-2 text-gray-600">Discount</td><td className="text-right tabular-nums py-2">-{formatBDT(sale.discount)}</td></tr>}
             <tr>
-              <td colSpan={6} className="text-right py-2 font-bold border-t" style={{ color: accent }}>Total</td>
+              <td colSpan={6} className="text-right py-2 font-bold border-t" style={{ color: accent }}>Invoice Total</td>
               <td className="text-right tabular-nums py-2 font-bold" style={{ color: accent }}>{formatBDT(sale.total)}</td>
             </tr>
+            {(sale.previousDue ?? 0) > 0 && <tr><td colSpan={6} className="text-right py-2 text-gray-600">Previous Due</td><td className="text-right tabular-nums py-2 text-amber-700">{formatBDT(sale.previousDue)}</td></tr>}
+            {(sale.previousDue ?? 0) > 0 && <tr><td colSpan={6} className="text-right py-2 font-bold">Total Due</td><td className="text-right tabular-nums py-2 font-bold">{formatBDT(sale.totalDue ?? sale.total)}</td></tr>}
             <tr><td colSpan={6} className="text-right py-2 text-gray-600">Paid</td><td className="text-right tabular-nums py-2">{formatBDT(sale.paid)}</td></tr>
-            {sale.due > 0 && <tr><td colSpan={6} className="text-right py-2 font-bold text-amber-700">Due</td><td className="text-right tabular-nums py-2 font-bold text-amber-700">{formatBDT(sale.due)}</td></tr>}
+            {(sale.closingBalance ?? sale.due) > 0 && <tr><td colSpan={6} className="text-right py-2 font-bold text-amber-700">Closing Balance</td><td className="text-right tabular-nums py-2 font-bold text-amber-700">{formatBDT(sale.closingBalance ?? sale.due)}</td></tr>}
           </tfoot>
         </table>
       </div>
@@ -424,11 +426,13 @@ function PrintInvoice({
             <tr><td colSpan={6} style={{ textAlign: "right", padding: "8px", color: "#4b5563" }}>Subtotal</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums" }}>{formatBDT(sale.total + sale.discount)}</td></tr>
             {sale.discount > 0 && <tr><td colSpan={6} style={{ textAlign: "right", padding: "8px", color: "#4b5563" }}>Discount</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums" }}>-{formatBDT(sale.discount)}</td></tr>}
             <tr style={{ borderTop: `2px solid ${accent}` }}>
-              <td colSpan={6} style={{ textAlign: "right", padding: "8px", fontWeight: 700, color: accent }}>Total</td>
+              <td colSpan={6} style={{ textAlign: "right", padding: "8px", fontWeight: 700, color: accent }}>Invoice Total</td>
               <td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: accent }}>{formatBDT(sale.total)}</td>
             </tr>
+            {(sale.previousDue ?? 0) > 0 && <tr><td colSpan={6} style={{ textAlign: "right", padding: "8px", color: "#4b5563" }}>Previous Due</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums", color: "#b45309" }}>{formatBDT(sale.previousDue)}</td></tr>}
+            {(sale.previousDue ?? 0) > 0 && <tr><td colSpan={6} style={{ textAlign: "right", padding: "8px", fontWeight: 700 }}>Total Due</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{formatBDT(sale.totalDue ?? sale.total)}</td></tr>}
             <tr><td colSpan={6} style={{ textAlign: "right", padding: "8px", color: "#4b5563" }}>Paid</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums" }}>{formatBDT(sale.paid)}</td></tr>
-            {sale.due > 0 && <tr><td colSpan={6} style={{ textAlign: "right", padding: "8px", fontWeight: 700, color: "#b45309" }}>Due</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: "#b45309" }}>{formatBDT(sale.due)}</td></tr>}
+            {(sale.closingBalance ?? sale.due) > 0 && <tr><td colSpan={6} style={{ textAlign: "right", padding: "8px", fontWeight: 700, color: "#b45309" }}>Closing Balance</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: "#b45309" }}>{formatBDT(sale.closingBalance ?? sale.due)}</td></tr>}
           </tfoot>
         </table>
       </div>

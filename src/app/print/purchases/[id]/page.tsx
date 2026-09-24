@@ -222,11 +222,13 @@ export default function PrintPurchasePage() {
             <tfoot>
               <tr><td colSpan={5} style={{ textAlign: "right", padding: "8px", color: "#4b5563" }}>Subtotal</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums" }}>{formatBDT(purchase.total)}</td></tr>
               <tr style={{ borderTop: `2px solid ${accent}` }}>
-                <td colSpan={5} style={{ textAlign: "right", padding: "8px", fontWeight: 700, color: accent }}>Total</td>
+                <td colSpan={5} style={{ textAlign: "right", padding: "8px", fontWeight: 700, color: accent }}>Invoice Total</td>
                 <td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: accent }}>{formatBDT(purchase.total)}</td>
               </tr>
+              {(purchase.previousDue ?? 0) > 0 && <tr><td colSpan={5} style={{ textAlign: "right", padding: "8px", color: "#4b5563" }}>Previous Due</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums", color: "#b45309" }}>{formatBDT(purchase.previousDue)}</td></tr>}
+              {(purchase.previousDue ?? 0) > 0 && <tr><td colSpan={5} style={{ textAlign: "right", padding: "8px", fontWeight: 700 }}>Total Due</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums", fontWeight: 700 }}>{formatBDT(purchase.totalDue ?? purchase.total)}</td></tr>}
               <tr><td colSpan={5} style={{ textAlign: "right", padding: "8px", color: "#4b5563" }}>Paid</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums" }}>{formatBDT(purchase.paid)}</td></tr>
-              {purchase.due > 0 && <tr><td colSpan={5} style={{ textAlign: "right", padding: "8px", fontWeight: 700, color: "#b45309" }}>Due</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: "#b45309" }}>{formatBDT(purchase.due)}</td></tr>}
+              {(purchase.closingBalance ?? purchase.due) > 0 && <tr><td colSpan={5} style={{ textAlign: "right", padding: "8px", fontWeight: 700, color: "#b45309" }}>Closing Balance</td><td style={{ textAlign: "right", padding: "8px", fontVariantNumeric: "tabular-nums", fontWeight: 700, color: "#b45309" }}>{formatBDT(purchase.closingBalance ?? purchase.due)}</td></tr>}
             </tfoot>
           </table>
         </div>

@@ -32,10 +32,47 @@ export const GET = withTenant(async (user, _req: Request, ctx: any) => {
   if (!sale || sale.deletedAt) {
     return NextResponse.json({ error: "Sale not found." }, { status: 404 });
   }
+
+  // Compute previousDue: the customer's balance JUST BEFORE this sale was created.
+  // previousDue = openingBalance + Σ(prev sales' due) − Σ(prev receipts)
+  // Using createdAt < sale.createdAt ensures correct ordering even when
+  // multiple invoices happen on the same day.
+  let previousDue = 0;
+  if (sale.customerId) {
+    const customer = await db.customer.findUnique({
+      where: { id: sale.customerId },
+      select: { openingBalance: true },
+    });
+    const prevSales = await db.sale.aggregate({
+      where: {
+        deletedAt: null,
+        isHeld: false,
+        customerId: sale.customerId,
+        createdAt: { lt: sale.createdAt },
+      },
+      _sum: { due: true },
+    });
+    const prevReceipts = await db.transaction.aggregate({
+      where: {
+        deletedAt: null,
+        type: "RECV",
+        customerId: sale.customerId,
+        createdAt: { lt: sale.createdAt },
+      },
+      _sum: { amount: true },
+    });
+    previousDue = (customer?.openingBalance ?? 0) + (prevSales._sum.due ?? 0) - (prevReceipts._sum.amount ?? 0);
+  }
+  const totalDue = previousDue + sale.total;
+  const closingBalance = totalDue - sale.paid;
+
   return NextResponse.json({
     sale: {
       ...sale,
       items: sale.items.map((it) => ({ ...it })),
+      previousDue,
+      totalDue,
+      closingBalance,
     },
   });
 });

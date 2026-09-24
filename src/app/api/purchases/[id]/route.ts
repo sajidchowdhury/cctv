@@ -42,6 +42,39 @@ export const GET = withTenant(async (user, _req: Request, ctx: any) => {
   if (!purchase || purchase.deletedAt) {
     return NextResponse.json({ error: "Purchase not found." }, { status: 404 });
   }
+
+  // Compute previousDue: the supplier's balance JUST BEFORE this purchase was created.
+  // previousDue = openingBalance + Σ(prev purchases' due) − Σ(prev payments)
+  // Using createdAt < purchase.createdAt ensures correct ordering even when
+  // multiple invoices happen on the same day.
+  let previousDue = 0;
+  if (purchase.supplierId) {
+    const supplier = await db.supplier.findUnique({
+      where: { id: purchase.supplierId },
+      select: { openingBalance: true },
+    });
+    const prevPurchases = await db.purchase.aggregate({
+      where: {
+        deletedAt: null,
+        supplierId: purchase.supplierId,
+        createdAt: { lt: purchase.createdAt },
+      },
+      _sum: { due: true },
+    });
+    const prevPayments = await db.transaction.aggregate({
+      where: {
+        deletedAt: null,
+        type: "PAY",
+        supplierId: purchase.supplierId,
+        createdAt: { lt: purchase.createdAt },
+      },
+      _sum: { amount: true },
+    });
+    previousDue = (supplier?.openingBalance ?? 0) + (prevPurchases._sum.due ?? 0) - (prevPayments._sum.amount ?? 0);
+  }
+  const totalDue = previousDue + purchase.total;
+  const closingBalance = totalDue - purchase.paid;
+
   return NextResponse.json({
     purchase: {
       id: purchase.id,
@@ -55,6 +88,9 @@ export const GET = withTenant(async (user, _req: Request, ctx: any) => {
       due: purchase.due,
       mode: purchase.mode,
       notes: purchase.notes,
+      previousDue,
+      totalDue,
+      closingBalance,
       items: purchase.items.map((it) => ({
         id: it.id,
         productId: it.productId,
