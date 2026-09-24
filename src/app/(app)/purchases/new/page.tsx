@@ -110,6 +110,11 @@ function NewPurchaseForm() {
   // means the missing units will be created without serial numbers — they'll
   // show up as 'no serial' in stock + won't be individually trackable).
   const [showSerialDeficitConfirm, setShowSerialDeficitConfirm] = useState(false);
+  // Invoice number confirmation: if the user clicks Save without entering an
+  // invoice number (on create mode), this dialog asks them to confirm they
+  // want the system to auto-generate one. They can either confirm (proceed
+  // with blank → server auto-generates) or cancel (to type one themselves).
+  const [showInvoiceNoConfirm, setShowInvoiceNoConfirm] = useState(false);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -334,7 +339,7 @@ function NewPurchaseForm() {
     }
   }
 
-  async function onSave(opts?: { forceSerialDeficit?: boolean }) {
+  async function onSave(opts?: { forceSerialDeficit?: boolean; forceBlankInvoice?: boolean }) {
     if (lines.length === 0) {
       toast({ title: "Empty cart", description: "Add at least one product.", variant: "destructive" });
       return;
@@ -346,12 +351,15 @@ function NewPurchaseForm() {
         return;
       }
     }
+    // Invoice number check: in create mode, if the invoice number is blank,
+    // warn the user before saving. They can either confirm (let the system
+    // auto-generate) or cancel (to type one themselves).
+    if (!isEditMode && !invoiceNo.trim() && !opts?.forceBlankInvoice) {
+      setShowInvoiceNoConfirm(true);
+      return;
+    }
     // Serial deficit check: for serialised products, if the user entered
-    // fewer serials than qty, warn them before saving. They can either:
-    //   - Cancel → go back + add the missing serials
-    //   - Confirm → save as-is (missing units get created without serials)
-    // This catches the common mistake of entering qty=5 but only scanning 1
-    // serial, then hitting save without realising the other 4 are untracked.
+    // fewer serials than qty, warn them before saving.
     if (!opts?.forceSerialDeficit) {
       const deficitLines = lines.filter((l) => {
         if (!l.isSerialised) return false;
@@ -919,6 +927,44 @@ function NewPurchaseForm() {
             >
               <Info className="h-4 w-4 mr-2" />
               Save anyway (create without serials)
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Invoice number confirmation: in create mode, if the user clicks
+          Save without entering an invoice number, this dialog asks if they
+          want the system to auto-generate one. Cancel → returns to the form
+          so they can type one. Confirm → proceeds with blank (server
+          auto-generates). */}
+      <AlertDialog
+        open={showInvoiceNoConfirm}
+        onOpenChange={(open) => { if (!open) setShowInvoiceNoConfirm(false); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Invoice number is blank
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You haven&apos;t entered an invoice number. Do you want the system
+              to auto-generate one?
+              <br /><br />
+              If your supplier gave you a specific invoice number, cancel and
+              type it in the Invoice no. field. Otherwise, confirm to let the
+              system generate one automatically.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel — type invoice no.</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowInvoiceNoConfirm(false);
+                onSave({ forceBlankInvoice: true });
+              }}
+            >
+              Yes, auto-generate
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
