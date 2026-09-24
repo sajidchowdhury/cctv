@@ -36,7 +36,16 @@ export const GET = withTenant(async (user, req: Request) => {
   const products = await db.product.findMany({
     where: {
       deletedAt: null,
-      ...(search ? { name: { contains: search, mode: "insensitive" } } : {}),
+      ...(search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { model: { contains: search, mode: "insensitive" } },
+              { sku: { contains: search, mode: "insensitive" } },
+              { category: { name: { contains: search, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
       ...(categoryId ? { categoryId } : {}),
     },
     select: {
