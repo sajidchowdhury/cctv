@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Download, Loader2, ShieldCheck, ShieldAlert, BookOpen, Search } from "lucide-react";
+import { Download, Loader2, ShieldCheck, ShieldAlert, BookOpen, Search, AlertCircle } from "lucide-react";
 import { formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
 
@@ -54,15 +54,19 @@ export default function WarrantyExpiryReportPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Warranty expiry" description={`Upcoming warranty ends: ${from} to ${to} (doc §5.3).`} action={<Button variant="outline" size="sm" onClick={() => exportToCSV(`warranty-expiry-${from}-to-${to}`, units)} disabled={!units.length}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>} />
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search product / serial / customer…"
-          className="pl-9"
-        />
-      </div>
+      <Card data-print-hidden>
+        <CardContent className="py-4 space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search product / serial / customer…"
+              className="pl-9"
+            />
+          </div>
+        </CardContent>
+      </Card>
       {!hasGenerated ? (
         <EmptyState
           icon={BookOpen}
@@ -80,10 +84,40 @@ export default function WarrantyExpiryReportPage() {
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Total units</p><p className="text-xl font-bold tabular-nums">{data?.count ?? 0}</p></CardContent></Card>
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Expiring soon (≤30d)</p><p className="text-xl font-bold tabular-nums text-amber-600 dark:text-amber-400">{units.filter((u) => !u.expired && (u.daysLeft ?? 999) <= 30).length}</p></CardContent></Card>
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Already expired</p><p className="text-xl font-bold tabular-nums text-red-600 dark:text-red-400">{units.filter((u) => u.expired).length}</p></CardContent></Card>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 print:grid-cols-3">
+            <Card>
+              <CardContent className="py-3 px-4 flex items-center gap-3">
+                <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                  <ShieldCheck className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Total units</p>
+                  <p className="text-lg font-bold tabular-nums leading-tight">{data?.count ?? 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="py-3 px-4 flex items-center gap-3">
+                <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
+                  <AlertCircle className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Expiring ≤30d</p>
+                  <p className="text-lg font-bold tabular-nums leading-tight text-amber-600 dark:text-amber-400">{units.filter((u) => !u.expired && (u.daysLeft ?? 999) <= 30).length}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="py-3 px-4 flex items-center gap-3">
+                <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 shrink-0">
+                  <ShieldAlert className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Expired</p>
+                  <p className="text-lg font-bold tabular-nums leading-tight text-red-600 dark:text-red-400">{units.filter((u) => u.expired).length}</p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
           {units.length === 0 ? (
             <div className="text-center py-8"><ShieldCheck className="h-10 w-10 text-muted-foreground mx-auto mb-2" /><p className="text-sm text-muted-foreground">No warranties expiring in this window.</p></div>

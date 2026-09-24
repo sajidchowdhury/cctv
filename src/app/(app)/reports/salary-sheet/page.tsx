@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Download, Loader2, Briefcase, Search } from "lucide-react";
+import { Download, Loader2, Briefcase, Search, Users, Wallet, CheckCircle2, AlertCircle } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatBDT, formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
@@ -66,21 +66,25 @@ export default function SalarySheetReportPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Employee salary sheet" description="Monthly payroll summary (doc §5.3)." action={<Button variant="outline" size="sm" onClick={() => exportToCSV(`salary-sheet-${month || "all"}`, records)} disabled={!records.length}><Download className="mr-2 h-4 w-4" /> Export CSV</Button>} />
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="space-y-1 max-w-xs">
-          <Label className="text-xs">Filter by month (YYYY-MM)</Label>
-          <Input type="month" value={month} onChange={(e) => { setMonth(e.target.value); setPage(1); }} placeholder="All months" />
-        </div>
-        <div className="relative flex-1 min-w-[12rem] sm:self-end">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search employee / role…"
-            className="pl-9"
-          />
-        </div>
-      </div>
+      <Card data-print-hidden>
+        <CardContent className="py-4 space-y-3">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="space-y-1 max-w-xs">
+              <Label className="text-xs">Filter by month (YYYY-MM)</Label>
+              <Input type="month" value={month} onChange={(e) => { setMonth(e.target.value); setPage(1); }} placeholder="All months" />
+            </div>
+            <div className="relative flex-1 min-w-[12rem] sm:self-end">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search employee / role…"
+                className="pl-9"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       {!hasGenerated ? (
         <EmptyState
           icon={Briefcase}
@@ -98,11 +102,51 @@ export default function SalarySheetReportPage() {
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-4">
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Records</p><p className="text-xl font-bold tabular-nums">{summary?.count ?? 0}</p></CardContent></Card>
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Total net payable</p><p className="text-xl font-bold tabular-nums">{summary?.totalNetDisplay ?? "—"}</p></CardContent></Card>
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Paid</p><p className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{summary?.paidCount ?? 0}</p></CardContent></Card>
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Pending</p><p className="text-xl font-bold tabular-nums text-amber-600 dark:text-amber-400">{summary?.pendingCount ?? 0}</p></CardContent></Card>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 print:grid-cols-4">
+            <Card>
+              <CardContent className="py-3 px-4 flex items-center gap-3">
+                <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                  <Users className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Records</p>
+                  <p className="text-lg font-bold tabular-nums leading-tight">{summary?.count ?? 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="py-3 px-4 flex items-center gap-3">
+                <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                  <Wallet className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Total net payable</p>
+                  <p className="text-lg font-bold tabular-nums leading-tight">{summary?.totalNetDisplay ?? "—"}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="py-3 px-4 flex items-center gap-3">
+                <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+                  <CheckCircle2 className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Paid</p>
+                  <p className="text-lg font-bold tabular-nums leading-tight text-emerald-600 dark:text-emerald-400">{summary?.paidCount ?? 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="py-3 px-4 flex items-center gap-3">
+                <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
+                  <AlertCircle className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Pending</p>
+                  <p className="text-lg font-bold tabular-nums leading-tight text-amber-600 dark:text-amber-400">{summary?.pendingCount ?? 0}</p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
           {records.length === 0 ? (
             <div className="text-center py-8"><Briefcase className="h-10 w-10 text-muted-foreground mx-auto mb-2" /><p className="text-sm text-muted-foreground">No salary records. Generate payroll from Employees → Payroll.</p></div>

@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Download, Loader2, Printer, Coins, TrendingUp, TrendingDown, Search } from "lucide-react";
+import { Download, Loader2, Printer, Coins, TrendingUp, TrendingDown, Search, FileText } from "lucide-react";
 import { formatBDT, formatDate } from "@/lib/format";
 import { exportToCSV } from "@/lib/csv";
 
@@ -91,10 +91,10 @@ export default function ProfitLossDetailedReportPage() {
         }
       />
 
-      <div data-print-hidden>
-        <div className="flex flex-col sm:flex-row gap-3">
+      <Card data-print-hidden>
+        <CardContent className="py-4 space-y-3">
           <DateRangePicker from={from} to={to} onFromChange={setFrom} onToChange={setTo} onApply={() => { setAppliedFrom(from); setAppliedTo(to); setHasGenerated(true); setPage(1); }} />
-          <div className="relative flex-1 min-w-[12rem]">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               value={search}
@@ -103,8 +103,8 @@ export default function ProfitLossDetailedReportPage() {
               className="pl-9"
             />
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {!hasGenerated ? (
         <EmptyState
@@ -133,17 +133,51 @@ export default function ProfitLossDetailedReportPage() {
         </div>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-4">
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Invoices</p><p className="text-xl font-bold tabular-nums">{summary?.invoiceCount ?? 0}</p></CardContent></Card>
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Revenue</p><p className="text-xl font-bold tabular-nums">{summary?.totalRevenueDisplay ?? "—"}</p></CardContent></Card>
-            <Card><CardContent className="py-4"><p className="text-xs text-muted-foreground">Cost</p><p className="text-xl font-bold tabular-nums text-amber-600 dark:text-amber-400">{summary?.totalCostDisplay ?? "—"}</p></CardContent></Card>
-            <Card><CardContent className="py-4">
-              <p className="text-xs text-muted-foreground">Net profit · {summary?.marginDisplay ?? "0%"}</p>
-              <p className={`text-xl font-bold tabular-nums ${isProfit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                {isProfit ? <TrendingUp className="inline h-5 w-5 mr-1" /> : <TrendingDown className="inline h-5 w-5 mr-1" />}
-                {summary?.totalProfitDisplay ?? "—"}
-              </p>
-            </CardContent></Card>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 print:grid-cols-4">
+            <Card>
+              <CardContent className="py-3 px-4 flex items-center gap-3">
+                <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                  <FileText className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Invoices</p>
+                  <p className="text-lg font-bold tabular-nums leading-tight">{summary?.invoiceCount ?? 0}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="py-3 px-4 flex items-center gap-3">
+                <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+                  <TrendingUp className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Revenue</p>
+                  <p className="text-lg font-bold tabular-nums leading-tight">{summary?.totalRevenueDisplay ?? "—"}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="py-3 px-4 flex items-center gap-3">
+                <div className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
+                  <Coins className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Cost</p>
+                  <p className="text-lg font-bold tabular-nums leading-tight text-amber-600 dark:text-amber-400">{summary?.totalCostDisplay ?? "—"}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="py-3 px-4 flex items-center gap-3">
+                <div className={`inline-flex h-9 w-9 items-center justify-center rounded-lg shrink-0 ${isProfit ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-red-500/10 text-red-600 dark:text-red-400"}`}>
+                  {isProfit ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Net profit · {summary?.marginDisplay ?? "0%"}</p>
+                  <p className={`text-lg font-bold tabular-nums leading-tight ${isProfit ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>{summary?.totalProfitDisplay ?? "—"}</p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Desktop table */}
