@@ -300,7 +300,7 @@ function NewPurchaseForm() {
   // ─── Inline supplier creation ───────────────────────────────
   async function onCreateSupplier() {
     if (newSupplier.name.trim().length < 2) {
-      toast({ title: "Name required", description: "Supplier name must be at least 2 chars.", variant: "destructive" });
+      toast({ title: "Company name required", description: "Company name must be at least 2 chars.", variant: "destructive" });
       return;
     }
     setCreatingSupplier(true);
@@ -816,24 +816,16 @@ function NewPurchaseForm() {
           </DialogHeader>
           <div className="grid gap-3 py-2">
             <div className="space-y-1">
-              <Label htmlFor="sup-name">Name *</Label>
+              <Label htmlFor="sup-name">Company name *</Label>
               <Input id="sup-name" value={newSupplier.name}
                 onChange={(e) => setNewSupplier({ ...newSupplier, name: e.target.value })}
-                placeholder="e.g. Hikvision Bangladesh" />
+                placeholder="e.g. Hikvision Bangladesh Ltd" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="sup-phone">Phone</Label>
-                <Input id="sup-phone" value={newSupplier.phone}
-                  onChange={(e) => setNewSupplier({ ...newSupplier, phone: e.target.value })}
-                  placeholder="01xxxxxxxxx" />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="sup-company">Company</Label>
-                <Input id="sup-company" value={newSupplier.company}
-                  onChange={(e) => setNewSupplier({ ...newSupplier, company: e.target.value })}
-                  placeholder="optional" />
-              </div>
+            <div className="space-y-1">
+              <Label htmlFor="sup-phone">Phone</Label>
+              <Input id="sup-phone" value={newSupplier.phone}
+                onChange={(e) => setNewSupplier({ ...newSupplier, phone: e.target.value })}
+                placeholder="01xxxxxxxxx" />
             </div>
             <div className="space-y-1">
               <Label htmlFor="sup-address">Address</Label>
