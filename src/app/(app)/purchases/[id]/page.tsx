@@ -39,7 +39,7 @@ export default function PurchaseDetailPage() {
         action={
           <div className="flex gap-2 flex-wrap">
             <Button asChild variant="outline" size="sm">
-              <Link href="/purchases"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
+              <Link href="/dashboard"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
             </Button>
             <Button asChild variant="outline" size="sm" disabled={isLocked}>
               <Link
@@ -71,7 +71,7 @@ export default function PurchaseDetailPage() {
                   } else {
                     toast({ title: "Purchase deleted", description: data.message });
                     qc.invalidateQueries({ queryKey: ["purchases"] });
-                    router.push("/purchases");
+                    router.push("/dashboard");
                   }
                 } finally {
                   setDeleting(false);

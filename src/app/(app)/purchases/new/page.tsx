@@ -372,7 +372,7 @@ function NewPurchaseForm() {
       }
       // Invalidate the purchases query so the list refetches on navigation.
       qc.invalidateQueries({ queryKey: ["purchases"] });
-      router.push("/purchases");
+      router.push("/dashboard");
     } finally {
       setSaving(false);
     }
@@ -391,7 +391,7 @@ function NewPurchaseForm() {
           : "Multi-row cart with serial capture. Scan or type serials — they appear as removable chips."}
         action={
           <Button asChild variant="outline" size="sm">
-            <Link href="/purchases"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
+            <Link href="/dashboard"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Link>
           </Button>
         }
       />

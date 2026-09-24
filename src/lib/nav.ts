@@ -54,7 +54,7 @@ export const NAV_ITEMS: NavItem[] = [
     phase: "S11",
   },
   {
-    href: "/purchases",
+    href: "/purchases/new",
     label: "Purchase",
     labelBn: "ক্রয়",
     icon: PackagePlus,
