@@ -32,22 +32,29 @@ export const GET = withTenant(async (user, req: Request) => {
   const search = url.searchParams.get("q") ?? "";
   const categoryId = url.searchParams.get("categoryId") ?? undefined;
   const lowStockOnly = url.searchParams.get("lowStock") === "1";
+  const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1", 10));
+  const pageSize = Math.max(1, parseInt(url.searchParams.get("pageSize") ?? "0", 10)); // 0 = no pagination
+
+  const where = {
+    deletedAt: null,
+    ...(search
+      ? {
+          OR: [
+            { name: { contains: search, mode: "insensitive" } },
+            { model: { contains: search, mode: "insensitive" } },
+            { sku: { contains: search, mode: "insensitive" } },
+            { category: { name: { contains: search, mode: "insensitive" } } },
+          ],
+        }
+      : {}),
+    ...(categoryId ? { categoryId } : {}),
+  };
+
+  // Get total count for pagination.
+  const total = await db.product.count({ where });
 
   const products = await db.product.findMany({
-    where: {
-      deletedAt: null,
-      ...(search
-        ? {
-            OR: [
-              { name: { contains: search, mode: "insensitive" } },
-              { model: { contains: search, mode: "insensitive" } },
-              { sku: { contains: search, mode: "insensitive" } },
-              { category: { name: { contains: search, mode: "insensitive" } } },
-            ],
-          }
-        : {}),
-      ...(categoryId ? { categoryId } : {}),
-    },
+    where,
     select: {
       id: true,
       name: true,
@@ -74,6 +81,7 @@ export const GET = withTenant(async (user, req: Request) => {
       },
     },
     orderBy: { createdAt: "desc" },
+    ...(pageSize > 0 ? { skip: (page - 1) * pageSize, take: pageSize } : {}),
   });
 
   // Compute onHand via shared helper (handles both serialised + non-serialised).
@@ -115,7 +123,7 @@ export const GET = withTenant(async (user, req: Request) => {
     rows = rows.filter((r) => r.lowStock);
   }
 
-  return NextResponse.json({ products: rows });
+  return NextResponse.json({ products: rows, total, page, pageSize: pageSize || total, totalPages: pageSize > 0 ? Math.ceil(total / pageSize) : 1 });
 });
 
 export const POST = withTenant(async (user, req: Request) => {

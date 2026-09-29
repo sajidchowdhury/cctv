@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
@@ -13,10 +13,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { DataTable } from "@/components/layout/data-table";
 import { EntityPicker } from "@/components/layout/entity-picker";
+import { ReportPagination, type PaginationState } from "@/components/layout/report-pagination";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Boxes, Plus, AlertTriangle, Loader2, ScanLine, Package, Save, Pencil, X } from "lucide-react";
+import { Boxes, Plus, AlertTriangle, Loader2, ScanLine, Package, Save, Pencil, X, Search } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { formatBDT } from "@/lib/format";
 import { TableSkeleton } from "@/components/layout/skeletons";
 import { useToast } from "@/hooks/use-toast";
 import { suggestIsSerialised } from "@/lib/onhand";
@@ -26,7 +26,9 @@ type Product = {
   name: string;
   model: string | null;
   sku: string;
+  categoryId: string | null;
   categoryName: string | null;
+  unitId: string | null;
   unitName: string | null;
   safetyStock: number;
   defaultPrice: number | null;
@@ -44,6 +46,10 @@ export default function ProductsPage() {
   const [search, setSearch] = useState("");
   const [lowOnly, setLowOnly] = useState(false);
 
+  // ── Pagination state ──
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   // ── Product setup form state (merged from products/new) ──
   // editingId is null when creating a new product. When set, the form is in
   // edit mode — submit calls PATCH /api/products/[id] instead of POST.
@@ -60,16 +66,70 @@ export default function ProductsPage() {
     isSerialised: true,
   });
 
+  // ── Searchable category picker state (same pattern as the supplier picker) ──
+  // Categories are loaded once on mount (small list) and filtered client-side.
+  const [categorySearch, setCategorySearch] = useState("");
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const categoryPickerRef = useRef<HTMLDivElement>(null);
+
+  // Derived: currently selected category object (for badge + dropdown visibility).
+  const selectedCategory = useMemo(
+    () => categories.find((c) => c.id === form.categoryId) ?? null,
+    [categories, form.categoryId]
+  );
+
+  // Client-side filtered categories for the dropdown.
+  const filteredCategories = useMemo(() => {
+    const q = categorySearch.trim().toLowerCase();
+    const list = q
+      ? categories.filter((c) => c.name.toLowerCase().includes(q))
+      : categories;
+    return list.slice(0, 50);
+  }, [categories, categorySearch]);
+
+  // Close the category dropdown when clicking outside the picker.
+  useEffect(() => {
+    if (!categoryDropdownOpen) return;
+    function onDocClick(e: MouseEvent) {
+      if (
+        categoryPickerRef.current &&
+        !categoryPickerRef.current.contains(e.target as Node)
+      ) {
+        setCategoryDropdownOpen(false);
+        // If the search text doesn't match the selected category, restore it
+        // so the input always reflects the current selection when not editing.
+        if (selectedCategory && categorySearch !== selectedCategory.name) {
+          setCategorySearch(selectedCategory.name);
+        }
+      }
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [categoryDropdownOpen, selectedCategory, categorySearch]);
+
   // Load categories + units once for the setup form dropdowns.
   useEffect(() => {
     Promise.all([
       fetch("/cctv/api/categories").then((r) => r.json()),
       fetch("/cctv/api/units").then((r) => r.json()),
     ]).then(([c, u]) => {
-      setCategories(c.categories ?? []);
-      setUnits(u.units ?? []);
+      const cats = c.categories ?? [];
+      const us = u.units ?? [];
+      setCategories(cats);
+      setUnits(us);
+      // Default unit → "Pcs" (case-insensitive). Only auto-select when no unit
+      // is currently set (so editing a product with its own unit is respected).
+      const pcsUnit = us.find((x: Unit) => x.name.toLowerCase() === "pcs");
+      if (pcsUnit) {
+        setForm((f) => ({ ...f, unitId: f.unitId || pcsUnit.id }));
+      }
     });
   }, []);
+
+  // Reset to page 1 when the search/filter changes so the user sees fresh results.
+  useEffect(() => {
+    setPage(1);
+  }, [search, lowOnly]);
 
   // F1-S2: auto-suggest isSerialised when category changes.
   function onCategoryChange(categoryId: string) {
@@ -82,15 +142,20 @@ export default function ProductsPage() {
   // detail (including categoryId + unitId which the list API doesn't return).
   async function onEditProduct(product: Product) {
     setEditingId(product.id);
+    // Prime the form + category search input with what we already know from
+    // the list row (categoryId/categoryName are both returned by the list API).
     setForm({
       name: product.name,
-      categoryId: "",
+      categoryId: product.categoryId ?? "",
       model: product.model ?? "",
-      unitId: "",
+      unitId: product.unitId ?? "",
       safetyStock: product.safetyStock,
       isSerialised: product.isSerialised,
     });
-    // Fetch the full product to get categoryId + unitId (not in the list response).
+    setCategorySearch(product.categoryName ?? "");
+    setCategoryDropdownOpen(false);
+    // Fetch the full product to confirm categoryId + unitId (in case the list
+    // row was stale or the detail response includes more accurate data).
     try {
       const res = await fetch(`/cctv/api/products/${product.id}`);
       const data = await res.json();
@@ -103,6 +168,12 @@ export default function ProductsPage() {
           safetyStock: data.product.safetyStock,
           isSerialised: data.product.isSerialised,
         });
+        // Sync the search input with the resolved category name. The detail
+        // response nests category as { id, name } — fall back to categoryName
+        // (returned by the list API) just in case.
+        const detailCatName =
+          data.product.category?.name ?? data.product.categoryName ?? null;
+        setCategorySearch(detailCatName ?? "");
       }
     } catch {}
     // Scroll to the form so the user sees it.
@@ -112,6 +183,8 @@ export default function ProductsPage() {
   function onCancelEdit() {
     setEditingId(null);
     setForm({ name: "", categoryId: "", model: "", unitId: "", safetyStock: 0, isSerialised: true });
+    setCategorySearch("");
+    setCategoryDropdownOpen(false);
   }
 
   async function onSubmitProduct(e: React.FormEvent) {
@@ -170,52 +243,45 @@ export default function ProductsPage() {
   }
 
   const { data, isLoading } = useQuery({
-    queryKey: ["products", search, lowOnly],
+    queryKey: ["products", search, lowOnly, page, pageSize],
     queryFn: async () => {
-      const url = `/cctv/api/products?q=${encodeURIComponent(search)}${lowOnly ? "&lowStock=1" : ""}`;
+      const url =
+        `/cctv/api/products?q=${encodeURIComponent(search)}` +
+        `${lowOnly ? "&lowStock=1" : ""}` +
+        `&page=${page}&pageSize=${pageSize}`;
       const r = await fetch(url);
-      return (await r.json()).products as Product[];
+      const json = await r.json();
+      return {
+        products: (json.products ?? []) as Product[],
+        total: (json.total ?? 0) as number,
+        totalPages: (json.totalPages ?? 1) as number,
+      };
     },
   });
 
-  const products = data ?? [];
+  const products = data?.products ?? [];
+  const total = data?.total ?? 0;
+
+  function onPaginationChange(state: PaginationState) {
+    setPage(state.page);
+    setPageSize(state.pageSize);
+  }
 
   const columns = useMemo<ColumnDef<Product>[]>(
     () => [
-      { header: "Product", accessorKey: "name" },
-      { header: "Model", accessorKey: "model", cell: ({ row }) => row.original.model ?? "—" },
-      { header: "SKU", accessorKey: "sku", cell: ({ row }) => <code className="text-xs">{row.original.sku}</code> },
-      { header: "Category", accessorKey: "categoryName", cell: ({ row }) => row.original.categoryName ?? "—" },
       {
-        header: "Tracking",
-        id: "tracking",
+        // SL — continuous across pages: (page-1) * pageSize + index + 1
+        header: "SL",
+        id: "sl",
         cell: ({ row }) => (
-          <Badge variant="outline" className="text-xs">
-            {row.original.isSerialised ? (
-              <><ScanLine className="h-3 w-3 mr-1" /> Serialised</>
-            ) : (
-              <><Package className="h-3 w-3 mr-1" /> Qty-based</>
-            )}
-          </Badge>
+          <span className="tabular-nums text-muted-foreground">
+            {(page - 1) * pageSize + row.index + 1}
+          </span>
         ),
       },
-      { header: "On hand", accessorKey: "onHand", cell: ({ row }) => <span className="tabular-nums">{row.original.onHand}</span> },
-      {
-        header: "Safety",
-        accessorKey: "safetyStock",
-        cell: ({ row }) => <span className="tabular-nums text-muted-foreground">{row.original.safetyStock}</span>,
-      },
-      {
-        header: "Status",
-        cell: ({ row }) =>
-          row.original.lowStock ? (
-            <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-              <AlertTriangle className="h-3 w-3 mr-1" /> Low
-            </Badge>
-          ) : (
-            <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">OK</Badge>
-          ),
-      },
+      { header: "Product", accessorKey: "name" },
+      { header: "Model", accessorKey: "model", cell: ({ row }) => row.original.model ?? "—" },
+      { header: "Category", accessorKey: "categoryName", cell: ({ row }) => row.original.categoryName ?? "—" },
       {
         header: "",
         id: "actions",
@@ -232,7 +298,7 @@ export default function ProductsPage() {
         ),
       },
     ],
-    []
+    [page, pageSize]
   );
 
   return (
@@ -267,24 +333,93 @@ export default function ProductsPage() {
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
                 <div className="flex gap-2">
-                  <Select value={form.categoryId} onValueChange={onCategoryChange}>
-                    <SelectTrigger id="category" className="flex-1"><SelectValue placeholder="Select…" /></SelectTrigger>
-                    <SelectContent>
-                      {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  {/* Searchable category picker — same pattern as the supplier
+                      picker. Categories are loaded once on mount (small list)
+                      and filtered client-side. */}
+                  <div className="relative flex-1" ref={categoryPickerRef}>
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="category"
+                      value={categorySearch}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setCategorySearch(v);
+                        setCategoryDropdownOpen(true);
+                        // Clear the selection if the user is editing the search
+                        // and the value no longer matches the selected category name.
+                        if (selectedCategory && v !== selectedCategory.name) {
+                          setForm((f) => ({ ...f, categoryId: "" }));
+                        }
+                      }}
+                      onFocus={() => setCategoryDropdownOpen(true)}
+                      placeholder="Search category…"
+                      className="pl-9"
+                    />
+                    {categorySearch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCategorySearch("");
+                          setForm((f) => ({ ...f, categoryId: "" }));
+                          setCategoryDropdownOpen(false);
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        aria-label="Clear category"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {/* Dropdown — show when the picker is focused and no category
+                        is selected yet. */}
+                    {categoryDropdownOpen && !selectedCategory && filteredCategories.length > 0 && (
+                      <div className="absolute z-30 left-0 right-0 mt-1 rounded-lg border bg-background shadow-lg max-h-60 overflow-y-auto scroll-area-thin">
+                        {filteredCategories.map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => {
+                              onCategoryChange(c.id);
+                              setCategorySearch(c.name);
+                              setCategoryDropdownOpen(false);
+                            }}
+                            className="flex w-full items-center justify-between border-b last:border-0 px-3 py-2 text-left text-sm hover:bg-accent min-h-[40px]"
+                          >
+                            <span className="flex-1 truncate">{c.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {/* No-results hint */}
+                    {categoryDropdownOpen && !selectedCategory && filteredCategories.length === 0 && categorySearch.trim().length >= 1 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        No categories match &quot;{categorySearch}&quot;.
+                      </p>
+                    )}
+                  </div>
                   <EntityPicker
                     label="Category"
                     items={categories}
                     createEndpoint="/cctv/api/categories"
                     createBodyBuilder={(name) => ({ name })}
-                    onSelect={(c) => onCategoryChange(c.id)}
+                    onSelect={(c) => {
+                      onCategoryChange(c.id);
+                      setCategorySearch(c.name);
+                      setCategoryDropdownOpen(false);
+                    }}
                     onCreated={(c) => {
                       setCategories((cats) => [...cats, c].sort((a, b) => a.name.localeCompare(b.name)));
                       onCategoryChange(c.id);
+                      setCategorySearch(c.name);
+                      setCategoryDropdownOpen(false);
                     }}
                   />
                 </div>
+                {/* Selected category badge */}
+                {selectedCategory && (
+                  <Badge variant="secondary" className="text-xs w-fit">
+                    {selectedCategory.name}
+                  </Badge>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="model">Model</Label>
@@ -400,9 +535,19 @@ export default function ProductsPage() {
         <DataTable columns={columns} data={products} maxHeight="max-h-[32rem]" />
       )}
 
+      {/* Pagination — 10 per page by default. SL stays continuous across pages. */}
+      {!isLoading && products.length > 0 && (
+        <ReportPagination
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          onChange={onPaginationChange}
+        />
+      )}
+
       <Card>
         <CardContent className="py-3 text-xs text-muted-foreground">
-          {products.length} product{products.length !== 1 ? "s" : ""} · {products.filter((p) => p.lowStock).length} low-stock
+          {total} product{total !== 1 ? "s" : ""} · {products.filter((p) => p.lowStock).length} low-stock
         </CardContent>
       </Card>
     </div>

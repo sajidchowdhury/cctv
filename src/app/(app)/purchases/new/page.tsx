@@ -339,9 +339,19 @@ function NewPurchaseForm() {
     }
   }
 
-  async function onSave(opts?: { forceSerialDeficit?: boolean; forceBlankInvoice?: boolean }) {
+  async function onSave(opts?: { forceSerialDeficit?: boolean }) {
     if (lines.length === 0) {
       toast({ title: "Empty cart", description: "Add at least one product.", variant: "destructive" });
+      return;
+    }
+    // Supplier is mandatory for purchases (no walk-in concept).
+    if (!supplierId) {
+      toast({ title: "Supplier required", description: "Please select a supplier before saving.", variant: "destructive" });
+      return;
+    }
+    // Invoice number is mandatory for purchases.
+    if (!invoiceNo.trim()) {
+      toast({ title: "Invoice no. required", description: "Please enter the supplier's invoice number.", variant: "destructive" });
       return;
     }
     for (const line of lines) {
@@ -350,13 +360,6 @@ function NewPurchaseForm() {
         toast({ title: "Serial count exceeds qty", description: `${line.productName}: ${line.serials.length} serials but qty is ${qty}.`, variant: "destructive" });
         return;
       }
-    }
-    // Invoice number check: in create mode, if the invoice number is blank,
-    // warn the user before saving. They can either confirm (let the system
-    // auto-generate) or cancel (to type one themselves).
-    if (!isEditMode && !invoiceNo.trim() && !opts?.forceBlankInvoice) {
-      setShowInvoiceNoConfirm(true);
-      return;
     }
     // Serial deficit check: for serialised products, if the user entered
     // fewer serials than qty, warn them before saving.
@@ -413,8 +416,7 @@ function NewPurchaseForm() {
       }
       // Invalidate the purchases query so the list refetches on navigation.
       qc.invalidateQueries({ queryKey: ["purchases"] });
-      // Auto-open the purchase invoice in a new tab for printing (same
-      // pattern as sales — the print page auto-triggers window.print()).
+      // Auto-open the purchase invoice in a new tab for printing.
       const newId = data.id;
       if (!isEditMode && newId) {
         try {
@@ -423,7 +425,18 @@ function NewPurchaseForm() {
           // Popup blocker — fail silently.
         }
       }
-      router.push("/dashboard");
+      // Stay on the purchase page — clear the cart so the user can start
+      // a new purchase. Don't redirect to dashboard.
+      if (!isEditMode) {
+        setLines([]);
+        setSupplierId("");
+        setSelectedSupplier(null);
+        setSupplierSearch("");
+        setInvoiceNo("");
+        setPaid("");
+        setNotes("");
+        setMode("CASH");
+      }
     } finally {
       setSaving(false);
     }
@@ -538,12 +551,12 @@ function NewPurchaseForm() {
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="invoiceNo">Invoice no.</Label>
+              <Label htmlFor="invoiceNo">Invoice no. *</Label>
               <Input
                 id="invoiceNo"
                 value={invoiceNo}
                 onChange={(e) => setInvoiceNo(e.target.value)}
-                placeholder={isEditMode ? "" : "Auto-generated if blank"}
+                placeholder="Enter supplier invoice no."
               />
             </div>
             <div className="space-y-2">
@@ -932,43 +945,6 @@ function NewPurchaseForm() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Invoice number confirmation: in create mode, if the user clicks
-          Save without entering an invoice number, this dialog asks if they
-          want the system to auto-generate one. Cancel → returns to the form
-          so they can type one. Confirm → proceeds with blank (server
-          auto-generates). */}
-      <AlertDialog
-        open={showInvoiceNoConfirm}
-        onOpenChange={(open) => { if (!open) setShowInvoiceNoConfirm(false); }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Invoice number is blank
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              You haven&apos;t entered an invoice number. Do you want the system
-              to auto-generate one?
-              <br /><br />
-              If your supplier gave you a specific invoice number, cancel and
-              type it in the Invoice no. field. Otherwise, confirm to let the
-              system generate one automatically.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel — type invoice no.</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setShowInvoiceNoConfirm(false);
-                onSave({ forceBlankInvoice: true });
-              }}
-            >
-              Yes, auto-generate
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
