@@ -10,6 +10,7 @@
  */
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { withTenant } from "@/lib/session";
 import { generateSku } from "@/lib/sku";
@@ -35,7 +36,7 @@ export const GET = withTenant(async (user, req: Request) => {
   const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1", 10));
   const pageSize = Math.max(1, parseInt(url.searchParams.get("pageSize") ?? "0", 10)); // 0 = no pagination
 
-  const where = {
+  const where: Prisma.ProductWhereInput = {
     deletedAt: null,
     ...(search
       ? {
