@@ -41,6 +41,9 @@ export default function PrintPurchasePage() {
 
   useEffect(() => {
     if (isLoading || !data || printed) return;
+    // Wait for the business profile to load too — it contains the header
+    // image, footer image, accent color, and business name/logo. Without
+    // this, the print dialog opens before the profile renders.
     const t = setTimeout(() => {
       try {
         window.print();
@@ -48,9 +51,9 @@ export default function PrintPurchasePage() {
         // Print blocked — user can use Ctrl+P manually.
       }
       setPrinted(true);
-    }, 400);
+    }, 600);
     return () => clearTimeout(t);
-  }, [isLoading, data, printed]);
+  }, [isLoading, data, profile, printed]);
 
   if (isLoading) {
     return (

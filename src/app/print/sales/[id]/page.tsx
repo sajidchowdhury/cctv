@@ -55,7 +55,8 @@ export default function PrintInvoicePage() {
   // (profile is optional — if it fails, we still print with defaults).
   useEffect(() => {
     if (isLoading || !data || printed) return;
-    // Small delay so the DOM paints before print dialog opens.
+    // Wait for the business profile to load too — it contains the header
+    // image, footer image, accent color, and business name/logo.
     const t = setTimeout(() => {
       try {
         window.print();
@@ -63,9 +64,9 @@ export default function PrintInvoicePage() {
         // Print blocked — user can use Ctrl+P manually.
       }
       setPrinted(true);
-    }, 400);
+    }, 600);
     return () => clearTimeout(t);
-  }, [isLoading, data, printed]);
+  }, [isLoading, data, profile, printed]);
 
   if (isLoading) {
     return (

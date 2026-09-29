@@ -71,6 +71,10 @@ export default function ProductsPage() {
   const [categorySearch, setCategorySearch] = useState("");
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const categoryPickerRef = useRef<HTMLDivElement>(null);
+  // Inline category edit state — when editingCategoryId is set, the category
+  // in the dropdown turns into an editable input with save/cancel.
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
 
   // Derived: currently selected category object (for badge + dropdown visibility).
   const selectedCategory = useMemo(
@@ -136,6 +140,38 @@ export default function ProductsPage() {
     const cat = categories.find((c) => c.id === categoryId);
     const suggested = suggestIsSerialised(cat?.name ?? null);
     setForm((f) => ({ ...f, categoryId, isSerialised: suggested }));
+  }
+
+  // Save a renamed category via PATCH /api/categories/[id].
+  async function saveCategoryEdit(categoryId: string) {
+    const trimmed = editingCategoryName.trim();
+    if (trimmed.length < 2) {
+      toast({ title: "Name too short", description: "Category name must be at least 2 characters.", variant: "destructive" });
+      return;
+    }
+    try {
+      const res = await fetch(`/cctv/api/categories/${categoryId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Failed", description: data.error ?? "Could not update category.", variant: "destructive" });
+        return;
+      }
+      // Update the local categories list.
+      setCategories((cs) => cs.map((c) => (c.id === categoryId ? { ...c, name: data.category.name } : c)));
+      // Update the search input if it was showing the old name.
+      if (categorySearch === categories.find((c) => c.id === categoryId)?.name) {
+        setCategorySearch(data.category.name);
+      }
+      toast({ title: "Category renamed", description: data.category.name });
+    } catch {
+      toast({ title: "Error", description: "Could not update category.", variant: "destructive" });
+    } finally {
+      setEditingCategoryId(null);
+    }
   }
 
   // Load a product into the form for editing. Fetches the full product
@@ -374,18 +410,73 @@ export default function ProductsPage() {
                     {categoryDropdownOpen && !selectedCategory && filteredCategories.length > 0 && (
                       <div className="absolute z-30 left-0 right-0 mt-1 rounded-lg border bg-background shadow-lg max-h-60 overflow-y-auto scroll-area-thin">
                         {filteredCategories.map((c) => (
-                          <button
+                          <div
                             key={c.id}
-                            type="button"
-                            onClick={() => {
-                              onCategoryChange(c.id);
-                              setCategorySearch(c.name);
-                              setCategoryDropdownOpen(false);
-                            }}
                             className="flex w-full items-center justify-between border-b last:border-0 px-3 py-2 text-left text-sm hover:bg-accent min-h-[40px]"
                           >
-                            <span className="flex-1 truncate">{c.name}</span>
-                          </button>
+                            {editingCategoryId === c.id ? (
+                              // Inline edit mode: input + save + cancel
+                              <div className="flex items-center gap-1 flex-1">
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={editingCategoryName}
+                                  onChange={(e) => setEditingCategoryName(e.target.value)}
+                                  onKeyDown={async (e) => {
+                                    if (e.key === "Enter" && editingCategoryName.trim()) {
+                                      await saveCategoryEdit(c.id);
+                                    } else if (e.key === "Escape") {
+                                      setEditingCategoryId(null);
+                                    }
+                                  }}
+                                  className="flex-1 h-7 px-2 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-primary"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => saveCategoryEdit(c.id)}
+                                  className="text-emerald-600 hover:text-emerald-700 px-1"
+                                  title="Save"
+                                >
+                                  <Save className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingCategoryId(null)}
+                                  className="text-muted-foreground hover:text-foreground px-1"
+                                  title="Cancel"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              // Normal mode: click to select + pencil to edit
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onCategoryChange(c.id);
+                                    setCategorySearch(c.name);
+                                    setCategoryDropdownOpen(false);
+                                  }}
+                                  className="flex-1 truncate text-left"
+                                >
+                                  {c.name}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingCategoryId(c.id);
+                                    setEditingCategoryName(c.name);
+                                  }}
+                                  className="text-muted-foreground hover:text-foreground ml-2 shrink-0"
+                                  title="Edit category name"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                              </>
+                            )}
+                          </div>
                         ))}
                       </div>
                     )}
